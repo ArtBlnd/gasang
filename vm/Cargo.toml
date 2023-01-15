@@ -1,0 +1,15 @@
+[package]
+name = "vm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[[bin]]
+name = "interpret-ir"
+path = "interpret-ir.rs"
+
+[dependencies]
+num-traits = "0.2.15"
+slab = "0.4.7"

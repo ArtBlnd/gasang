@@ -1,0 +1,14 @@
+[package]
+name = "machineinstr"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[[bin]]
+name = "disassemble"
+path = "disassemble.rs"
+
+[dependencies]
+num-traits = "0.2.15"
