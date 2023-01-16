@@ -14,6 +14,12 @@ pub struct RmRaRnRd {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RnRd {
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShImm12RnRd {
     pub sh: u8,
     pub imm12: u16,
@@ -169,4 +175,12 @@ pub struct DataProc3Src {
     pub ra: u8,
     pub rn: u8,
     pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoadStoreRegUnscaledImm {
+    pub size: u8,
+    pub imm9: u16,
+    pub rn: u8,
+    pub rt: u8,
 }

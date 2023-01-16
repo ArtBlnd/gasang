@@ -107,7 +107,7 @@ fn parse_aarch64_d_p_r(raw_instr: u32) -> AArch64Instr {
             m .bind("x_0_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
                 todo!("Data processing (2 source)")
             }).bind("x_1_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Data processing (1 source)")
+                parse_data_proc_1src(raw_instr)
             }).bind("x_x_x_0_101_0xxx_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
                 parse_logical_shifted_register(raw_instr)
             }).bind("x_x_x_0_101_1xx0_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
@@ -328,7 +328,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
             }).bind("xx10_1_x_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
                 todo!("Load/Store register pair (pre-indexed)");
             }).bind("xx11_1_x_0_0x_x_0xxxxx_xxxx_00_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Load/Store register (unscaled immediate)");
+                parse_load_store_reg_unscaled_imm(raw_instr)
             }).bind("xx11_1_x_0_0x_x_0xxxxx_xxxx_01_xxxxxxxxxx", |raw_instr: u32| {
                 todo!("Load/Store register (immidiate post-indexed)");
             }).bind("xx11_1_x_0_0x_x_0xxxxx_xxxx_10_xxxxxxxxxx", |raw_instr: u32| {
@@ -475,14 +475,14 @@ fn parse_add_sub_immediate(raw_instr: u32) -> AArch64Instr {
                 };
 
                 match sf_op_s.value {
-                    0b000 => AArch64Instr::AddImmediate32(data),
-                    0b001 => AArch64Instr::AddsImmediate32(data),
-                    0b010 => AArch64Instr::SubImmediate32(data),
-                    0b011 => AArch64Instr::SubsImmediate32(data),
-                    0b100 => AArch64Instr::AddImmediate64(data),
-                    0b101 => AArch64Instr::AddsImmediate64(data),
-                    0b110 => AArch64Instr::SubImmediate64(data),
-                    0b111 => AArch64Instr::SubsImmediate64(data),
+                    0b000 => AArch64Instr::AddImm32(data),
+                    0b001 => AArch64Instr::AddsImm32(data),
+                    0b010 => AArch64Instr::SubImm32(data),
+                    0b011 => AArch64Instr::SubsImm32(data),
+                    0b100 => AArch64Instr::AddImm64(data),
+                    0b101 => AArch64Instr::AddsImm64(data),
+                    0b110 => AArch64Instr::SubImm64(data),
+                    0b111 => AArch64Instr::SubsImm64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
             });
@@ -1403,6 +1403,54 @@ fn parse_extract(raw_instr: u32) -> AArch64Instr {
     });
 }
 
+fn parse_data_proc_1src(raw_instr: u32) -> AArch64Instr {
+    thread_local! {
+        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
+            let mut m = BitPatternMatcher::new();
+            m.bind("x_1_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             sf: Extract<BitRange<31, 32>, u8>,
+             s: Extract<BitRange<29, 30>, u8>,
+             opcode2: Extract<BitRange<16, 21>, u8>,
+             opcode: Extract<BitRange<10, 16>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>,
+            | {
+                let data = RnRd{
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (sf.value, s.value, opcode2.value, opcode.value) {
+                    (0b0, 0b0, 0b00000, 0b000000) => AArch64Instr::RbitVar32(data),
+                    (0b0, 0b0, 0b00000, 0b000001) => AArch64Instr::Rev16Var32(data),
+                    (0b0, 0b0, 0b00000, 0b000010) => AArch64Instr::RevVar32(data),
+                    (0b0, 0b0, 0b00000, 0b000100) => AArch64Instr::ClzVar32(data),
+                    (0b0, 0b0, 0b00000, 0b000101) => AArch64Instr::ClsVar32(data),
+                    (0b1, 0b0, 0b00000, 0b000000) => AArch64Instr::RbitVar64(data),
+                    (0b1, 0b0, 0b00000, 0b000001) => AArch64Instr::Rev16Var64(data),
+                    (0b1, 0b0, 0b00000, 0b000010) => AArch64Instr::Rev32(data),
+                    (0b1, 0b0, 0b00000, 0b000011) => AArch64Instr::RevVar64(data),
+                    (0b1, 0b0, 0b00000, 0b000100) => AArch64Instr::ClzVar64(data),
+                    (0b1, 0b0, 0b00000, 0b000101) => AArch64Instr::ClsVar64(data),
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            });
+
+            RefCell::new(m)
+        }
+    }
+
+    return MATCHER.with(|v| {
+        let mut v = v.try_borrow_mut().unwrap();
+        if let Some(instr) = v.handle(raw_instr) {
+            return instr;
+        } else {
+            todo!("Unknown instruction {:032b}", raw_instr);
+        }
+    });
+}
+
 fn parse_cmp_and_branch_imm(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
@@ -1474,7 +1522,72 @@ fn parse_data_proccessing_3src(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b00, 0b010, 0b0) => AArch64Instr::Smulh(data),
                     (0b1, 0b00, 0b101, 0b0) => AArch64Instr::Umaddl(data),
                     (0b1, 0b00, 0b101, 0b1) => AArch64Instr::Umsubl(data),
-                    (0b1, 0b00, 0b111, 0b0) => AArch64Instr::Umulh(data),
+                    (0b1, 0b00, 0b110, 0b0) => AArch64Instr::Umulh(data),
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            });
+
+            RefCell::new(m)
+        }
+    }
+
+    return MATCHER.with(|v| {
+        let mut v = v.try_borrow_mut().unwrap();
+        if let Some(instr) = v.handle(raw_instr) {
+            return instr;
+        } else {
+            todo!("Unknown instruction {:032b}", raw_instr);
+        }
+    });
+}
+
+
+fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
+    thread_local! {
+        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
+            let mut m = BitPatternMatcher::new();
+            m.bind("xx_111_x_00_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
+            |raw_instr: u32,
+             size: Extract<BitRange<30, 32>, u8>,
+             v: Extract<BitRange<26, 27>, u8>,
+             opc: Extract<BitRange<22, 24>, u8>,
+             imm9: Extract<BitRange<12, 21>, u16>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>,
+            | {
+                let data = LoadStoreRegUnscaledImm {
+                    size: size.value,
+                    imm9: imm9.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (size.value, v.value, opc.value) {
+                    (0b00, 0b0, 0b00) => AArch64Instr::Sturb(data),
+                    (0b00, 0b0, 0b01) => AArch64Instr::Ldurb(data),
+                    (0b00, 0b0, 0b10) => AArch64Instr::Ldursb64(data),
+                    (0b00, 0b0, 0b11) => AArch64Instr::Ldursb32(data),
+                    (0b00, 0b1, 0b00) => AArch64Instr::SturSimdFP8(data),
+                    (0b00, 0b1, 0b01) => AArch64Instr::LdurSimdFP8(data),
+                    (0b00, 0b1, 0b10) => AArch64Instr::SturSimdFP128(data),
+                    (0b00, 0b1, 0b11) => AArch64Instr::LdurSimdFP128(data),
+                    (0b01, 0b0, 0b00) => AArch64Instr::Sturh(data),
+                    (0b01, 0b0, 0b01) => AArch64Instr::Ldurh(data),
+                    (0b01, 0b0, 0b10) => AArch64Instr::Ldursh64(data),
+                    (0b01, 0b0, 0b11) => AArch64Instr::Ldursh32(data),
+                    (0b01, 0b1, 0b00) => AArch64Instr::SturSimdFP16(data),
+                    (0b01, 0b1, 0b01) => AArch64Instr::LdurSimdFP16(data),
+                    (0b10, 0b0, 0b00) => AArch64Instr::Stur32(data),
+                    (0b10, 0b0, 0b01) => AArch64Instr::Ldur32(data),
+                    (0b10, 0b0, 0b10) => AArch64Instr::Ldursw(data),
+                    (0b10, 0b1, 0b00) => AArch64Instr::SturSimdFP32(data),
+                    (0b10, 0b1, 0b01) => AArch64Instr::LdurSimdFP32(data),
+                    (0b11, 0b0, 0b00) => AArch64Instr::Stur64(data),
+                    (0b11, 0b0, 0b01) => AArch64Instr::Ldur64(data),
+                    (0b11, 0b0, 0b10) => AArch64Instr::Prefum(data),
+                    (0b11, 0b1, 0b00) => AArch64Instr::SturSimdFP64(data),
+                    (0b11, 0b1, 0b01) => AArch64Instr::LdurSimdFP64(data),
+
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
             });
