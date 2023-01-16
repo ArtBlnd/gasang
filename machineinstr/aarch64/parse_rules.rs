@@ -1541,7 +1541,6 @@ fn parse_data_proccessing_3src(raw_instr: u32) -> AArch64Instr {
     });
 }
 
-
 fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {

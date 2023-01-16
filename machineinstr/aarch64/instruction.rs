@@ -125,7 +125,7 @@ pub enum AArch64Instr {
     Ldp64(LoadStoreRegPairOffset),
     StpSimdFP128(LoadStoreRegPairOffset),
     LdpSimdFP128(LoadStoreRegPairOffset),
-    
+
     Sturb(LoadStoreRegUnscaledImm),
     Ldurb(LoadStoreRegUnscaledImm),
     Ldursb64(LoadStoreRegUnscaledImm),
@@ -150,7 +150,6 @@ pub enum AArch64Instr {
     Prefum(LoadStoreRegUnscaledImm),
     SturSimdFP64(LoadStoreRegUnscaledImm),
     LdurSimdFP64(LoadStoreRegUnscaledImm),
-    
 
     BImm(Imm26),
     BlImm(Imm26),
@@ -249,4 +248,3 @@ pub enum AArch64Instr {
     DcpS2(ExceptionGen),
     DcpS3(ExceptionGen),
 }
-
