@@ -79,12 +79,11 @@ pub struct UncondBranchReg {
     pub rm: u8,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PcRelAddressing {
     pub immlo: u8,
     pub immhi: u32,
-    pub rd: u8
+    pub rd: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,4 +137,36 @@ pub struct LoadStoreRegPairOffset {
     pub rt2: u8,
     pub rn: u8,
     pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AddSubImmWithTags {
+    pub o2: u8,
+    pub uimm6: u8,
+    pub op3: u8,
+    pub uimm4: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExtractImm {
+    pub rm: u8,
+    pub imms: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CmpAndBranchImm {
+    pub imm19: u32,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataProc3Src {
+    pub rm: u8,
+    pub ra: u8,
+    pub rn: u8,
+    pub rd: u8,
 }

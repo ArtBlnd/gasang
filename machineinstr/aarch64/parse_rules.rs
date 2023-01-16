@@ -1,6 +1,6 @@
 use crate::aarch64::*;
 use crate::bit_patterns::*;
-use crate::utils::{BitReader, extract_bits32};
+use crate::utils::{extract_bits32, BitReader};
 use crate::MachineInstrParserRule;
 
 use std::cell::RefCell;
@@ -73,7 +73,7 @@ fn parse_aarch64_d_p_i(raw_instr: u32) -> AArch64Instr {
             }).bind("xxx_100_010_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
                 parse_add_sub_immediate(raw_instr)
             }).bind("xxx_100_011_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                todo!("Add/Substract (immediate with tags)")
+                parse_add_sub_imm_with_tags(raw_instr)
             }).bind("xxx_100_100_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
                 parse_logical_imm(raw_instr)
             }).bind("xxx_100_101_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
@@ -81,7 +81,7 @@ fn parse_aarch64_d_p_i(raw_instr: u32) -> AArch64Instr {
             }).bind("xxx_100_110_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
                 parse_bitfield(raw_instr)
             }).bind("xxx_100_111_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                todo!("Extract")
+                parse_extract(raw_instr)
             });
 
 
@@ -126,8 +126,8 @@ fn parse_aarch64_d_p_r(raw_instr: u32) -> AArch64Instr {
                 todo!("Conditional compare (immediate)")
             }).bind("x_x_x_1_101_0100_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
                 parse_cond_sel(raw_instr)
-            }).bind("x_x_x_1_101_1xxx_xxxxx_xxxx0x_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Data-processing (3 source)")
+            }).bind("x_x_x_1_101_1xxx_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
+                parse_data_proccessing_3src(raw_instr)
             });
 
             RefCell::new(m)
@@ -360,7 +360,6 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
     });
 }
 
-
 fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
@@ -390,7 +389,7 @@ fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: u32) -> AArch64
             }).bind("x00_101_xxxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
                 parse_uncond_branch_imm(raw_instr)
             }).bind("x01_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                todo!("Compare and branch (immediate)")
+                parse_cmp_and_branch_imm(raw_instr)
             }).bind("x01_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
                 parse_test_and_branch_imm(raw_instr)
             });
@@ -456,7 +455,6 @@ fn parse_add_sub_shifted_reg(raw_instr: u32) -> AArch64Instr {
     });
 }
 
-    
 fn parse_add_sub_immediate(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
@@ -503,7 +501,6 @@ fn parse_add_sub_immediate(raw_instr: u32) -> AArch64Instr {
     });
 }
 
-    
 fn parse_fp_data_processing_3src(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
@@ -562,7 +559,7 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
             let mut m = BitPatternMatcher::new();
-            m.bind("xx_111_x_01_xx_xxxxxxxxxxxx_xxxxx_xxxxx", 
+            m.bind("xx_111_x_01_xx_xxxxxxxxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
@@ -624,7 +621,7 @@ fn parse_move_wide_imm(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
             let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_100101_xx_xxxxxxxxxxxxxxxx_xxxxx", 
+            m.bind("x_xx_100101_xx_xxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: u32,
              sf_opc: Extract<BitRange<29, 32>, u8>,
              hw: Extract<BitRange<21, 23>, u8>,
@@ -671,7 +668,7 @@ fn parse_uncond_branch_reg(raw_instr: u32) -> AArch64Instr {
              op2: Extract<BitRange<16, 21>, u8>,
              op3: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             op4: Extract<BitRange<0, 5>, u8> | 
+             op4: Extract<BitRange<0, 5>, u8> |
             {
                 let z = extract_bits32(24..25, raw_instr);
                 let op = extract_bits32(21..23, raw_instr);
@@ -757,7 +754,6 @@ fn parse_uncond_branch_imm(raw_instr: u32) -> AArch64Instr {
     });
 }
 
-
 fn parse_cond_branch_imm(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
@@ -776,7 +772,7 @@ fn parse_cond_branch_imm(raw_instr: u32) -> AArch64Instr {
 
                 match (o1.value, o0.value) {
                     (0b0, 0b0) => AArch64Instr::BCond(data),
-                    (0b0, 0b1) => AArch64Instr::BcCond(data), 
+                    (0b0, 0b1) => AArch64Instr::BcCond(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
             });
@@ -794,7 +790,6 @@ fn parse_cond_branch_imm(raw_instr: u32) -> AArch64Instr {
         }
     });
 }
-
 
 fn parse_cond_sel(raw_instr: u32) -> AArch64Instr {
     thread_local! {
@@ -1031,7 +1026,7 @@ fn parse_exception_gen(raw_instr: u32) -> AArch64Instr {
                     op2: op2.value,
                     ll: ll.value,
                 };
-                
+
                 match (opc.value, op2.value, ll.value) {
                     (0b000, 0b000, 0b01) => AArch64Instr::Svc(data),
                     (0b000, 0b000, 0b10) => AArch64Instr::Hvc(data),
@@ -1174,7 +1169,6 @@ fn parse_add_sub_ext_reg(raw_instr: u32) -> AArch64Instr {
     });
 }
 
-
 fn parse_bitfield(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
@@ -1271,7 +1265,6 @@ fn parse_logical_imm(raw_instr: u32) -> AArch64Instr {
     });
 }
 
-
 fn parse_load_store_reg_pair_offset(raw_instr: u32) -> AArch64Instr {
     thread_local! {
         pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
@@ -1306,6 +1299,182 @@ fn parse_load_store_reg_pair_offset(raw_instr: u32) -> AArch64Instr {
                     (0b10, 0b0, 0b1) => AArch64Instr::Ldp64(data),
                     (0b10, 0b1, 0b0) => AArch64Instr::StpSimdFP128(data),
                     (0b10, 0b1, 0b1) => AArch64Instr::LdpSimdFP128(data),
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            });
+
+            RefCell::new(m)
+        }
+    }
+
+    return MATCHER.with(|v| {
+        let mut v = v.try_borrow_mut().unwrap();
+        if let Some(instr) = v.handle(raw_instr) {
+            return instr;
+        } else {
+            todo!("Unknown instruction {:032b}", raw_instr);
+        }
+    });
+}
+
+fn parse_add_sub_imm_with_tags(raw_instr: u32) -> AArch64Instr {
+    thread_local! {
+        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
+            let mut m = BitPatternMatcher::new();
+            m.bind("x_x_x_100011_x_xxxxxx_xx_xxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             sf_op_s: Extract<BitRange<29, 32>, u8>,
+             o2: Extract<BitRange<22, 23>, u8>,
+             uimm6: Extract<BitRange<16, 22>, u8>,
+             op3: Extract<BitRange<14, 16>, u8>,
+             uimm4: Extract<BitRange<10, 14>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>,
+            | {
+                let data = AddSubImmWithTags{
+                    o2: o2.value,
+                    uimm6: uimm6.value,
+                    op3: op3.value,
+                    uimm4: uimm4.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (sf_op_s.value, o2.value) {
+                    (0b100, 0b0) => AArch64Instr::Addg(data),
+                    (0b110, 0b0) => AArch64Instr::Subg(data),
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            });
+
+            RefCell::new(m)
+        }
+    }
+
+    return MATCHER.with(|v| {
+        let mut v = v.try_borrow_mut().unwrap();
+        if let Some(instr) = v.handle(raw_instr) {
+            return instr;
+        } else {
+            todo!("Unknown instruction {:032b}", raw_instr);
+        }
+    });
+}
+
+fn parse_extract(raw_instr: u32) -> AArch64Instr {
+    thread_local! {
+        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
+            let mut m = BitPatternMatcher::new();
+            m.bind("x_xx_100111_x_x_xxxxx_xxxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             sf_op21: Extract<BitRange<29, 32>, u8>,
+             n: Extract<BitRange<22, 23>, u8>,
+             o0: Extract<BitRange<21, 22>, u8>,
+             rm: Extract<BitRange<16, 21>, u8>,
+             imms: Extract<BitRange<10, 16>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>,
+            | {
+                let data = ExtractImm{
+                    rm: rm.value,
+                    imms: imms.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (sf_op21.value, n.value, o0.value, imms.value) {
+                    (0b000, 0b0, 0b0, imms) if ((imms ^ 0b000000) & 0b100000) == 0b000000 => AArch64Instr::Extr32(data),
+                    (0b100, 1, 0, _) => AArch64Instr::Extr64(data),
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            });
+
+            RefCell::new(m)
+        }
+    }
+
+    return MATCHER.with(|v| {
+        let mut v = v.try_borrow_mut().unwrap();
+        if let Some(instr) = v.handle(raw_instr) {
+            return instr;
+        } else {
+            todo!("Unknown instruction {:032b}", raw_instr);
+        }
+    });
+}
+
+fn parse_cmp_and_branch_imm(raw_instr: u32) -> AArch64Instr {
+    thread_local! {
+        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
+            let mut m = BitPatternMatcher::new();
+            m.bind("x_011010_x_xxxxxxxxxxxxxxxxxxx_xxxxx",
+            |raw_instr: u32,
+             sf: Extract<BitRange<31, 32>, u8>,
+             op: Extract<BitRange<24, 25>, u8>,
+             imm19: Extract<BitRange<5, 24>, u32>,
+             rt: Extract<BitRange<0, 5>, u8>,
+            | {
+                let data = CmpAndBranchImm{
+                    imm19: imm19.value,
+                    rt: rt.value,
+                };
+
+                match (sf.value, op.value) {
+                    (0b0, 0b0) => AArch64Instr::Cbz32(data),
+                    (0b0, 0b1) => AArch64Instr::Cbnz32(data),
+                    (0b1, 0b0) => AArch64Instr::Cbz64(data),
+                    (0b1, 0b1) => AArch64Instr::Cbnz64(data),
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            });
+
+            RefCell::new(m)
+        }
+    }
+
+    return MATCHER.with(|v| {
+        let mut v = v.try_borrow_mut().unwrap();
+        if let Some(instr) = v.handle(raw_instr) {
+            return instr;
+        } else {
+            todo!("Unknown instruction {:032b}", raw_instr);
+        }
+    });
+}
+
+fn parse_data_proccessing_3src(raw_instr: u32) -> AArch64Instr {
+    thread_local! {
+        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
+            let mut m = BitPatternMatcher::new();
+            m.bind("x_xx_11011_xxx_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             sf: Extract<BitRange<31, 32>, u8>,
+             op54: Extract<BitRange<29, 31>, u8>,
+             op31: Extract<BitRange<21, 24>, u8>,
+             rm: Extract<BitRange<16, 21>, u8>,
+             o0: Extract<BitRange<15, 16>, u8>,
+             ra: Extract<BitRange<10, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>,
+            | {
+                let data = DataProc3Src{
+                    rm: rm.value,
+                    ra: ra.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (sf.value, op54.value, op31.value, o0.value) {
+                    (0b0, 0b00, 0b000, 0b0) => AArch64Instr::Madd32(data),
+                    (0b0, 0b00, 0b000, 0b1) => AArch64Instr::Msub32(data),
+                    (0b1, 0b00, 0b000, 0b0) => AArch64Instr::Madd64(data),
+                    (0b1, 0b00, 0b000, 0b1) => AArch64Instr::Msub64(data),
+                    (0b1, 0b00, 0b001, 0b0) => AArch64Instr::Smaddl(data),
+                    (0b1, 0b00, 0b001, 0b1) => AArch64Instr::Smsubl(data),
+                    (0b1, 0b00, 0b010, 0b0) => AArch64Instr::Smulh(data),
+                    (0b1, 0b00, 0b101, 0b0) => AArch64Instr::Umaddl(data),
+                    (0b1, 0b00, 0b101, 0b1) => AArch64Instr::Umsubl(data),
+                    (0b1, 0b00, 0b111, 0b0) => AArch64Instr::Umulh(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
             });

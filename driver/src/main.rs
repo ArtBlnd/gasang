@@ -30,10 +30,5 @@ fn main() {
     let reader = BitReader::new(buf.iter().cloned());
     let mut parser = MachineInstParser::new(reader, AArch64InstrParserRule);
 
-    println!("{:#?}",  parser.nth(30));
-    println!("{:#?}",  parser.next());
-    println!("{:#?}",  parser.next());
-    println!("{:#?}",  parser.next());
-    println!("{:#?}",  parser.next());
-    println!("{:#?}",  parser.next());
+    todo!()
 }

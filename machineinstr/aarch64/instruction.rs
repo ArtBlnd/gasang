@@ -1,7 +1,9 @@
 use crate::aarch64::*;
 
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+
 // AArch64 instruction
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AArch64Instr {
     AddImmediate32(ShImm12RnRd),
     AddsImmediate32(ShImm12RnRd),
@@ -20,6 +22,12 @@ pub enum AArch64Instr {
     OrrImm64(LogicalImm),
     EorImm64(LogicalImm),
     AndsImm64(LogicalImm),
+
+    Addg(AddSubImmWithTags),
+    Subg(AddSubImmWithTags),
+
+    Extr32(ExtractImm),
+    Extr64(ExtractImm),
 
     Sbfm32(Bitfield),
     Bfm32(Bitfield),
@@ -117,7 +125,7 @@ pub enum AArch64Instr {
     Ldp64(LoadStoreRegPairOffset),
     StpSimdFP128(LoadStoreRegPairOffset),
     LdpSimdFP128(LoadStoreRegPairOffset),
-    
+
     BImm(Imm26),
     BlImm(Imm26),
 
@@ -126,6 +134,11 @@ pub enum AArch64Instr {
 
     Tbz(B5B40Imm14Rt),
     Tbnz(B5B40Imm14Rt),
+
+    Cbz32(CmpAndBranchImm),
+    Cbnz32(CmpAndBranchImm),
+    Cbz64(CmpAndBranchImm),
+    Cbnz64(CmpAndBranchImm),
 
     Csel32(RmCondRnRd),
     Csinc32(RmCondRnRd),
@@ -161,6 +174,17 @@ pub enum AArch64Instr {
     AndsShiftedReg64(ShiftRmImm6RnRd),
     BicsShiftedReg64(ShiftRmImm6RnRd),
 
+    Madd32(DataProc3Src),
+    Msub32(DataProc3Src),
+    Madd64(DataProc3Src),
+    Msub64(DataProc3Src),
+    Smaddl(DataProc3Src),
+    Smsubl(DataProc3Src),
+    Smulh(DataProc3Src),
+    Umaddl(DataProc3Src),
+    Umsubl(DataProc3Src),
+    Umulh(DataProc3Src),
+
     Br(UncondBranchReg),
     Blr(UncondBranchReg),
     Ret(UncondBranchReg),
@@ -187,3 +211,4 @@ pub enum AArch64Instr {
     DcpS2(ExceptionGen),
     DcpS3(ExceptionGen),
 }
+

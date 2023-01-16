@@ -386,7 +386,6 @@ where
     }
 }
 
-
 impl<F, O, R1, T1, R2, T2, R3, T3, R4, T4, R5, T5, R6, T6, R7, T7>
     Handler<(R1, T1, R2, T2, R3, T3, R4, T4, R5, T5, R6, T6, R7, T7)> for F
 where
@@ -460,9 +459,25 @@ where
     }
 }
 
-
 impl<F, O, R1, T1, R2, T2, R3, T3, R4, T4, R5, T5, R6, T6, R7, T7, R8, T8>
-    Handler<(R1, T1, R2, T2, R3, T3, R4, T4, R5, T5, R6, T6, R7, T7, R8, T8)> for F
+    Handler<(
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+    )> for F
 where
     F: Fn(
         u32,
@@ -542,9 +557,27 @@ where
     }
 }
 
-
 impl<F, O, R1, T1, R2, T2, R3, T3, R4, T4, R5, T5, R6, T6, R7, T7, R8, T8, R9, T9>
-    Handler<(R1, T1, R2, T2, R3, T3, R4, T4, R5, T5, R6, T6, R7, T7, R8, T8, R9, T9)> for F
+    Handler<(
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+    )> for F
 where
     F: Fn(
         u32,

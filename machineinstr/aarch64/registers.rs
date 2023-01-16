@@ -1,5 +1,3 @@
-
-
 // General purpose registers
 pub enum Gpr {
     X0,

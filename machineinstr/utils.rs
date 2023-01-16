@@ -9,9 +9,7 @@ where
     I: Iterator<Item = u8>,
 {
     pub fn new(iter: I) -> Self {
-        Self {
-            iter,
-        }
+        Self { iter }
     }
 
     pub fn read32(&mut self) -> Option<u32> {

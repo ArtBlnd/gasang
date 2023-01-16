@@ -12,3 +12,4 @@ path = "disassemble.rs"
 
 [dependencies]
 num-traits = "0.2.15"
+elf = "0.7.1"
