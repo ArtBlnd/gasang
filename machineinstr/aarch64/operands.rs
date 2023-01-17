@@ -138,7 +138,7 @@ pub struct LogicalImm {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LoadStoreRegPairOffset {
+pub struct LoadStoreRegPair {
     pub imm7: u8,
     pub rt2: u8,
     pub rn: u8,
@@ -178,9 +178,39 @@ pub struct DataProc3Src {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LoadStoreRegUnscaledImm {
-    pub size: u8,
-    pub imm9: u16,
-    pub rn: u8,
+pub struct SysRegMov {
+    pub o0: u8,
+    pub op1: u8,
+    pub crn: u8,
+    pub crm: u8,
+    pub op2: u8,
     pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataProc2Src {
+    pub rm: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Barriers {
+    pub crm: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvancedSimdCopy {
+    pub imm5: u8,
+    pub imm4: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CondCmpReg {
+    pub rm: u8,
+    pub cond: u8,
+    pub rn: u8,
+    pub nzcv: u8,
 }
