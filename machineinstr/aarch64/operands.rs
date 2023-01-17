@@ -214,3 +214,29 @@ pub struct CondCmpReg {
     pub rn: u8,
     pub nzcv: u8,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdLdStMultiStructures {
+    pub q: u8,
+    pub size: u8,
+    pub rn: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvancedSimdExtract {
+    pub q: u8,
+    pub rm: u8,
+    pub imm4: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdLdStMultiStructuresPostIndexed {
+    pub q: u8,
+    pub rm: u8,
+    pub size: u8,
+    pub rn: u8,
+    pub rt: u8,
+}
