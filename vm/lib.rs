@@ -2,6 +2,8 @@ mod register;
 pub use register::*;
 mod instr;
 pub use instr::*;
+mod interrupt;
+pub use interrupt::*;
 mod aarch64;
 pub use aarch64::*;
 mod mmu;
@@ -12,12 +14,10 @@ use slab::Slab;
 pub type RegId = usize;
 pub type FlagId = usize;
 
-pub struct VmCpu {
+pub struct VmState {
     gpr_register: Slab<GprRegister>,
     fpr_register: Slab<FprRegister>,
     flags: Slab<bool>,
-
-    memory: Vec<u8>,
 
     // instruction pointer
     ip: usize,
@@ -26,8 +26,8 @@ pub struct VmCpu {
     cf_modified: bool,
 }
 
-impl VmCpu {
-    pub fn run(&mut self, instr: &Vec<VmInstr>) -> Result<(), usize> {
+impl VmState {
+    pub fn run(&mut self, instr: &Vec<VmInstr>) -> Result<(), Interrupt> {
         while self.ip < instr.len() {
             instr[self.ip](self)?;
 
@@ -44,11 +44,7 @@ impl VmCpu {
     }
 
     pub fn new_gpr_register(&mut self, name: impl AsRef<str>, size: u8) -> RegId {
-        self.gpr_register.insert(GprRegister {
-            name: name.as_ref().to_string(),
-            size,
-            value: 0,
-        })
+        self.gpr_register.insert(GprRegister::new(name, size))
     }
 
     pub fn get_gpr_register(&mut self, id: RegId) -> Option<&mut GprRegister> {
@@ -79,5 +75,9 @@ impl VmCpu {
 
     pub fn new_flag(&mut self, name: impl AsRef<str>) -> FlagId {
         self.flags.insert(false)
+    }
+
+    pub fn set_cf_modified(&mut self) {
+        self.cf_modified = true;
     }
 }

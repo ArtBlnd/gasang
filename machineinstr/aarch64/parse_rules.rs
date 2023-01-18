@@ -3,7 +3,7 @@ use crate::bit_patterns::*;
 use crate::utils::{extract_bits32, BitReader};
 use crate::MachineInstrParserRule;
 
-use std::cell::RefCell;
+use once_cell::sync::Lazy;
 
 /// AArch64 instruction parser
 pub struct AArch64InstrParserRule;
@@ -24,40 +24,42 @@ where
     I: Iterator<Item = u8>,
 {
     // AArch64 instruction has fixed length of 32 bits
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m .bind("0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                todo!("Reserved")
-            }).bind("1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                todo!("SME encodings")
-            }).bind("x_xx_0010_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                todo!("SVE encodings")
-            }).bind("x_xx_100x_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_aarch64_d_p_i(raw_instr)
-            }).bind("x_xx_101x_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr)
-            }).bind("x_xx_x1x0_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_aarch64_load_and_stores(raw_instr)
-            }).bind("x_xx_x101_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_aarch64_d_p_r(raw_instr)
-            }).bind("x_xx_x111_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_aarch64_dp_sfp_adv_simd(raw_instr)
-            });
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind("0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            todo!("Reserved")
+        })
+        .bind("1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            todo!("SME encodings")
+        })
+        .bind("x_xx_0010_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            todo!("SVE encodings")
+        })
+        .bind("x_xx_100x_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_aarch64_d_p_i(raw_instr)
+        })
+        .bind("x_xx_101x_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr)
+        })
+        .bind("x_xx_x1x0_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_aarch64_load_and_stores(raw_instr)
+        })
+        .bind("x_xx_x101_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_aarch64_d_p_r(raw_instr)
+        })
+        .bind("x_xx_x111_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_aarch64_dp_sfp_adv_simd(raw_instr)
+        });
 
-            RefCell::new(m)
-        }
-    }
+        m
+    });
 
     if let Some(raw_instr) = reader.read32() {
-        return MATCHER.with(|v| {
-            let mut v = v.try_borrow_mut().unwrap();
-            if let Some(instr) = v.handle(raw_instr) {
-                return Some(instr);
-            } else {
-                todo!("Unknown instruction {:032b}", raw_instr);
-            }
-        });
+        if let Some(instr) = MATCHER.handle(raw_instr) {
+            return Some(instr);
+        } else {
+            todo!("Unknown instruction {:032b}", raw_instr);
+        }
     }
 
     None
@@ -65,355 +67,606 @@ where
 
 // parse DPI(Data Processing Immediate) instructions in AArch64
 fn parse_aarch64_d_p_i(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m .bind("xxx_100_00x_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_pc_rel_addressing(raw_instr)
-            }).bind("xxx_100_010_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_add_sub_immediate(raw_instr)
-            }).bind("xxx_100_011_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_add_sub_imm_with_tags(raw_instr)
-            }).bind("xxx_100_100_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_logical_imm(raw_instr)
-            }).bind("xxx_100_101_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_move_wide_imm(raw_instr)
-            }).bind("xxx_100_110_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_bitfield(raw_instr)
-            }).bind("xxx_100_111_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-                parse_extract(raw_instr)
-            });
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind("xxx_100_00x_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_pc_rel_addressing(raw_instr)
+        })
+        .bind("xxx_100_010_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_add_sub_immediate(raw_instr)
+        })
+        .bind("xxx_100_011_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_add_sub_imm_with_tags(raw_instr)
+        })
+        .bind("xxx_100_100_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_logical_imm(raw_instr)
+        })
+        .bind("xxx_100_101_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_move_wide_imm(raw_instr)
+        })
+        .bind("xxx_100_110_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_bitfield(raw_instr)
+        })
+        .bind("xxx_100_111_xxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+            parse_extract(raw_instr)
+        });
 
-
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 // parse DPI(Data Processing Register) instructions in AArch64
 fn parse_aarch64_d_p_r(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m .bind("x_0_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_data_proc_2src(raw_instr)
-            }).bind("x_1_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_data_proc_1src(raw_instr)
-            }).bind("x_x_x_0_101_0xxx_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_logical_shifted_register(raw_instr)
-            }).bind("x_x_x_0_101_1xx0_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_add_sub_shifted_reg(raw_instr)
-            }).bind("x_x_x_0_101_1xx1_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_add_sub_ext_reg(raw_instr)
-            }).bind("x_x_x_1_101_0000_xxxxx_000000_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Add/subtract (with carry)")
-            }).bind("x_x_x_1_101_0000_xxxxx_x00001_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Rotate Right into flags")
-            }).bind("x_x_x_1_101_0000_xxxxx_xx0010_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Evaluate into flags")
-            }).bind("x_x_x_1_101_0010_xxxxx_xxxx0x_xxxxxxxxxx", |raw_instr: u32| {
-                parse_cond_cmp_reg(raw_instr)
-            }).bind("x_x_x_1_101_0010_xxxxx_xxxx1x_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Conditional compare (immediate)")
-            }).bind("x_x_x_1_101_0100_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_cond_sel(raw_instr)
-            }).bind("x_x_x_1_101_1xxx_xxxxx_xxxxxx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_data_proccessing_3src(raw_instr)
-            });
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_0_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx",
+            |raw_instr: u32| parse_data_proc_2src(raw_instr),
+        )
+        .bind(
+            "x_1_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx",
+            |raw_instr: u32| parse_data_proc_1src(raw_instr),
+        )
+        .bind(
+            "x_x_x_0_101_0xxx_xxxxx_xxxxxx_xxxxxxxxxx",
+            |raw_instr: u32| parse_logical_shifted_register(raw_instr),
+        )
+        .bind(
+            "x_x_x_0_101_1xx0_xxxxx_xxxxxx_xxxxxxxxxx",
+            |raw_instr: u32| parse_add_sub_shifted_reg(raw_instr),
+        )
+        .bind(
+            "x_x_x_0_101_1xx1_xxxxx_xxxxxx_xxxxxxxxxx",
+            |raw_instr: u32| parse_add_sub_ext_reg(raw_instr),
+        )
+        .bind(
+            "x_x_x_1_101_0000_xxxxx_000000_xxxxxxxxxx",
+            |raw_instr: u32| todo!("Add/subtract (with carry)"),
+        )
+        .bind(
+            "x_x_x_1_101_0000_xxxxx_x00001_xxxxxxxxxx",
+            |raw_instr: u32| todo!("Rotate Right into flags"),
+        )
+        .bind(
+            "x_x_x_1_101_0000_xxxxx_xx0010_xxxxxxxxxx",
+            |raw_instr: u32| todo!("Evaluate into flags"),
+        )
+        .bind(
+            "x_x_x_1_101_0010_xxxxx_xxxx0x_xxxxxxxxxx",
+            |raw_instr: u32| parse_cond_cmp_reg(raw_instr),
+        )
+        .bind(
+            "x_x_x_1_101_0010_xxxxx_xxxx1x_xxxxxxxxxx",
+            |raw_instr: u32| parse_cond_cmp_imm(raw_instr),
+        )
+        .bind(
+            "x_x_x_1_101_0100_xxxxx_xxxxxx_xxxxxxxxxx",
+            |raw_instr: u32| parse_cond_sel(raw_instr),
+        )
+        .bind(
+            "x_x_x_1_101_1xxx_xxxxx_xxxxxx_xxxxxxxxxx",
+            |raw_instr: u32| parse_data_proccessing_3src(raw_instr),
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0100", "0x", "x101", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Cryptographic AES")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0101", "0x", "x0xx", "xxx0xxx00"), |raw_instr: u32| {
-                todo!("Cryptographic three-register SHA")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0101", "0x", "x101", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Cryptographic two-register SHA")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "00", "00xx", "xxx0xxxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar copy")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "0x", "10xx", "xxx00xxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar three same FP16")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "0x", "1111", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar two-register miscellaneous FP16")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "0x", "x0xx", "xxx1xxxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar three same extra")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "0x", "x100", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar two-register miscellaneous")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "0x", "x110", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar pairwise")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "0x", "x1xx", "xxxxxxx00"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar three different")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "0x", "x1xx", "xxxxxxxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar three same")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "10", "xxxx", "xxxxxxxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar shifted by immediate")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "01x1", "1x", "xxxx", "xxxxxxxx0"), |raw_instr: u32| {
-                todo!("Advanced SIMD scalar x indexed element")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0x00", "0x", "x0xx", "xxx0xxx00"), |raw_instr: u32| {
-                todo!("Advanced SIMD table lookup")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0x00", "0x", "x0xx", "xxx0xxx10"), |raw_instr: u32| {
-                todo!("Advanced SIMD permute")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0x10", "0x", "x0xx", "xxx0xxxx0"), |raw_instr: u32| {
-                parse_advanced_simd_extract(raw_instr)
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "00", "00xx", "xxx0xxxx1"), |raw_instr: u32| {
-                parse_advanced_simd_copy(raw_instr)
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "0x", "10xx", "xxx00xxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD three same (FP16)")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "0x", "1111", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Advanced SIMD two-register miscellaneous (FP16)")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "0x", "x0xx", "xxx1xxxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD three-register extension")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "0x", "x100", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Advanced SIMD two-register miscellaneous")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "0x", "x110", "00xxxxx10"), |raw_instr: u32| {
-                todo!("Advanced SIMD across lanes")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "0x", "x1xx", "xxxxxxx00"), |raw_instr: u32| {
-                todo!("Advanced SIMD three different")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "0x", "x1xx", "xxxxxxxx1"), |raw_instr: u32| {
-                todo!("Advanced SIMD three same")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "10", "xxxx", "xxxxxxxx1"), |raw_instr: u32, op2: Extract<BitRange<19, 23>, u8> | {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0100", "0x", "x101", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Cryptographic AES"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0101", "0x", "x0xx", "xxx0xxx00"
+            ),
+            |raw_instr: u32| todo!("Cryptographic three-register SHA"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0101", "0x", "x101", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Cryptographic two-register SHA"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "00", "00xx", "xxx0xxxx1"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar copy"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "0x", "10xx", "xxx00xxx1"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar three same FP16"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "0x", "1111", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar two-register miscellaneous FP16"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "0x", "x0xx", "xxx1xxxx1"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar three same extra"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "0x", "x100", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar two-register miscellaneous"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "0x", "x110", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar pairwise"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "0x", "x1xx", "xxxxxxx00"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar three different"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "0x", "x1xx", "xxxxxxxx1"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar three same"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "10", "xxxx", "xxxxxxxx1"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar shifted by immediate"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "01x1", "1x", "xxxx", "xxxxxxxx0"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD scalar x indexed element"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0x00", "0x", "x0xx", "xxx0xxx00"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD table lookup"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0x00", "0x", "x0xx", "xxx0xxx10"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD permute"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0x10", "0x", "x0xx", "xxx0xxxx0"
+            ),
+            |raw_instr: u32| parse_advanced_simd_extract(raw_instr),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "00", "00xx", "xxx0xxxx1"
+            ),
+            |raw_instr: u32| parse_advanced_simd_copy(raw_instr),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "0x", "10xx", "xxx00xxx1"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD three same (FP16)"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "0x", "1111", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD two-register miscellaneous (FP16)"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "0x", "x0xx", "xxx1xxxx1"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD three-register extension"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "0x", "x100", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD two-register miscellaneous"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "0x", "x110", "00xxxxx10"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD across lanes"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "0x", "x1xx", "xxxxxxx00"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD three different"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "0x", "x1xx", "xxxxxxxx1"
+            ),
+            |raw_instr: u32| parse_advanced_simd_three_same(raw_instr),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "10", "xxxx", "xxxxxxxx1"
+            ),
+            |raw_instr: u32, op2: Extract<BitRange<19, 23>, u8>| {
                 if op2.value == 0b0000 {
-                    todo!("Advanced SIMD modified immediate")
-                }
-                else {
+                    parse_adv_simd_modified_imm(raw_instr)
+                } else {
                     todo!("Advanced SIMD shift by immediate")
                 }
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "0xx0", "1x", "xxxx", "xxxxxxxx0"), |raw_instr: u32| {
-                todo!("Advanced SIMD vector x indexed element")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "1100", "00", "10xx", "xxx10xxxx"), |raw_instr: u32| {
-                todo!("Cryptographic three-register, imm2")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "1100", "00", "11xx", "xxx1x00xx"), |raw_instr: u32| {
-                todo!("Cryptographic three-reigster SHA 512")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "1100", "00", "xxxx", "xxx0xxxxx"), |raw_instr: u32| {
-                todo!("Cryptographic four-register")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "1100", "01", "00xx", "xxxxxxxxx"), |raw_instr: u32| {
-                todo!("XAR")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "1100", "01", "1000", "0001000xx"), |raw_instr: u32| {
-                todo!("Cryptographic two-register SHA 512")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x0xx", "xxxxxxxxx"), |raw_instr: u32| {
-                todo!("Conversion between floating-point and fixed point")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x1xx", "xxx000000"), |raw_instr: u32| {
-                parse_conv_between_float_and_int(raw_instr)
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x1xx", "xxxx10000"), |raw_instr: u32| {
-                todo!("Floating-point data-processing (1 source)")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x1xx", "xxxxx1000"), |raw_instr: u32| {
-                todo!("Floating-point compare")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x1xx", "xxxxxx100"), |raw_instr: u32| {
-                todo!("Floating-point immediate")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x1xx", "xxxxxxx01"), |raw_instr: u32| {
-                todo!("Floating-point conditional compare")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x1xx", "xxxxxxx10"), |raw_instr: u32| {
-                todo!("Floating-point data-processing (2 source)")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "0x", "x1xx", "xxxxxxx11"), |raw_instr: u32| {
-                todo!("Floating-point conditional select")
-            })
-            .bind(&format!("{}_xxx_{}_{}_{}_xxxxxxxxxx", "x0x1", "1x", "xxxx", "xxxxxxxxx"), |raw_instr: u32| {
-                parse_fp_data_processing_3src(raw_instr)
-            });
+            },
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "0xx0", "1x", "xxxx", "xxxxxxxx0"
+            ),
+            |raw_instr: u32| todo!("Advanced SIMD vector x indexed element"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "1100", "00", "10xx", "xxx10xxxx"
+            ),
+            |raw_instr: u32| todo!("Cryptographic three-register, imm2"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "1100", "00", "11xx", "xxx1x00xx"
+            ),
+            |raw_instr: u32| todo!("Cryptographic three-reigster SHA 512"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "1100", "00", "xxxx", "xxx0xxxxx"
+            ),
+            |raw_instr: u32| todo!("Cryptographic four-register"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "1100", "01", "00xx", "xxxxxxxxx"
+            ),
+            |raw_instr: u32| todo!("XAR"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "1100", "01", "1000", "0001000xx"
+            ),
+            |raw_instr: u32| todo!("Cryptographic two-register SHA 512"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x0xx", "xxxxxxxxx"
+            ),
+            |raw_instr: u32| todo!("Conversion between floating-point and fixed point"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x1xx", "xxx000000"
+            ),
+            |raw_instr: u32| parse_conv_between_float_and_int(raw_instr),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x1xx", "xxxx10000"
+            ),
+            |raw_instr: u32| todo!("Floating-point data-processing (1 source)"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x1xx", "xxxxx1000"
+            ),
+            |raw_instr: u32| todo!("Floating-point compare"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x1xx", "xxxxxx100"
+            ),
+            |raw_instr: u32| todo!("Floating-point immediate"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x1xx", "xxxxxxx01"
+            ),
+            |raw_instr: u32| todo!("Floating-point conditional compare"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x1xx", "xxxxxxx10"
+            ),
+            |raw_instr: u32| todo!("Floating-point data-processing (2 source)"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "0x", "x1xx", "xxxxxxx11"
+            ),
+            |raw_instr: u32| todo!("Floating-point conditional select"),
+        )
+        .bind(
+            &format!(
+                "{}_xxx_{}_{}_{}_xxxxxxxxxx",
+                "x0x1", "1x", "xxxx", "xxxxxxxxx"
+            ),
+            |raw_instr: u32| parse_fp_data_processing_3src(raw_instr),
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 // parse Load and stores instructions in AArch64
 fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m .bind("0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Compare and swap");
-            }).bind("0x00_1_1_0_00_x_000000_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_adv_simd_ld_st_multi_structures(raw_instr)
-            }).bind("0x00_1_1_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr)
-            }).bind("0x00_1_1_0_10_x_x00000_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "0x00_1_1_0_00_x_000000_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| parse_adv_simd_ld_st_multi_structures(raw_instr),
+        )
+        .bind(
+            "0x00_1_1_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr),
+        )
+        .bind(
+            "0x00_1_1_0_10_x_x00000_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Advanced SIMD Load/Store single structure");
-            }).bind("0x00_1_1_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "0x00_1_1_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Advanced SIMD Load/Store single structure(post-indexed)");
-            }).bind("1101_1_0_0_1x_x_1xxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "1101_1_0_0_1x_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Load/store memory tags");
-            }).bind("1x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "1x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Load/store exclusive pair");
-            }).bind("xx00_1_0_0_00_x_0xxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx00_1_0_0_00_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Load/store exclusive register");
-            }).bind("xx00_1_0_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
-                todo!("Load/store ordered");
-            }).bind("xx00_1_0_0_01_x_1xxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx00_1_0_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_ordered(raw_instr),
+        )
+        .bind(
+            "xx00_1_0_0_01_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Compare and Swap");
-            }).bind("xx01_1_0_0_1x_x_0xxxxx_xxxx_00_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx01_1_0_0_1x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("LDAPR/STLR(unscaled immediate)");
-            }).bind("xx01_1_x_0_0x_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx01_1_x_0_0x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Load register (literal)");
-            }).bind("xx01_1_x_0_1x_x_0xxxxx_xxxx_01_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx01_1_x_0_1x_x_0xxxxx_xxxx_01_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Memory Copy and Memory Set");
-            }).bind("xx10_1_x_0_00_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx10_1_x_0_00_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Load/Store no allocate pair (offset)");
-            }).bind("xx10_1_x_0_01_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_pair_post_indexed(raw_instr)
-            }).bind("xx10_1_x_0_10_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_pair_offset(raw_instr)
-            }).bind("xx10_1_x_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_pair_pre_indexed(raw_instr)
-            }).bind("xx11_1_x_0_0x_x_0xxxxx_xxxx_00_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_unscaled_imm(raw_instr)
-            }).bind("xx11_1_x_0_0x_x_0xxxxx_xxxx_01_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_imm_post_indexed(raw_instr)
-            }).bind("xx11_1_x_0_0x_x_0xxxxx_xxxx_10_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx10_1_x_0_01_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_pair_post_indexed(raw_instr),
+        )
+        .bind(
+            "xx10_1_x_0_10_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_pair_offset(raw_instr),
+        )
+        .bind(
+            "xx10_1_x_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_pair_pre_indexed(raw_instr),
+        )
+        .bind(
+            "xx11_1_x_0_0x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_unscaled_imm(raw_instr),
+        )
+        .bind(
+            "xx11_1_x_0_0x_x_0xxxxx_xxxx_01_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_imm_post_indexed(raw_instr),
+        )
+        .bind(
+            "xx11_1_x_0_0x_x_0xxxxx_xxxx_10_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Load/Store register (unprevilaged)");
-            }).bind("xx11_1_x_0_0x_x_0xxxxx_xxxx_11_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_imm_pre_indexed(raw_instr)
-            }).bind("xx11_1_x_0_0x_x_1xxxxx_xxxx_00_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx11_1_x_0_0x_x_0xxxxx_xxxx_11_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_imm_pre_indexed(raw_instr),
+        )
+        .bind(
+            "xx11_1_x_0_0x_x_1xxxxx_xxxx_00_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Atomic memory operations");
-            }).bind("xx11_1_x_0_0x_x_1xxxxx_xxxx_10_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_reg_offset(raw_instr)
-            }).bind("xx11_1_x_0_0x_x_1xxxxx_xxxx_x1_xxxxxxxxxx", |raw_instr: u32| {
+            },
+        )
+        .bind(
+            "xx11_1_x_0_0x_x_1xxxxx_xxxx_10_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_reg_offset(raw_instr),
+        )
+        .bind(
+            "xx11_1_x_0_0x_x_1xxxxx_xxxx_x1_xxxxxxxxxx",
+            |raw_instr: u32| {
                 todo!("Load/Store register (pac)");
-            }).bind("xx11_1_x_0_1x_x_xxxxxx_xxxx_xx_xxxxxxxxxx", |raw_instr: u32| {
-                parse_load_store_reg_unsigned_imm(raw_instr)
-            });
+            },
+        )
+        .bind(
+            "xx11_1_x_0_1x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            |raw_instr: u32| parse_load_store_reg_unsigned_imm(raw_instr),
+        );
 
-
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            //--------------------------------------------
-            //      |op1|101|      op2     |       | op3 |
-            m .bind("010_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_cond_branch_imm(raw_instr)
-            }).bind("110_101_00xxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_exception_gen(raw_instr)
-            }).bind("110_101_01000000110001_xxxxxxx_xxxxx", |raw_instr: u32| {
-                todo!("System Instruction with Register Argument");
-            }).bind("110_101_01000000110010_xxxxxxx_11111", |raw_instr: u32| {
-                parse_hints(raw_instr)
-            }).bind("110_101_01000000110011_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_barriers(raw_instr)
-            }).bind("110_101_0100000xxx0100_xxxxxxx_xxxxx", |raw_isntr: u32| {
-                todo!("PSTATE")
-            }).bind("110_101_0100100xxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                todo!("System with results")
-            }).bind("110_101_0100x01xxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                todo!("System instructions")
-            }).bind("110_101_0100x1xxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_sys_reg_mov(raw_instr)
-            }).bind("110_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_uncond_branch_reg(raw_instr)
-            }).bind("x00_101_xxxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_uncond_branch_imm(raw_instr)
-            }).bind("x01_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_cmp_and_branch_imm(raw_instr)
-            }).bind("x01_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
-                parse_test_and_branch_imm(raw_instr)
-            });
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        //--------------------------------------------
+        //      |op1|101|      op2     |       | op3 |
+        m.bind("010_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_cond_branch_imm(raw_instr)
+        })
+        .bind("110_101_00xxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_exception_gen(raw_instr)
+        })
+        .bind("110_101_01000000110001_xxxxxxx_xxxxx", |raw_instr: u32| {
+            todo!("System Instruction with Register Argument");
+        })
+        .bind("110_101_01000000110010_xxxxxxx_11111", |raw_instr: u32| {
+            parse_hints(raw_instr)
+        })
+        .bind("110_101_01000000110011_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_barriers(raw_instr)
+        })
+        .bind("110_101_0100000xxx0100_xxxxxxx_xxxxx", |raw_isntr: u32| {
+            todo!("PSTATE")
+        })
+        .bind("110_101_0100100xxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            todo!("System with results")
+        })
+        .bind("110_101_0100x01xxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            todo!("System instructions")
+        })
+        .bind("110_101_0100x1xxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_sys_reg_mov(raw_instr)
+        })
+        .bind("110_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_uncond_branch_reg(raw_instr)
+        })
+        .bind("x00_101_xxxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_uncond_branch_imm(raw_instr)
+        })
+        .bind("x01_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_cmp_and_branch_imm(raw_instr)
+        })
+        .bind("x01_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+            parse_test_and_branch_imm(raw_instr)
+        });
 
-
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_add_sub_shifted_reg(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xxx_01011_xx_0_xxxxxxxxxxxxxxxxxxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xxx_01011_xx_0_xxxxxxxxxxxxxxxxxxxxx",
             |raw_instr: u32,
              sf_op_s: Extract<BitRange<29, 32>, u8>,
              shift: Extract<BitRange<21, 24>, u8>,
@@ -439,34 +692,30 @@ fn parse_add_sub_shifted_reg(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_add_sub_immediate(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_x_x_100010_x_xxxxxxxxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_x_x_100010_x_xxxxxxxxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf_op_s: Extract<BitRange<29, 32>, u8>,
              sh: Extract<BitRange<22, 23>, u8>,
              imm12: Extract<BitRange<10, 22>, u16>,
-            rn: Extract<BitRange<5, 10>, u8>,
-            rd: Extract<BitRange<0, 5>, u8>,
-             | {
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = ShImm12RnRd {
                     sh: sh.value,
                     imm12: imm12.value,
@@ -485,27 +734,24 @@ fn parse_add_sub_immediate(raw_instr: u32) -> AArch64Instr {
                     0b111 => AArch64Instr::SubsImm64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_fp_data_processing_3src(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_0_x_11111_xx_x_xxxxx_x_xxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_0_x_11111_xx_x_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              m: Extract<BitRange<31, 32>, u8>,
              s: Extract<BitRange<29, 30>, u8>,
@@ -515,8 +761,7 @@ fn parse_fp_data_processing_3src(raw_instr: u32) -> AArch64Instr {
              o0: Extract<BitRange<15, 16>, u8>,
              ra: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-             | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = RmRaRnRd {
                     rm: rm.value,
                     ra: ra.value,
@@ -539,35 +784,31 @@ fn parse_fp_data_processing_3src(raw_instr: u32) -> AArch64Instr {
                     (0b0, 0b0, 0b11, 0b1, 0b1) => AArch64Instr::FnmSubHalfPrecision(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_load_store_reg_unsigned_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_111_x_01_xx_xxxxxxxxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_111_x_01_xx_xxxxxxxxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
              imm12: Extract<BitRange<10, 22>, u16>,
              rm: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
+             rt: Extract<BitRange<0, 5>, u8>| {
                 let data = Imm12RnRt {
                     imm12: imm12.value,
                     rn: rm.value,
@@ -601,33 +842,29 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: u32) -> AArch64Instr {
                     (0b11, 0b1, 0b01) => AArch64Instr::LdrImmSimdFP64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_move_wide_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_100101_xx_xxxxxxxxxxxxxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_xx_100101_xx_xxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: u32,
              sf_opc: Extract<BitRange<29, 32>, u8>,
              hw: Extract<BitRange<21, 23>, u8>,
              imm16: Extract<BitRange<5, 21>, u16>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = Imm16Rd {
                     imm16: imm16.value,
                     rd: rd.value,
@@ -642,34 +879,30 @@ fn parse_move_wide_imm(raw_instr: u32) -> AArch64Instr {
                     (0b111, _) => AArch64Instr::Movk64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_uncond_branch_reg(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("1101011_xxxx_xxxxx_xxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "1101011_xxxx_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              opc: Extract<BitRange<21, 25>, u8>,
              op2: Extract<BitRange<16, 21>, u8>,
              op3: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             op4: Extract<BitRange<0, 5>, u8> |
-            {
+             op4: Extract<BitRange<0, 5>, u8>| {
                 let z = extract_bits32(24..25, raw_instr);
                 let op = extract_bits32(21..23, raw_instr);
                 let a = extract_bits32(11..12, raw_instr);
@@ -686,85 +919,99 @@ fn parse_uncond_branch_reg(raw_instr: u32) -> AArch64Instr {
 
                 match (opc.value, op2.value, op3.value, rn, rm) {
                     (0b0000, 0b11111, 0b000000, _, 0b00000) => AArch64Instr::Br(data),
-                    (0b0000, 0b11111, 0b000010, _, 0b11111) => todo!("BRAA, BRAAZ, BRAB, BRABZ. Key A, zero modifier"),
-                    (0b0000, 0b11111, 0b000011, _, 0b11111) => todo!("BRAA, BRAAZ, BRAB, BRABZ. Key B, zero modifier"),
+                    (0b0000, 0b11111, 0b000010, _, 0b11111) => {
+                        todo!("BRAA, BRAAZ, BRAB, BRABZ. Key A, zero modifier")
+                    }
+                    (0b0000, 0b11111, 0b000011, _, 0b11111) => {
+                        todo!("BRAA, BRAAZ, BRAB, BRABZ. Key B, zero modifier")
+                    }
                     (0b0001, 0b11111, 0b000000, _, 0b00000) => AArch64Instr::Blr(data),
-                    (0b0001, 0b11111, 0b000010, _, 0b11111) => todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ. Key A, zero modifier"),
-                    (0b0001, 0b11111, 0b000011, _, 0b11111) => todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ. Key B, zero modifier"),
+                    (0b0001, 0b11111, 0b000010, _, 0b11111) => {
+                        todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ. Key A, zero modifier")
+                    }
+                    (0b0001, 0b11111, 0b000011, _, 0b11111) => {
+                        todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ. Key B, zero modifier")
+                    }
                     (0b0010, 0b11111, 0b000000, _, 0b00000) => AArch64Instr::Ret(data),
-                    (0b0010, 0b11111, 0b000010, 0b11111, 0b11111) => todo!("RETAA, RETAB - RETAA variant"),
-                    (0b0010, 0b11111, 0b000011, 0b11111, 0b11111) => todo!("RETAA, RETAB - RETAB variant"),
+                    (0b0010, 0b11111, 0b000010, 0b11111, 0b11111) => {
+                        todo!("RETAA, RETAB - RETAA variant")
+                    }
+                    (0b0010, 0b11111, 0b000011, 0b11111, 0b11111) => {
+                        todo!("RETAA, RETAB - RETAB variant")
+                    }
                     (0b0100, 0b11111, 0b000000, 0b11111, 0b00000) => AArch64Instr::ERet(data),
-                    (0b0100, 0b11111, 0b000010, 0b11111, 0b11111) => todo!("ERETAA, ERETAB - ERETAA variant"),
-                    (0b0100, 0b11111, 0b000011, 0b11111, 0b11111) => todo!("ERETAA, ERETAB - ERETAB variant"),
+                    (0b0100, 0b11111, 0b000010, 0b11111, 0b11111) => {
+                        todo!("ERETAA, ERETAB - ERETAA variant")
+                    }
+                    (0b0100, 0b11111, 0b000011, 0b11111, 0b11111) => {
+                        todo!("ERETAA, ERETAB - ERETAB variant")
+                    }
                     (0b0101, 0b11111, 0b000000, 0b11111, 0b00000) => AArch64Instr::Drps(data),
-                    (0b1000, 0b11111, 0b000010, _, _) => todo!("BRAA, BRAAZ, BRAB, BRABZ - Key A, register modifier"),
-                    (0b1000, 0b11111, 0b000011, _, _) => todo!("BRAA, BRAAZ, BRAB, BRABZ - Key B, register modifier"),
-                    (0b1001, 0b11111, 0b000010, _, _) => todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ - Key A, register modifier"),
-                    (0b1001, 0b11111, 0b000011, _, _) => todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ - Key B, register modifier"),
+                    (0b1000, 0b11111, 0b000010, _, _) => {
+                        todo!("BRAA, BRAAZ, BRAB, BRABZ - Key A, register modifier")
+                    }
+                    (0b1000, 0b11111, 0b000011, _, _) => {
+                        todo!("BRAA, BRAAZ, BRAB, BRABZ - Key B, register modifier")
+                    }
+                    (0b1001, 0b11111, 0b000010, _, _) => {
+                        todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ - Key A, register modifier")
+                    }
+                    (0b1001, 0b11111, 0b000011, _, _) => {
+                        todo!("BLRAA, BLRAAZ, BLRAB, BLRABZ - Key B, register modifier")
+                    }
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_uncond_branch_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_00101_xxxxxxxxxxxxxxxxxxxxxxxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_00101_xxxxxxxxxxxxxxxxxxxxxxxxxx",
             |raw_instr: u32,
              op: Extract<BitRange<31, 32>, u8>,
-             imm26: Extract<BitRange<0, 26>, u32>,
-            | {
-                let data = Imm26 {
-                    imm26: imm26.value,
-                };
+             imm26: Extract<BitRange<0, 26>, u32>| {
+                let data = Imm26 { imm26: imm26.value };
 
                 match op.value {
                     0b0 => AArch64Instr::BImm(data),
                     0b1 => AArch64Instr::BlImm(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_cond_branch_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("0101010_x_xxxxxxxxxxxxxxxxxxx_x_xxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0101010_x_xxxxxxxxxxxxxxxxxxx_x_xxxx",
             |raw_instr: u32,
              o1: Extract<BitRange<24, 25>, u8>,
              imm19: Extract<BitRange<5, 24>, u32>,
              o0: Extract<BitRange<4, 5>, u8>,
-             cond: Extract<BitRange<0, 4>, u8>,
-             | {
+             cond: Extract<BitRange<0, 4>, u8>| {
                 let data = Imm19Cond {
                     imm19: imm19.value,
                     cond: cond.value,
@@ -775,35 +1022,31 @@ fn parse_cond_branch_imm(raw_instr: u32) -> AArch64Instr {
                     (0b0, 0b1) => AArch64Instr::BcCond(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_cond_sel(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_x_x_11010100_xxxxx_xxxx_xx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_x_x_11010100_xxxxx_xxxx_xx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf_op_s: Extract<BitRange<29, 32>, u8>,
              rm: Extract<BitRange<16, 21>, u8>,
              cond: Extract<BitRange<12, 16>, u8>,
              op2: Extract<BitRange<10, 12>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-             | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = RmCondRnRd {
                     rm: rm.value,
                     cond: cond.value,
@@ -822,34 +1065,30 @@ fn parse_cond_sel(raw_instr: u32) -> AArch64Instr {
                     (0b110, 0b01) => AArch64Instr::Csel32(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_test_and_branch_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_011011_x_xxxxx_xxxxxxxxxxxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_011011_x_xxxxx_xxxxxxxxxxxxxx_xxxxx",
             |raw_instr: u32,
              b5: Extract<BitRange<31, 32>, u8>,
              op: Extract<BitRange<24, 25>, u8>,
              b40: Extract<BitRange<19, 24>, u8>,
              imm14: Extract<BitRange<5, 19>, u16>,
-             rt: Extract<BitRange<0, 5>, u8>,
-             | {
+             rt: Extract<BitRange<0, 5>, u8>| {
                 let data = B5B40Imm14Rt {
                     b5: b5.value,
                     b40: b40.value,
@@ -862,27 +1101,24 @@ fn parse_test_and_branch_imm(raw_instr: u32) -> AArch64Instr {
                     0b1 => AArch64Instr::Tbnz(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_logical_shifted_register(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_01010_xx_x_xxxxx_xxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_xx_01010_xx_x_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              opc: Extract<BitRange<29, 31>, u8>,
@@ -891,8 +1127,7 @@ fn parse_logical_shifted_register(raw_instr: u32) -> AArch64Instr {
              rm: Extract<BitRange<16, 21>, u8>,
              imm6: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-             | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = ShiftRmImm6RnRd {
                     shift: shift.value,
                     rm: rm.value,
@@ -921,31 +1156,27 @@ fn parse_logical_shifted_register(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b11, 0b1) => AArch64Instr::BicsShiftedReg64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_hints(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("11010101000000110010_xxxx_xxx_11111",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "11010101000000110010_xxxx_xxx_11111",
             |raw_instr: u32,
              crm: Extract<BitRange<8, 12>, u8>,
-             op2: Extract<BitRange<5, 8>, u8>,
-            | {
+             op2: Extract<BitRange<5, 8>, u8>| {
                 match (crm.value, op2.value) {
                     (0b0000, 0b000) => AArch64Instr::Nop,
                     (0b0000, 0b001) => AArch64Instr::Yield,
@@ -955,33 +1186,29 @@ fn parse_hints(raw_instr: u32) -> AArch64Instr {
                     (0b0000, 0b101) => AArch64Instr::Sevl,
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_pc_rel_addressing(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_10000_xxxxxxxxxxxxxxxxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_xx_10000_xxxxxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: u32,
              op: Extract<BitRange<31, 32>, u8>,
              immlo: Extract<BitRange<29, 30>, u8>,
              immhi: Extract<BitRange<5, 24>, u32>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = PcRelAddressing {
                     immlo: immlo.value,
                     immhi: immhi.value,
@@ -993,33 +1220,29 @@ fn parse_pc_rel_addressing(raw_instr: u32) -> AArch64Instr {
                     0b1 => AArch64Instr::Adrp(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_exception_gen(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("11010100_xxx_xxxxxxxxxxxxxxxx_xxx_xx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "11010100_xxx_xxxxxxxxxxxxxxxx_xxx_xx",
             |raw_instr: u32,
              opc: Extract<BitRange<21, 24>, u8>,
              imm16: Extract<BitRange<5, 21>, u16>,
              op2: Extract<BitRange<2, 5>, u8>,
-             ll: Extract<BitRange<0, 2>, u8>,
-            | {
+             ll: Extract<BitRange<0, 2>, u8>| {
                 let data = ExceptionGen {
                     opc: opc.value,
                     imm16: imm16.value,
@@ -1039,27 +1262,24 @@ fn parse_exception_gen(raw_instr: u32) -> AArch64Instr {
                     (0b101, 0b000, 0b11) => AArch64Instr::DcpS3(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_load_store_reg_reg_offset(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_111_x_00_xx_1_xxxxx_xxx_x_10_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_111_x_00_xx_1_xxxxx_xxx_x_10_xxxxx_xxxxx",
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
@@ -1068,8 +1288,7 @@ fn parse_load_store_reg_reg_offset(raw_instr: u32) -> AArch64Instr {
              option: Extract<BitRange<13, 16>, u8>,
              s: Extract<BitRange<12, 13>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
+             rt: Extract<BitRange<0, 5>, u8>| {
                 let data = LoadStoreRegRegOffset {
                     size: size.value,
                     v: v.value,
@@ -1082,13 +1301,21 @@ fn parse_load_store_reg_reg_offset(raw_instr: u32) -> AArch64Instr {
                 };
 
                 match (size.value, v.value, opc.value, option.value) {
-                    (0b00, 0b0, 0b00, _) if option.value != 0b011 => AArch64Instr::StrbRegExtReg(data),
+                    (0b00, 0b0, 0b00, _) if option.value != 0b011 => {
+                        AArch64Instr::StrbRegExtReg(data)
+                    }
                     (0b00, 0b0, 0b00, 0b011) => AArch64Instr::StrbRegShiftedReg(data),
-                    (0b00, 0b0, 0b01, _) if option.value != 0b011 => AArch64Instr::LdrbRegExtReg(data),
+                    (0b00, 0b0, 0b01, _) if option.value != 0b011 => {
+                        AArch64Instr::LdrbRegExtReg(data)
+                    }
                     (0b00, 0b0, 0b01, 0b011) => AArch64Instr::LdrbRegShiftedReg(data),
-                    (0b00, 0b0, 0b10, _) if option.value != 0b011 => AArch64Instr::LdrsbRegExtReg64(data),
+                    (0b00, 0b0, 0b10, _) if option.value != 0b011 => {
+                        AArch64Instr::LdrsbRegExtReg64(data)
+                    }
                     (0b00, 0b0, 0b10, 0b011) => AArch64Instr::LdrsbRegShiftedReg64(data),
-                    (0b00, 0b0, 0b11, _) if option.value != 0b011 => AArch64Instr::LdrsbRegExtReg32(data),
+                    (0b00, 0b0, 0b11, _) if option.value != 0b011 => {
+                        AArch64Instr::LdrsbRegExtReg32(data)
+                    }
                     (0b00, 0b0, 0b11, 0b011) => AArch64Instr::LdrsbRegShiftedReg32(data),
                     (_, 0b1, 0b00, _) | (0b00, 0b1, 0b10, _) => AArch64Instr::StrRegSimdFP(data),
                     (_, 0b1, 0b01, _) | (0b00, 0b1, 0b11, _) => AArch64Instr::LdrRegSimdFP(data),
@@ -1104,27 +1331,24 @@ fn parse_load_store_reg_reg_offset(raw_instr: u32) -> AArch64Instr {
                     (0b11, 0b0, 0b10, _) => AArch64Instr::PrfmReg(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_add_sub_ext_reg(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_x_x_01011_xx_1_xxxxx_xxx_xxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_x_x_01011_xx_1_xxxxx_xxx_xxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf_op_s: Extract<BitRange<29, 32>, u8>,
              opt: Extract<BitRange<22, 24>, u8>,
@@ -1132,8 +1356,7 @@ fn parse_add_sub_ext_reg(raw_instr: u32) -> AArch64Instr {
              option: Extract<BitRange<13, 16>, u8>,
              imm3: Extract<BitRange<10, 13>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = AddSubtractExtReg {
                     rm: rm.value,
                     option: option.value,
@@ -1153,27 +1376,24 @@ fn parse_add_sub_ext_reg(raw_instr: u32) -> AArch64Instr {
                     (0b111, 0b00) => AArch64Instr::SubsExtReg64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_bitfield(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_100110_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_xx_100110_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              opc: Extract<BitRange<29, 31>, u8>,
@@ -1181,8 +1401,7 @@ fn parse_bitfield(raw_instr: u32) -> AArch64Instr {
              immr: Extract<BitRange<16, 22>, u8>,
              imms: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = Bitfield {
                     immr: immr.value,
                     imms: imms.value,
@@ -1200,27 +1419,24 @@ fn parse_bitfield(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_logical_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_100100_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_xx_100100_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              opc: Extract<BitRange<29, 31>, u8>,
@@ -1228,8 +1444,7 @@ fn parse_logical_imm(raw_instr: u32) -> AArch64Instr {
              immr: Extract<BitRange<16, 22>, u8>,
              imms: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = LogicalImm {
                     immr: immr.value,
                     imms: imms.value,
@@ -1249,27 +1464,24 @@ fn parse_logical_imm(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_load_store_reg_pair_offset(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_101_x_010_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_101_x_010_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              opc: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
@@ -1277,9 +1489,8 @@ fn parse_load_store_reg_pair_offset(raw_instr: u32) -> AArch64Instr {
              imm7: Extract<BitRange<15, 22>, u8>,
              rt2: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = LoadStoreRegPair{
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = LoadStoreRegPair {
                     imm7: imm7.value,
                     rt2: rt2.value,
                     rn: rn.value,
@@ -1301,27 +1512,24 @@ fn parse_load_store_reg_pair_offset(raw_instr: u32) -> AArch64Instr {
                     (0b10, 0b1, 0b1) => AArch64Instr::LdpSimdFP128(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_add_sub_imm_with_tags(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_x_x_100011_x_xxxxxx_xx_xxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_x_x_100011_x_xxxxxx_xx_xxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf_op_s: Extract<BitRange<29, 32>, u8>,
              o2: Extract<BitRange<22, 23>, u8>,
@@ -1329,9 +1537,8 @@ fn parse_add_sub_imm_with_tags(raw_instr: u32) -> AArch64Instr {
              op3: Extract<BitRange<14, 16>, u8>,
              uimm4: Extract<BitRange<10, 14>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = AddSubImmWithTags{
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AddSubImmWithTags {
                     o2: o2.value,
                     uimm6: uimm6.value,
                     op3: op3.value,
@@ -1345,27 +1552,24 @@ fn parse_add_sub_imm_with_tags(raw_instr: u32) -> AArch64Instr {
                     (0b110, 0b0) => AArch64Instr::Subg(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_extract(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_100111_x_x_xxxxx_xxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_xx_100111_x_x_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf_op21: Extract<BitRange<29, 32>, u8>,
              n: Extract<BitRange<22, 23>, u8>,
@@ -1373,9 +1577,8 @@ fn parse_extract(raw_instr: u32) -> AArch64Instr {
              rm: Extract<BitRange<16, 21>, u8>,
              imms: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = ExtractImm{
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = ExtractImm {
                     rm: rm.value,
                     imms: imms.value,
                     rn: rn.value,
@@ -1383,40 +1586,38 @@ fn parse_extract(raw_instr: u32) -> AArch64Instr {
                 };
 
                 match (sf_op21.value, n.value, o0.value, imms.value) {
-                    (0b000, 0b0, 0b0, imms) if ((imms ^ 0b000000) & 0b100000) == 0b000000 => AArch64Instr::Extr32(data),
+                    (0b000, 0b0, 0b0, imms) if ((imms ^ 0b000000) & 0b100000) == 0b000000 => {
+                        AArch64Instr::Extr32(data)
+                    }
                     (0b100, 1, 0, _) => AArch64Instr::Extr64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_data_proc_1src(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_1_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_1_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              s: Extract<BitRange<29, 30>, u8>,
              opcode2: Extract<BitRange<16, 21>, u8>,
              opcode: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = RnRd{
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = RnRd {
                     rn: rn.value,
                     rd: rd.value,
                 };
@@ -1435,34 +1636,30 @@ fn parse_data_proc_1src(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b0, 0b00000, 0b000101) => AArch64Instr::ClsVar64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_cmp_and_branch_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_011010_x_xxxxxxxxxxxxxxxxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_011010_x_xxxxxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              op: Extract<BitRange<24, 25>, u8>,
              imm19: Extract<BitRange<5, 24>, u32>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = CmpAndBranchImm{
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = CmpAndBranchImm {
                     imm19: imm19.value,
                     rt: rt.value,
                 };
@@ -1474,27 +1671,24 @@ fn parse_cmp_and_branch_imm(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b1) => AArch64Instr::Cbnz64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_data_proccessing_3src(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_xx_11011_xxx_xxxxx_x_xxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_xx_11011_xxx_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              op54: Extract<BitRange<29, 31>, u8>,
@@ -1503,9 +1697,8 @@ fn parse_data_proccessing_3src(raw_instr: u32) -> AArch64Instr {
              o0: Extract<BitRange<15, 16>, u8>,
              ra: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = DataProc3Src{
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = DataProc3Src {
                     rm: rm.value,
                     ra: ra.value,
                     rn: rn.value,
@@ -1525,35 +1718,31 @@ fn parse_data_proccessing_3src(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b00, 0b110, 0b0) => AArch64Instr::Umulh(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_111_x_00_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_111_x_00_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
+             rt: Extract<BitRange<0, 5>, u8>| {
                 let data = Imm12RnRt {
                     imm12: imm9.value,
                     rn: rn.value,
@@ -1588,27 +1777,24 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_sys_reg_mov(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("1101010100_x_1_x_xxx_xxxx_xxxx_xxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "1101010100_x_1_x_xxx_xxxx_xxxx_xxx_xxxxx",
             |raw_instr: u32,
              l: Extract<BitRange<21, 22>, u8>,
              o0: Extract<BitRange<19, 20>, u8>,
@@ -1616,8 +1802,7 @@ fn parse_sys_reg_mov(raw_instr: u32) -> AArch64Instr {
              crn: Extract<BitRange<12, 16>, u8>,
              crm: Extract<BitRange<8, 12>, u8>,
              op2: Extract<BitRange<5, 8>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
+             rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SysRegMov {
                     o0: o0.value,
                     op1: op1.value,
@@ -1632,27 +1817,24 @@ fn parse_sys_reg_mov(raw_instr: u32) -> AArch64Instr {
                     1 => AArch64Instr::Mrs(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_load_store_reg_pair_pre_indexed(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_101_x_011_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_101_x_011_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              opc: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
@@ -1660,9 +1842,8 @@ fn parse_load_store_reg_pair_pre_indexed(raw_instr: u32) -> AArch64Instr {
              imm7: Extract<BitRange<15, 22>, u8>,
              rt2: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = LoadStoreRegPair{
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = LoadStoreRegPair {
                     imm7: imm7.value,
                     rt2: rt2.value,
                     rn: rn.value,
@@ -1684,28 +1865,24 @@ fn parse_load_store_reg_pair_pre_indexed(raw_instr: u32) -> AArch64Instr {
                     (0b10, 0b1, 0b1) => AArch64Instr::LdpSimdFpVar128(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
-
 fn parse_load_store_reg_pair_post_indexed(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_101_x_001_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_101_x_001_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              opc: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
@@ -1713,9 +1890,8 @@ fn parse_load_store_reg_pair_post_indexed(raw_instr: u32) -> AArch64Instr {
              imm7: Extract<BitRange<15, 22>, u8>,
              rt2: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = LoadStoreRegPair{
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = LoadStoreRegPair {
                     imm7: imm7.value,
                     rt2: rt2.value,
                     rn: rn.value,
@@ -1737,36 +1913,32 @@ fn parse_load_store_reg_pair_post_indexed(raw_instr: u32) -> AArch64Instr {
                     (0b10, 0b1, 0b1) => AArch64Instr::LdpSimdFpVar128(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_data_proc_2src(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_0_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_0_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              s: Extract<BitRange<29, 30>, u8>,
              rm: Extract<BitRange<16, 21>, u8>,
              opcode: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = DataProc2Src{
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = DataProc2Src {
                     rm: rm.value,
                     rn: rn.value,
                     rd: rd.value,
@@ -1787,36 +1959,32 @@ fn parse_data_proc_2src(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b0, 0b001011) => AArch64Instr::RorvVar64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_111_x_00_xx_0_xxxxxxxxx_11_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_111_x_00_xx_0_xxxxxxxxx_11_xxxxx_xxxxx",
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = Imm12RnRt{
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = Imm12RnRt {
                     imm12: imm9.value,
                     rn: rn.value,
                     rt: rt.value,
@@ -1837,7 +2005,7 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
                     (0b01, 0b0, 0b11) => AArch64Instr::LdrshImm32(data),
                     (0b01, 0b1, 0b00) => AArch64Instr::StrImmSimdFP16(data),
                     (0b01, 0b1, 0b01) => AArch64Instr::LdrImmSimdFP16(data),
-                    
+
                     (0b10, 0b0, 0b00) => AArch64Instr::StrImm32(data),
                     (0b10, 0b0, 0b01) => AArch64Instr::LdrImm32(data),
                     (0b10, 0b0, 0b10) => AArch64Instr::LdrswImm(data),
@@ -1850,36 +2018,32 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("xx_111_x_00_xx_0_xxxxxxxxx_01_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_111_x_00_xx_0_xxxxxxxxx_01_xxxxx_xxxxx",
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = Imm12RnRt{
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = Imm12RnRt {
                     imm12: imm9.value,
                     rn: rn.value,
                     rt: rt.value,
@@ -1900,7 +2064,7 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
                     (0b01, 0b0, 0b11) => AArch64Instr::LdrshImm32(data),
                     (0b01, 0b1, 0b00) => AArch64Instr::StrImmSimdFP16(data),
                     (0b01, 0b1, 0b01) => AArch64Instr::LdrImmSimdFP16(data),
-                    
+
                     (0b10, 0b0, 0b00) => AArch64Instr::StrImm32(data),
                     (0b10, 0b0, 0b01) => AArch64Instr::LdrImm32(data),
                     (0b10, 0b0, 0b10) => AArch64Instr::LdrswImm(data),
@@ -1913,35 +2077,29 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_barriers(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("11010101000000110011_xxxx_xxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "11010101000000110011_xxxx_xxx_xxxxx",
             |raw_instr: u32,
              crm: Extract<BitRange<8, 12>, u8>,
              op2: Extract<BitRange<5, 8>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = Barriers{
-                    crm: crm.value
-                };
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = Barriers { crm: crm.value };
 
                 match (crm.value, op2.value, rt.value) {
                     (_, 0b010, 0b11111) => AArch64Instr::Clrex(data),
@@ -1951,36 +2109,32 @@ fn parse_barriers(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_advanced_simd_copy(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("0_x_x_01110000_xxxxx_0_xxxx_1_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_x_01110000_xxxxx_0_xxxx_1_xxxxx_xxxxx",
             |raw_instr: u32,
              q: Extract<BitRange<30, 31>, u8>,
              op: Extract<BitRange<29, 30>, u8>,
              imm5: Extract<BitRange<16, 21>, u8>,
              imm4: Extract<BitRange<11, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = AdvancedSimdCopy{
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvancedSimdCopy {
                     imm5: imm5.value,
                     imm4: imm4.value,
                     rn: rn.value,
@@ -1992,34 +2146,30 @@ fn parse_advanced_simd_copy(raw_instr: u32) -> AArch64Instr {
                     (_, 0b0, _, 0b0001) => AArch64Instr::DupGeneral(data),
                     (0b0 | 0b1, 0b0, _, 0b0101) => AArch64Instr::Smov(data),
                     (0b0, 0b0, _, 0b0111) => AArch64Instr::Umov(data),
-                    (0b1, 0b0, 0b01000 | 0b11000, 0b0111)  => AArch64Instr::Umov(data),
+                    (0b1, 0b0, 0b01000 | 0b11000, 0b0111) => AArch64Instr::Umov(data),
                     (0b1, 0b0, _, 0b0011) => AArch64Instr::InsGeneral(data),
                     (0b1, 0b1, _, _) => AArch64Instr::InsElement(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
-
 fn parse_cond_cmp_reg(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_x_x_11010010_xxxxx_xxxx_0_x_xxxxx_x_xxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_x_x_11010010_xxxxx_xxxx_0_x_xxxxx_x_xxxx",
             |raw_instr: u32,
              sf_op_s: Extract<BitRange<29, 32>, u8>,
              rm: Extract<BitRange<16, 21>, u8>,
@@ -2027,9 +2177,8 @@ fn parse_cond_cmp_reg(raw_instr: u32) -> AArch64Instr {
              o2: Extract<BitRange<10, 11>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              o3: Extract<BitRange<4, 5>, u8>,
-             nzcv: Extract<BitRange<0, 4>, u8>,
-            | {
-                let data = CondCmpReg{
+             nzcv: Extract<BitRange<0, 4>, u8>| {
+                let data = CondCmpReg {
                     rm: rm.value,
                     cond: cond.value,
                     rn: rn.value,
@@ -2044,36 +2193,32 @@ fn parse_cond_cmp_reg(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_adv_simd_ld_st_multi_structures(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("0_x_0011000_x_000000_xxxx_xx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_0011000_x_000000_xxxx_xx_xxxxx_xxxxx",
             |raw_instr: u32,
              q: Extract<BitRange<30, 31>, u8>,
              l: Extract<BitRange<22, 23>, u8>,
              opcode: Extract<BitRange<12, 16>, u8>,
              size: Extract<BitRange<10, 12>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = AdvSimdLdStMultiStructures{
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvSimdLdStMultiStructures {
                     q: q.value,
                     size: size.value,
                     rn: rn.value,
@@ -2099,36 +2244,32 @@ fn parse_adv_simd_ld_st_multi_structures(raw_instr: u32) -> AArch64Instr {
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_advanced_simd_extract(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("0_x_101110_xx_0_xxxxx_0_xxxx_0_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_101110_xx_0_xxxxx_0_xxxx_0_xxxxx_xxxxx",
             |raw_instr: u32,
              q: Extract<BitRange<30, 31>, u8>,
              op2: Extract<BitRange<22, 24>, u8>,
              rm: Extract<BitRange<16, 21>, u8>,
              imm4: Extract<BitRange<11, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
-                let data = AdvancedSimdExtract{
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvancedSimdExtract {
                     q: q.value,
                     rm: rm.value,
                     imm4: imm4.value,
@@ -2140,27 +2281,24 @@ fn parse_advanced_simd_extract(raw_instr: u32) -> AArch64Instr {
                     0b00 => AArch64Instr::Ext(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
 fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("0_x_0011001_x_0_xxxxx_xxxx_xx_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_0011001_x_0_xxxxx_xxxx_xx_xxxxx_xxxxx",
             |raw_instr: u32,
              q: Extract<BitRange<30, 31>, u8>,
              l: Extract<BitRange<22, 23>, u8>,
@@ -2168,8 +2306,7 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: u32) -> AArch64
              opcode: Extract<BitRange<12, 16>, u8>,
              size: Extract<BitRange<10, 12>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rt: Extract<BitRange<0, 5>, u8>,
-            | {
+             rt: Extract<BitRange<0, 5>, u8>| {
                 let data = AdvSimdLdStMultiStructuresPostIndexed {
                     q: q.value,
                     rm: rm.value,
@@ -2179,13 +2316,27 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: u32) -> AArch64
                 };
 
                 match (l.value, rm.value, opcode.value) {
-                    (0b0, rm, 0b0000) if rm != 0b11111 => AArch64Instr::St4MulStructuresRegOffsetVar(data),
-                    (0b0, rm, 0b0010) if rm != 0b11111 => AArch64Instr::St1MulStructures4RegRegOffsetVar(data),
-                    (0b0, rm, 0b0100) if rm != 0b11111 => AArch64Instr::St3MulStructuresRegOffsetVar(data),
-                    (0b0, rm, 0b0110) if rm != 0b11111 => AArch64Instr::St1MulStructures3RegRegOffsetVar(data),
-                    (0b0, rm, 0b0111) if rm != 0b11111 => AArch64Instr::St1MulStructures1RegRegOffsetVar(data),
-                    (0b0, rm, 0b1000) if rm != 0b11111 => AArch64Instr::St2MulStructuresRegOffsetVar(data),
-                    (0b0, rm, 0b1010) if rm != 0b11111 => AArch64Instr::St1MulStructures2RegRegOffsetVar(data),
+                    (0b0, rm, 0b0000) if rm != 0b11111 => {
+                        AArch64Instr::St4MulStructuresRegOffsetVar(data)
+                    }
+                    (0b0, rm, 0b0010) if rm != 0b11111 => {
+                        AArch64Instr::St1MulStructures4RegRegOffsetVar(data)
+                    }
+                    (0b0, rm, 0b0100) if rm != 0b11111 => {
+                        AArch64Instr::St3MulStructuresRegOffsetVar(data)
+                    }
+                    (0b0, rm, 0b0110) if rm != 0b11111 => {
+                        AArch64Instr::St1MulStructures3RegRegOffsetVar(data)
+                    }
+                    (0b0, rm, 0b0111) if rm != 0b11111 => {
+                        AArch64Instr::St1MulStructures1RegRegOffsetVar(data)
+                    }
+                    (0b0, rm, 0b1000) if rm != 0b11111 => {
+                        AArch64Instr::St2MulStructuresRegOffsetVar(data)
+                    }
+                    (0b0, rm, 0b1010) if rm != 0b11111 => {
+                        AArch64Instr::St1MulStructures2RegRegOffsetVar(data)
+                    }
 
                     (0b0, 0b11111, 0b0000) => AArch64Instr::St4MulStructuresImmOffsetVar(data),
                     (0b0, 0b11111, 0b0010) => AArch64Instr::St1MulStructures4RegImmOffsetVar(data),
@@ -2195,13 +2346,27 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: u32) -> AArch64
                     (0b0, 0b11111, 0b1000) => AArch64Instr::St2MulStructuresImmOffsetVar(data),
                     (0b0, 0b11111, 0b1010) => AArch64Instr::St1MulStructures2RegImmOffsetVar(data),
 
-                    (0b1, rm, 0b0000) if rm != 0b11111 => AArch64Instr::Ld4MulStructuresRegOffsetVar(data),
-                    (0b1, rm, 0b0010) if rm != 0b11111 => AArch64Instr::Ld1MulStructures4RegRegOffsetVar(data),
-                    (0b1, rm, 0b0100) if rm != 0b11111 => AArch64Instr::Ld3MulStructuresRegOffsetVar(data),
-                    (0b1, rm, 0b0110) if rm != 0b11111 => AArch64Instr::Ld1MulStructures3RegRegOffsetVar(data),
-                    (0b1, rm, 0b0111) if rm != 0b11111 => AArch64Instr::Ld1MulStructures1RegRegOffsetVar(data),
-                    (0b1, rm, 0b1000) if rm != 0b11111 => AArch64Instr::Ld2MulStructuresRegOffsetVar(data),
-                    (0b1, rm, 0b1010) if rm != 0b11111 => AArch64Instr::Ld1MulStructures2RegRegOffsetVar(data),
+                    (0b1, rm, 0b0000) if rm != 0b11111 => {
+                        AArch64Instr::Ld4MulStructuresRegOffsetVar(data)
+                    }
+                    (0b1, rm, 0b0010) if rm != 0b11111 => {
+                        AArch64Instr::Ld1MulStructures4RegRegOffsetVar(data)
+                    }
+                    (0b1, rm, 0b0100) if rm != 0b11111 => {
+                        AArch64Instr::Ld3MulStructuresRegOffsetVar(data)
+                    }
+                    (0b1, rm, 0b0110) if rm != 0b11111 => {
+                        AArch64Instr::Ld1MulStructures3RegRegOffsetVar(data)
+                    }
+                    (0b1, rm, 0b0111) if rm != 0b11111 => {
+                        AArch64Instr::Ld1MulStructures1RegRegOffsetVar(data)
+                    }
+                    (0b1, rm, 0b1000) if rm != 0b11111 => {
+                        AArch64Instr::Ld2MulStructuresRegOffsetVar(data)
+                    }
+                    (0b1, rm, 0b1010) if rm != 0b11111 => {
+                        AArch64Instr::Ld1MulStructures2RegRegOffsetVar(data)
+                    }
 
                     (0b1, 0b11111, 0b0000) => AArch64Instr::Ld4MulStructuresImmOffsetVar(data),
                     (0b1, 0b11111, 0b0010) => AArch64Instr::Ld1MulStructures4RegImmOffsetVar(data),
@@ -2212,28 +2377,24 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: u32) -> AArch64
                     (0b1, 0b11111, 0b1010) => AArch64Instr::Ld1MulStructures2RegImmOffsetVar(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }
 
-
 fn parse_conv_between_float_and_int(raw_instr: u32) -> AArch64Instr {
-    thread_local! {
-        pub static MATCHER: RefCell<BitPatternMatcher<AArch64Instr>> = {
-            let mut m = BitPatternMatcher::new();
-            m.bind("x_0_x_11110_xx_1_xx_xxx_000000_xxxxx_xxxxx",
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_0_x_11110_xx_1_xx_xxx_000000_xxxxx_xxxxx",
             |raw_instr: u32,
              sf: Extract<BitRange<31, 32>, u8>,
              s: Extract<BitRange<29, 30>, u8>,
@@ -2241,91 +2402,478 @@ fn parse_conv_between_float_and_int(raw_instr: u32) -> AArch64Instr {
              rmode: Extract<BitRange<19, 21>, u8>,
              opcode: Extract<BitRange<16, 19>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
-             rd: Extract<BitRange<0, 5>, u8>,
-            | {
+             rd: Extract<BitRange<0, 5>, u8>| {
                 let data = RnRd {
                     rn: rn.value,
                     rd: rd.value,
                 };
 
                 match (sf.value, s.value, ptype.value, rmode.value, opcode.value) {
-                    (0b0, 0b0, 0b00, 0b00, 0b000) => AArch64Instr::FcvtnsScalarSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b00, 0b001) => AArch64Instr::FcvtnuScalarSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b00, 0b010) => AArch64Instr::ScvtfScalarInt32ToSinglePrecision(data),
-                    (0b0, 0b0, 0b00, 0b00, 0b011) => AArch64Instr::UcvtfScalarInt32ToSinglePrecision(data),
-                    (0b0, 0b0, 0b00, 0b00, 0b100) => AArch64Instr::FcvtasScalarSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b00, 0b101) => AArch64Instr::FcvtauScalarSinglePrecisionTo32(data),
+                    (0b0, 0b0, 0b00, 0b00, 0b000) => {
+                        AArch64Instr::FcvtnsScalarSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b00, 0b001) => {
+                        AArch64Instr::FcvtnuScalarSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b00, 0b010) => {
+                        AArch64Instr::ScvtfScalarInt32ToSinglePrecision(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b00, 0b011) => {
+                        AArch64Instr::UcvtfScalarInt32ToSinglePrecision(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b00, 0b100) => {
+                        AArch64Instr::FcvtasScalarSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b00, 0b101) => {
+                        AArch64Instr::FcvtauScalarSinglePrecisionTo32(data)
+                    }
 
-                    (0b0, 0b0, 0b00, 0b00, 0b110) => AArch64Instr::FmovGeneralSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b00, 0b111) => AArch64Instr::FmovGeneral32ToSinglePrecision(data),
+                    (0b0, 0b0, 0b00, 0b00, 0b110) => {
+                        AArch64Instr::FmovGeneralSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b00, 0b111) => {
+                        AArch64Instr::FmovGeneral32ToSinglePrecision(data)
+                    }
 
-                    (0b0, 0b0, 0b00, 0b01, 0b000) => AArch64Instr::FcvtpsScalarSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b01, 0b001) => AArch64Instr::FcvtpuScalarSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b10, 0b000) => AArch64Instr::FcvtmsScalarSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b10, 0b001) => AArch64Instr::FcvtmuScalarSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b11, 0b000) => AArch64Instr::FcvtzsScalarIntSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b11, 0b001) => AArch64Instr::FcvtzuScalarIntSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b00, 0b000) => AArch64Instr::FcvtnsScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b00, 0b001) => AArch64Instr::FcvtnuScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b00, 0b010) => AArch64Instr::ScvtfScalarInt32ToDoublePrecision(data),
-                    (0b0, 0b0, 0b01, 0b00, 0b011) => AArch64Instr::UcvtfScalarInt32ToDoublePrecision(data),
-                    (0b0, 0b0, 0b01, 0b00, 0b100) => AArch64Instr::FcvtasScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b00, 0b101) => AArch64Instr::FcvtauScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b01, 0b000) => AArch64Instr::FcvtpsScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b01, 0b001) => AArch64Instr::FcvtpuScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b10, 0b000) => AArch64Instr::FcvtmsScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b10, 0b001) => AArch64Instr::FcvtmuScalarDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b11, 0b000) => AArch64Instr::FcvtzsScalarIntDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b11, 0b001) => AArch64Instr::FcvtzsScalarIntDoublePrecisionTo32(data),
+                    (0b0, 0b0, 0b00, 0b01, 0b000) => {
+                        AArch64Instr::FcvtpsScalarSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b01, 0b001) => {
+                        AArch64Instr::FcvtpuScalarSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b10, 0b000) => {
+                        AArch64Instr::FcvtmsScalarSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b10, 0b001) => {
+                        AArch64Instr::FcvtmuScalarSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b11, 0b000) => {
+                        AArch64Instr::FcvtzsScalarIntSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b11, 0b001) => {
+                        AArch64Instr::FcvtzuScalarIntSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00, 0b000) => {
+                        AArch64Instr::FcvtnsScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00, 0b001) => {
+                        AArch64Instr::FcvtnuScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00, 0b010) => {
+                        AArch64Instr::ScvtfScalarInt32ToDoublePrecision(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00, 0b011) => {
+                        AArch64Instr::UcvtfScalarInt32ToDoublePrecision(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00, 0b100) => {
+                        AArch64Instr::FcvtasScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00, 0b101) => {
+                        AArch64Instr::FcvtauScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b01, 0b000) => {
+                        AArch64Instr::FcvtpsScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b01, 0b001) => {
+                        AArch64Instr::FcvtpuScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b10, 0b000) => {
+                        AArch64Instr::FcvtmsScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b10, 0b001) => {
+                        AArch64Instr::FcvtmuScalarDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b11, 0b000) => {
+                        AArch64Instr::FcvtzsScalarIntDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b11, 0b001) => {
+                        AArch64Instr::FcvtzsScalarIntDoublePrecisionTo32(data)
+                    }
                     (0b0, 0b0, 0b01, 0b11, 0b110) => AArch64Instr::Fjcvtzs(data),
 
+                    (0b1, 0b0, 0b00, 0b00, 0b000) => {
+                        AArch64Instr::FcvtnsScalarSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b00, 0b001) => {
+                        AArch64Instr::FcvtnuScalarSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b00, 0b010) => {
+                        AArch64Instr::ScvtfScalarInt64ToSinglePrecision(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b00, 0b011) => {
+                        AArch64Instr::UcvtfScalarInt64ToSinglePrecision(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b00, 0b100) => {
+                        AArch64Instr::FcvtasScalarSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b00, 0b101) => {
+                        AArch64Instr::FcvtauScalarSinglePrecisionTo64(data)
+                    }
 
-                    (0b1, 0b0, 0b00, 0b00, 0b000) => AArch64Instr::FcvtnsScalarSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b00, 0b001) => AArch64Instr::FcvtnuScalarSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b00, 0b010) => AArch64Instr::ScvtfScalarInt64ToSinglePrecision(data),
-                    (0b1, 0b0, 0b00, 0b00, 0b011) => AArch64Instr::UcvtfScalarInt64ToSinglePrecision(data),
-                    (0b1, 0b0, 0b00, 0b00, 0b100) => AArch64Instr::FcvtasScalarSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b00, 0b101) => AArch64Instr::FcvtauScalarSinglePrecisionTo64(data),
+                    (0b1, 0b0, 0b01, 0b00, 0b110) => {
+                        AArch64Instr::FmovGeneralDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b111) => {
+                        AArch64Instr::FmovGeneral64ToDoublePrecision(data)
+                    }
 
-                    (0b1, 0b0, 0b01, 0b00, 0b110) => AArch64Instr::FmovGeneralDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b111) => AArch64Instr::FmovGeneral64ToDoublePrecision(data),
-                    
-                    (0b1, 0b0, 0b00, 0b01, 0b000) => AArch64Instr::FcvtpsScalarSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b01, 0b001) => AArch64Instr::FcvtpuScalarSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b10, 0b000) => AArch64Instr::FcvtmsScalarSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b10, 0b001) => AArch64Instr::FcvtmuScalarSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b11, 0b000) => AArch64Instr::FcvtzsScalarIntSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b11, 0b001) => AArch64Instr::FcvtzuScalarIntSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b000) => AArch64Instr::FcvtnsScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b001) => AArch64Instr::FcvtnuScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b010) => AArch64Instr::ScvtfScalarInt64ToDoublePrecision(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b011) => AArch64Instr::UcvtfScalarInt64ToDoublePrecision(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b100) => AArch64Instr::FcvtasScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b101) => AArch64Instr::FcvtauScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b01, 0b000) => AArch64Instr::FcvtpsScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b01, 0b001) => AArch64Instr::FcvtpuScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b10, 0b000) => AArch64Instr::FcvtmsScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b10, 0b001) => AArch64Instr::FcvtmuScalarDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b11, 0b000) => AArch64Instr::FcvtzsScalarIntDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b11, 0b001) => AArch64Instr::FcvtzsScalarIntDoublePrecisionTo64(data),
+                    (0b1, 0b0, 0b00, 0b01, 0b000) => {
+                        AArch64Instr::FcvtpsScalarSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b01, 0b001) => {
+                        AArch64Instr::FcvtpuScalarSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b10, 0b000) => {
+                        AArch64Instr::FcvtmsScalarSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b10, 0b001) => {
+                        AArch64Instr::FcvtmuScalarSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b11, 0b000) => {
+                        AArch64Instr::FcvtzsScalarIntSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b11, 0b001) => {
+                        AArch64Instr::FcvtzuScalarIntSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b000) => {
+                        AArch64Instr::FcvtnsScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b001) => {
+                        AArch64Instr::FcvtnuScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b010) => {
+                        AArch64Instr::ScvtfScalarInt64ToDoublePrecision(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b011) => {
+                        AArch64Instr::UcvtfScalarInt64ToDoublePrecision(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b100) => {
+                        AArch64Instr::FcvtasScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b101) => {
+                        AArch64Instr::FcvtauScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b01, 0b000) => {
+                        AArch64Instr::FcvtpsScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b01, 0b001) => {
+                        AArch64Instr::FcvtpuScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b10, 0b000) => {
+                        AArch64Instr::FcvtmsScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b10, 0b001) => {
+                        AArch64Instr::FcvtmuScalarDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b11, 0b000) => {
+                        AArch64Instr::FcvtzsScalarIntDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b11, 0b001) => {
+                        AArch64Instr::FcvtzsScalarIntDoublePrecisionTo64(data)
+                    }
 
-                    (0b1, 0b0, 0b10, 0b01, 0b110) => AArch64Instr::FmovGeneralTopHalfOf128To64(data),
-                    (0b1, 0b0, 0b10, 0b01, 0b111) => AArch64Instr::FmovGeneral64toTopHalfOf128(data),
+                    (0b1, 0b0, 0b10, 0b01, 0b110) => {
+                        AArch64Instr::FmovGeneralTopHalfOf128To64(data)
+                    }
+                    (0b1, 0b0, 0b10, 0b01, 0b111) => {
+                        AArch64Instr::FmovGeneral64toTopHalfOf128(data)
+                    }
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
-            });
+            },
+        );
 
-            RefCell::new(m)
-        }
-    }
-
-    return MATCHER.with(|v| {
-        let mut v = v.try_borrow_mut().unwrap();
-        if let Some(instr) = v.handle(raw_instr) {
-            return instr;
-        } else {
-            todo!("Unknown instruction {:032b}", raw_instr);
-        }
+        m
     });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_adv_simd_modified_imm(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_x_01111_00000_x_x_x_xxxx_x_1_x_x_x_x_x_xxxxx",
+            |raw_instr: u32,
+             q: Extract<BitRange<30, 31>, u8>,
+             op: Extract<BitRange<29, 30>, u8>,
+             a: Extract<BitRange<18, 19>, u8>,
+             b: Extract<BitRange<17, 18>, u8>,
+             c: Extract<BitRange<16, 17>, u8>,
+             cmode: Extract<BitRange<12, 16>, u8>,
+             o2: Extract<BitRange<11, 12>, u8>,
+             d: Extract<BitRange<9, 10>, u8>,
+             e: Extract<BitRange<8, 9>, u8>,
+             f: Extract<BitRange<7, 8>, u8>,
+             g: Extract<BitRange<6, 7>, u8>,
+             h: Extract<BitRange<5, 6>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvSimdModifiedImm {
+                    q: q.value,
+                    a: a.value,
+                    b: b.value,
+                    c: c.value,
+                    cmode: cmode.value,
+                    d: d.value,
+                    e: e.value,
+                    f: f.value,
+                    g: g.value,
+                    h: h.value,
+                    rd: rd.value,
+                };
+                let cmode = cmode.value as u32;
+                let cmode0 = extract_bits32(3..4, cmode);
+                let cmode1 = extract_bits32(2..3, cmode);
+                let cmode2 = extract_bits32(1..2, cmode);
+                let cmode3 = extract_bits32(0..1, cmode);
+
+                match (q.value, op.value, cmode0, cmode1, cmode2, cmode3, o2.value) {
+                    (_, 0b0, 0, _, _, 0, 0b0) => AArch64Instr::MoviShiftedImmVar32(data),
+                    (_, 0b0, 0, _, _, 1, 0b0) => AArch64Instr::OrrVecImmVar32(data),
+                    (_, 0b0, 1, 0, _, 0, 0b0) => AArch64Instr::MoviShiftedImmVar16(data),
+                    (_, 0b0, 1, 0, _, 1, 0b0) => AArch64Instr::OrrVecImmVar16(data),
+                    (_, 0b0, 1, 1, 0, _, 0b0) => AArch64Instr::MoviShiftingOnesVar32(data),
+                    (_, 0b0, 1, 1, 1, 0, 0b0) => AArch64Instr::MoviVar8(data),
+                    (_, 0b0, 1, 1, 1, 1, 0b0) => AArch64Instr::FmovVecImmSinglePrecisionVar(data),
+
+                    (_, 0b1, 0, _, _, 0, 0b0) => AArch64Instr::MvniShiftedImmVar32(data),
+                    (_, 0b1, 0, _, _, 1, 0b0) => AArch64Instr::BicVecImmVar32(data),
+                    (_, 0b1, 1, 0, _, 0, 0b0) => AArch64Instr::MvniShiftedImmVar16(data),
+                    (_, 0b1, 1, 0, _, 1, 0b0) => AArch64Instr::BicVecImmVar16(data),
+
+                    (_, 0b1, 1, 1, 0, _, 0b0) => AArch64Instr::MvniShiftingOnesVar32(data),
+                    (0b0, 0b1, 1, 1, 1, 0, 0b0) => AArch64Instr::MoviScalarVar64(data),
+
+                    (0b1, 0b1, 1, 1, 1, 0, 0b0) => AArch64Instr::MoviVectorVar64(data),
+                    (0b1, 0b1, 1, 1, 1, 1, 0b0) => AArch64Instr::FmovVecImmDoublePrecisionVar(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_cond_cmp_imm(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_x_x_11010010_xxxxx_xxxx_1_x_xxxxx_x_xxxx",
+            |raw_instr: u32,
+             sf_op_s: Extract<BitRange<29, 32>, u8>,
+             imm5: Extract<BitRange<16, 21>, u8>,
+             cond: Extract<BitRange<12, 16>, u8>,
+             o2: Extract<BitRange<10, 11>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             o3: Extract<BitRange<4, 5>, u8>,
+             nzcv: Extract<BitRange<0, 4>, u8>| {
+                let data = CondCmpImm {
+                    imm5: imm5.value,
+                    cond: cond.value,
+                    rn: rn.value,
+                    nzcv: nzcv.value,
+                };
+
+                match (sf_op_s.value, o2.value, o3.value) {
+                    (0b001, 0b0, 0b0) => AArch64Instr::CcmnImmVar32(data),
+                    (0b011, 0b0, 0b0) => AArch64Instr::CcmpImmVar32(data),
+                    (0b101, 0b0, 0b0) => AArch64Instr::CcmnImmVar64(data),
+                    (0b111, 0b0, 0b0) => AArch64Instr::CcmpImmVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_load_store_ordered(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_0010001_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             size: Extract<BitRange<30, 32>, u8>,
+             l: Extract<BitRange<22, 23>, u8>,
+             rs: Extract<BitRange<16, 21>, u8>,
+             o0: Extract<BitRange<15, 16>, u8>,
+             rt2: Extract<BitRange<10, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = LoadStoreOrdered {
+                    rs: rs.value,
+                    rt2: rt2.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (size.value, l.value, o0.value) {
+                    (0b00, 0b0, 0b1) => AArch64Instr::Stlrb(data),
+                    (0b00, 0b1, 0b1) => AArch64Instr::Ldarb(data),
+                    (0b01, 0b0, 0b1) => AArch64Instr::Stlrh(data),
+                    (0b01, 0b1, 0b1) => AArch64Instr::Ldarh(data),
+                    (0b10, 0b0, 0b1) => AArch64Instr::StlrVar32(data),
+                    (0b10, 0b1, 0b1) => AArch64Instr::LdarVar32(data),
+                    (0b11, 0b0, 0b1) => AArch64Instr::StlrVar64(data),
+                    (0b11, 0b1, 0b1) => AArch64Instr::LdarVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_advanced_simd_three_same(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_x_01110_xx_1_xxxxx_xxxxx_1_xxxxx_xxxxx",
+            |raw_instr: u32,
+             q: Extract<BitRange<30, 31>, u8>,
+             u: Extract<BitRange<29, 30>, u8>,
+             size: Extract<BitRange<22, 24>, u8>,
+             rm: Extract<BitRange<16, 21>, u8>,
+             opcode: Extract<BitRange<11, 16>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvancedSimd3Same {
+                    q: q.value,
+                    size: size.value,
+                    rm: rm.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (u.value, size.value, opcode.value) {
+                    (0b0, _, 0b00000) => AArch64Instr::Shadd(data),
+                    (0b0, _, 0b00001) => AArch64Instr::Sqadd(data),
+                    (0b0, _, 0b00010) => AArch64Instr::Srhadd(data),
+                    (0b0, _, 0b00100) => AArch64Instr::Shsub(data),
+                    (0b0, _, 0b00101) => AArch64Instr::Sqsub(data),
+                    (0b0, _, 0b00110) => AArch64Instr::CmgtReg(data),
+                    (0b0, _, 0b00111) => AArch64Instr::CmgeReg(data),
+                    (0b0, _, 0b01000) => AArch64Instr::Sshl(data),
+                    (0b0, _, 0b01001) => AArch64Instr::SqshlReg(data),
+                    (0b0, _, 0b01010) => AArch64Instr::Srshl(data),
+                    (0b0, _, 0b01011) => AArch64Instr::Sqrshl(data),
+                    (0b0, _, 0b01100) => AArch64Instr::Smax(data),
+                    (0b0, _, 0b01101) => AArch64Instr::Smin(data),
+                    (0b0, _, 0b01110) => AArch64Instr::Sabd(data),
+                    (0b0, _, 0b01111) => AArch64Instr::Saba(data),
+                    (0b0, _, 0b10000) => AArch64Instr::AddVec(data),
+                    (0b0, _, 0b10001) => AArch64Instr::Cmtst(data),
+                    (0b0, _, 0b10010) => AArch64Instr::MlaVec(data),
+                    (0b0, _, 0b10011) => AArch64Instr::MulVec(data),
+                    (0b0, _, 0b10100) => AArch64Instr::Smaxp(data),
+                    (0b0, _, 0b10101) => AArch64Instr::Sminp(data),
+                    (0b0, _, 0b10110) => AArch64Instr::SqdmulhVec(data),
+                    (0b0, _, 0b10111) => AArch64Instr::AddpVec(data),
+
+                    (0b0, 0b00 | 0b01, 0b11000) => AArch64Instr::FmaxnmVec(data),
+                    (0b0, 0b00 | 0b01, 0b11001) => AArch64Instr::FmlaVec(data),
+                    (0b0, 0b00 | 0b01, 0b11010) => AArch64Instr::FaddVec(data),
+                    (0b0, 0b00 | 0b01, 0b11011) => AArch64Instr::Fmulx(data),
+                    (0b0, 0b00 | 0b01, 0b11100) => AArch64Instr::FcmeqReg(data),
+                    (0b0, 0b00 | 0b01, 0b11110) => AArch64Instr::FmaxVec(data),
+                    (0b0, 0b00 | 0b01, 0b11111) => AArch64Instr::Frecps(data),
+
+                    (0b0, 0b00, 0b00011) => AArch64Instr::AndVec(data),
+                    (0b0, 0b01, 0b00011) => AArch64Instr::AndVec(data),
+
+                    (0b0, 0b10 | 0b11, 0b11000) => AArch64Instr::FminnmVec(data),
+                    (0b0, 0b10 | 0b11, 0b11001) => AArch64Instr::FmlsVec(data),
+                    (0b0, 0b10 | 0b11, 0b11010) => AArch64Instr::FsubVec(data),
+                    (0b0, 0b10 | 0b11, 0b11110) => AArch64Instr::FminVec(data),
+                    (0b0, 0b10 | 0b11, 0b11111) => AArch64Instr::Frsqrts(data),
+
+                    (0b0, 0b10, 0b00011) => AArch64Instr::OrrVecReg(data),
+                    (0b0, 0b11, 0b00011) => AArch64Instr::OrnVec(data),
+
+                    (0b1, _, 0b00000) => AArch64Instr::Uhadd(data),
+                    (0b1, _, 0b00001) => AArch64Instr::Uqadd(data),
+                    (0b1, _, 0b00010) => AArch64Instr::Urhadd(data),
+                    (0b1, _, 0b00100) => AArch64Instr::Uhsub(data),
+                    (0b1, _, 0b00101) => AArch64Instr::Uqsub(data),
+                    (0b1, _, 0b00110) => AArch64Instr::CmhiReg(data),
+                    (0b1, _, 0b00111) => AArch64Instr::CmhsReg(data),
+                    (0b1, _, 0b01000) => AArch64Instr::Ushl(data),
+                    (0b1, _, 0b01001) => AArch64Instr::UqshlReg(data),
+                    (0b1, _, 0b01010) => AArch64Instr::Urshl(data),
+                    (0b1, _, 0b01011) => AArch64Instr::Uqrshl(data),
+                    (0b1, _, 0b01100) => AArch64Instr::Umax(data),
+                    (0b1, _, 0b01101) => AArch64Instr::Umin(data),
+                    (0b1, _, 0b01110) => AArch64Instr::Uabd(data),
+                    (0b1, _, 0b01111) => AArch64Instr::Uaba(data),
+
+                    (0b1, _, 0b10000) => AArch64Instr::SubVec(data),
+                    (0b1, _, 0b10001) => AArch64Instr::CmeqReg(data),
+                    (0b1, _, 0b10010) => AArch64Instr::MlsVec(data),
+                    (0b1, _, 0b10011) => AArch64Instr::Pmul(data),
+                    (0b1, _, 0b10100) => AArch64Instr::Umaxp(data),
+                    (0b1, _, 0b10101) => AArch64Instr::Uminp(data),
+                    (0b1, _, 0b10110) => AArch64Instr::SqrdmulhVec(data),
+
+                    (0b1, 0b00 | 0b01, 0b11000) => AArch64Instr::FmaxnmpVec(data),
+                    (0b1, 0b00 | 0b01, 0b11010) => AArch64Instr::FaddpVec(data),
+                    (0b1, 0b00 | 0b01, 0b11011) => AArch64Instr::FmulVec(data),
+                    (0b1, 0b00 | 0b01, 0b11100) => AArch64Instr::FcmgeReg(data),
+                    (0b1, 0b00 | 0b01, 0b11101) => AArch64Instr::Facge(data),
+                    (0b1, 0b00 | 0b01, 0b11110) => AArch64Instr::FmaxpVec(data),
+                    (0b1, 0b00 | 0b01, 0b11111) => AArch64Instr::FdivVec(data),
+
+                    (0b1, 0b00, 0b00011) => AArch64Instr::EorVec(data),
+                    (0b1, 0b01, 0b00011) => AArch64Instr::Bsl(data),
+
+                    (0b1, 0b10 | 0b11, 0b11000) => AArch64Instr::FminnmpVec(data),
+                    (0b1, 0b10 | 0b11, 0b11010) => AArch64Instr::Fabd(data),
+                    (0b1, 0b10 | 0b11, 0b11100) => AArch64Instr::FcmgtReg(data),
+                    (0b1, 0b10 | 0b11, 0b11101) => AArch64Instr::Facgt(data),
+                    (0b1, 0b10 | 0b11, 0b11110) => AArch64Instr::FminpVec(data),
+
+                    (0b1, 0b10, 0b00011) => AArch64Instr::Bit(data),
+                    (0b1, 0b11, 0b00011) => AArch64Instr::Bif(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
 }

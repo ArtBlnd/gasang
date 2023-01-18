@@ -240,3 +240,43 @@ pub struct AdvSimdLdStMultiStructuresPostIndexed {
     pub rn: u8,
     pub rt: u8,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdModifiedImm {
+    pub q: u8,
+    pub a: u8,
+    pub b: u8,
+    pub c: u8,
+    pub cmode: u8,
+    pub d: u8,
+    pub e: u8,
+    pub f: u8,
+    pub g: u8,
+    pub h: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CondCmpImm {
+    pub imm5: u8,
+    pub cond: u8,
+    pub rn: u8,
+    pub nzcv: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoadStoreOrdered {
+    pub rs: u8,
+    pub rt2: u8,
+    pub rn: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvancedSimd3Same {
+    pub q: u8,
+    pub size: u8,
+    pub rm: u8,
+    pub rn: u8,
+    pub rd: u8,
+}

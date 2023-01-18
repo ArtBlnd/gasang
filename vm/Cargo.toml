@@ -13,3 +13,4 @@ path = "interpret-ir.rs"
 [dependencies]
 num-traits = "0.2.15"
 slab = "0.4.7"
+thiserror = "1.0.38"

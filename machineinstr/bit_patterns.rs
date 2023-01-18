@@ -664,3 +664,616 @@ where
         )
     }
 }
+
+impl<F, O, R1, T1, R2, T2, R3, T3, R4, T4, R5, T5, R6, T6, R7, T7, R8, T8, R9, T9, R10, T10>
+    Handler<(
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+        R10,
+        T10,
+    )> for F
+where
+    F: Fn(
+        u32,
+        Extract<R1, T1>,
+        Extract<R2, T2>,
+        Extract<R3, T3>,
+        Extract<R4, T4>,
+        Extract<R5, T5>,
+        Extract<R6, T6>,
+        Extract<R7, T7>,
+        Extract<R8, T8>,
+        Extract<R9, T9>,
+        Extract<R10, T10>,
+    ) -> O,
+    R1: BitRangeHelper,
+    T1: FromPrimitive,
+    R2: BitRangeHelper,
+    T2: FromPrimitive,
+    R3: BitRangeHelper,
+    T3: FromPrimitive,
+    R4: BitRangeHelper,
+    T4: FromPrimitive,
+    R5: BitRangeHelper,
+    T5: FromPrimitive,
+    R6: BitRangeHelper,
+    T6: FromPrimitive,
+    R7: BitRangeHelper,
+    T7: FromPrimitive,
+    R8: BitRangeHelper,
+    T8: FromPrimitive,
+    R9: BitRangeHelper,
+    T9: FromPrimitive,
+    R10: BitRangeHelper,
+    T10: FromPrimitive,
+{
+    type Output = O;
+
+    fn handle(&self, raw_instr: u32) -> Self::Output {
+        let op1: u64 = extract_bits32(R1::range(), raw_instr) as u64;
+        let op2: u64 = extract_bits32(R2::range(), raw_instr) as u64;
+        let op3: u64 = extract_bits32(R3::range(), raw_instr) as u64;
+        let op4: u64 = extract_bits32(R4::range(), raw_instr) as u64;
+        let op5: u64 = extract_bits32(R5::range(), raw_instr) as u64;
+        let op6: u64 = extract_bits32(R6::range(), raw_instr) as u64;
+        let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
+        let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+
+        (self)(
+            raw_instr,
+            Extract {
+                __p: PhantomData,
+                value: T1::from_u64(op1).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T2::from_u64(op2).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T3::from_u64(op3).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T4::from_u64(op4).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T5::from_u64(op5).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T6::from_u64(op6).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T7::from_u64(op7).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T8::from_u64(op8).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T9::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T10::from_u64(op9).unwrap(),
+            },
+        )
+    }
+}
+
+impl<
+        F,
+        O,
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+        R10,
+        T10,
+        R11,
+        T11,
+    >
+    Handler<(
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+        R10,
+        T10,
+        R11,
+        T11,
+    )> for F
+where
+    F: Fn(
+        u32,
+        Extract<R1, T1>,
+        Extract<R2, T2>,
+        Extract<R3, T3>,
+        Extract<R4, T4>,
+        Extract<R5, T5>,
+        Extract<R6, T6>,
+        Extract<R7, T7>,
+        Extract<R8, T8>,
+        Extract<R9, T9>,
+        Extract<R10, T10>,
+        Extract<R11, T11>,
+    ) -> O,
+    R1: BitRangeHelper,
+    T1: FromPrimitive,
+    R2: BitRangeHelper,
+    T2: FromPrimitive,
+    R3: BitRangeHelper,
+    T3: FromPrimitive,
+    R4: BitRangeHelper,
+    T4: FromPrimitive,
+    R5: BitRangeHelper,
+    T5: FromPrimitive,
+    R6: BitRangeHelper,
+    T6: FromPrimitive,
+    R7: BitRangeHelper,
+    T7: FromPrimitive,
+    R8: BitRangeHelper,
+    T8: FromPrimitive,
+    R9: BitRangeHelper,
+    T9: FromPrimitive,
+    R10: BitRangeHelper,
+    T10: FromPrimitive,
+    R11: BitRangeHelper,
+    T11: FromPrimitive,
+{
+    type Output = O;
+
+    fn handle(&self, raw_instr: u32) -> Self::Output {
+        let op1: u64 = extract_bits32(R1::range(), raw_instr) as u64;
+        let op2: u64 = extract_bits32(R2::range(), raw_instr) as u64;
+        let op3: u64 = extract_bits32(R3::range(), raw_instr) as u64;
+        let op4: u64 = extract_bits32(R4::range(), raw_instr) as u64;
+        let op5: u64 = extract_bits32(R5::range(), raw_instr) as u64;
+        let op6: u64 = extract_bits32(R6::range(), raw_instr) as u64;
+        let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
+        let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R11::range(), raw_instr) as u64;
+
+        (self)(
+            raw_instr,
+            Extract {
+                __p: PhantomData,
+                value: T1::from_u64(op1).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T2::from_u64(op2).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T3::from_u64(op3).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T4::from_u64(op4).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T5::from_u64(op5).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T6::from_u64(op6).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T7::from_u64(op7).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T8::from_u64(op8).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T9::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T10::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T11::from_u64(op9).unwrap(),
+            },
+        )
+    }
+}
+
+impl<
+        F,
+        O,
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+        R10,
+        T10,
+        R11,
+        T11,
+        R12,
+        T12,
+    >
+    Handler<(
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+        R10,
+        T10,
+        R11,
+        T11,
+        R12,
+        T12,
+    )> for F
+where
+    F: Fn(
+        u32,
+        Extract<R1, T1>,
+        Extract<R2, T2>,
+        Extract<R3, T3>,
+        Extract<R4, T4>,
+        Extract<R5, T5>,
+        Extract<R6, T6>,
+        Extract<R7, T7>,
+        Extract<R8, T8>,
+        Extract<R9, T9>,
+        Extract<R10, T10>,
+        Extract<R11, T11>,
+        Extract<R12, T12>,
+    ) -> O,
+    R1: BitRangeHelper,
+    T1: FromPrimitive,
+    R2: BitRangeHelper,
+    T2: FromPrimitive,
+    R3: BitRangeHelper,
+    T3: FromPrimitive,
+    R4: BitRangeHelper,
+    T4: FromPrimitive,
+    R5: BitRangeHelper,
+    T5: FromPrimitive,
+    R6: BitRangeHelper,
+    T6: FromPrimitive,
+    R7: BitRangeHelper,
+    T7: FromPrimitive,
+    R8: BitRangeHelper,
+    T8: FromPrimitive,
+    R9: BitRangeHelper,
+    T9: FromPrimitive,
+    R10: BitRangeHelper,
+    T10: FromPrimitive,
+    R11: BitRangeHelper,
+    T11: FromPrimitive,
+    R12: BitRangeHelper,
+    T12: FromPrimitive,
+{
+    type Output = O;
+
+    fn handle(&self, raw_instr: u32) -> Self::Output {
+        let op1: u64 = extract_bits32(R1::range(), raw_instr) as u64;
+        let op2: u64 = extract_bits32(R2::range(), raw_instr) as u64;
+        let op3: u64 = extract_bits32(R3::range(), raw_instr) as u64;
+        let op4: u64 = extract_bits32(R4::range(), raw_instr) as u64;
+        let op5: u64 = extract_bits32(R5::range(), raw_instr) as u64;
+        let op6: u64 = extract_bits32(R6::range(), raw_instr) as u64;
+        let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
+        let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R11::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R12::range(), raw_instr) as u64;
+
+        (self)(
+            raw_instr,
+            Extract {
+                __p: PhantomData,
+                value: T1::from_u64(op1).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T2::from_u64(op2).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T3::from_u64(op3).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T4::from_u64(op4).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T5::from_u64(op5).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T6::from_u64(op6).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T7::from_u64(op7).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T8::from_u64(op8).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T9::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T10::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T11::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T12::from_u64(op9).unwrap(),
+            },
+        )
+    }
+}
+
+impl<
+        F,
+        O,
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+        R10,
+        T10,
+        R11,
+        T11,
+        R12,
+        T12,
+        R13,
+        T13,
+    >
+    Handler<(
+        R1,
+        T1,
+        R2,
+        T2,
+        R3,
+        T3,
+        R4,
+        T4,
+        R5,
+        T5,
+        R6,
+        T6,
+        R7,
+        T7,
+        R8,
+        T8,
+        R9,
+        T9,
+        R10,
+        T10,
+        R11,
+        T11,
+        R12,
+        T12,
+        R13,
+        T13,
+    )> for F
+where
+    F: Fn(
+        u32,
+        Extract<R1, T1>,
+        Extract<R2, T2>,
+        Extract<R3, T3>,
+        Extract<R4, T4>,
+        Extract<R5, T5>,
+        Extract<R6, T6>,
+        Extract<R7, T7>,
+        Extract<R8, T8>,
+        Extract<R9, T9>,
+        Extract<R10, T10>,
+        Extract<R11, T11>,
+        Extract<R12, T12>,
+        Extract<R13, T13>,
+    ) -> O,
+    R1: BitRangeHelper,
+    T1: FromPrimitive,
+    R2: BitRangeHelper,
+    T2: FromPrimitive,
+    R3: BitRangeHelper,
+    T3: FromPrimitive,
+    R4: BitRangeHelper,
+    T4: FromPrimitive,
+    R5: BitRangeHelper,
+    T5: FromPrimitive,
+    R6: BitRangeHelper,
+    T6: FromPrimitive,
+    R7: BitRangeHelper,
+    T7: FromPrimitive,
+    R8: BitRangeHelper,
+    T8: FromPrimitive,
+    R9: BitRangeHelper,
+    T9: FromPrimitive,
+    R10: BitRangeHelper,
+    T10: FromPrimitive,
+    R11: BitRangeHelper,
+    T11: FromPrimitive,
+    R12: BitRangeHelper,
+    T12: FromPrimitive,
+    R13: BitRangeHelper,
+    T13: FromPrimitive,
+{
+    type Output = O;
+
+    fn handle(&self, raw_instr: u32) -> Self::Output {
+        let op1: u64 = extract_bits32(R1::range(), raw_instr) as u64;
+        let op2: u64 = extract_bits32(R2::range(), raw_instr) as u64;
+        let op3: u64 = extract_bits32(R3::range(), raw_instr) as u64;
+        let op4: u64 = extract_bits32(R4::range(), raw_instr) as u64;
+        let op5: u64 = extract_bits32(R5::range(), raw_instr) as u64;
+        let op6: u64 = extract_bits32(R6::range(), raw_instr) as u64;
+        let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
+        let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R11::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R12::range(), raw_instr) as u64;
+        let op9: u64 = extract_bits32(R13::range(), raw_instr) as u64;
+
+        (self)(
+            raw_instr,
+            Extract {
+                __p: PhantomData,
+                value: T1::from_u64(op1).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T2::from_u64(op2).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T3::from_u64(op3).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T4::from_u64(op4).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T5::from_u64(op5).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T6::from_u64(op6).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T7::from_u64(op7).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T8::from_u64(op8).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T9::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T10::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T11::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T12::from_u64(op9).unwrap(),
+            },
+            Extract {
+                __p: PhantomData,
+                value: T13::from_u64(op9).unwrap(),
+            },
+        )
+    }
+}
