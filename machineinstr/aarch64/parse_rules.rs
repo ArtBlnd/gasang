@@ -344,7 +344,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 if op2.value == 0b0000 {
                     parse_adv_simd_modified_imm(raw_instr)
                 } else {
-                    todo!("Advanced SIMD shift by immediate")
+                    parse_adv_simd_shift_by_imm(raw_instr)
                 }
             },
         )
@@ -2862,6 +2862,74 @@ fn parse_advanced_simd_three_same(raw_instr: u32) -> AArch64Instr {
 
                     (0b1, 0b10, 0b00011) => AArch64Instr::Bit(data),
                     (0b1, 0b11, 0b00011) => AArch64Instr::Bif(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_adv_simd_shift_by_imm(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_x_011110_xxxx_xxx_xxxxx_1_xxxxx_xxxxx",
+            |raw_instr: u32,
+             q: Extract<BitRange<30, 31>, u8>,
+             u: Extract<BitRange<29, 30>, u8>,
+             immb: Extract<BitRange<16, 19>, u8>,
+             opcode: Extract<BitRange<11, 16>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvSimdShiftByImm {
+                    q: q.value,
+                    immb: immb.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (u.value, opcode.value) {
+                    (0b0, 0b00000) => AArch64Instr::Sshr(data),
+                    (0b0, 0b00010) => AArch64Instr::Ssra(data),
+                    (0b0, 0b00100) => AArch64Instr::Srshr(data),
+                    (0b0, 0b00110) => AArch64Instr::Srsra(data),
+                    (0b0, 0b01010) => AArch64Instr::Shl(data),
+                    (0b0, 0b01110) => AArch64Instr::SqshlImm(data),
+                    (0b0, 0b10000) => AArch64Instr::ShrnShrn2(data),
+                    (0b0, 0b10001) => AArch64Instr::RshrnRshrn2(data),
+                    (0b0, 0b10010) => AArch64Instr::SqshrnSqshrn2(data),
+                    (0b0, 0b10011) => AArch64Instr::SqrshrnSqrshrn2(data),
+                    (0b0, 0b10100) => AArch64Instr::SshllSshll2(data),
+                    (0b0, 0b11100) => AArch64Instr::ScvtfVecFixedPt(data),
+                    (0b0, 0b11111) => AArch64Instr::FcvtzsVecFixedPt(data),
+
+                    (0b10, 0b00000) => AArch64Instr::Ushr(data),
+                    (0b1, 0b00010) => AArch64Instr::Usra(data),
+                    (0b1, 0b00100) => AArch64Instr::Urshr(data),
+                    (0b1, 0b00110) => AArch64Instr::Ursra(data),
+
+                    (0b1, 0b01000) => AArch64Instr::Sri(data),
+                    (0b1, 0b01010) => AArch64Instr::Sli(data),
+
+                    (0b1, 0b01100) => AArch64Instr::Sqshlu(data),
+                    (0b1, 0b01110) => AArch64Instr::UqshlImm(data),
+
+                    (0b1, 0b10000) => AArch64Instr::SqshrunSqshrun2(data),
+                    (0b1, 0b10001) => AArch64Instr::SqrshrunSqrshrun2(data),
+                    (0b1, 0b10010) => AArch64Instr::UqshrnUqshrn2(data),
+                    (0b1, 0b10011) => AArch64Instr::UqrshrnUqrshrn2(data),
+                    (0b1, 0b10100) => AArch64Instr::UshllUshll2(data),
+                    (0b1, 0b11100) => AArch64Instr::UcvtfVecFixedPt(data),
+                    (0b1, 0b11111) => AArch64Instr::FcvtzuVecFixedPt(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }

@@ -280,3 +280,11 @@ pub struct AdvancedSimd3Same {
     pub rn: u8,
     pub rd: u8,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdShiftByImm {
+    pub q: u8,
+    pub immb: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
