@@ -409,7 +409,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxx10000"
             ),
-            |raw_instr: u32| todo!("Floating-point data-processing (1 source)"),
+            |raw_instr: u32| parse_float_data_proc_1src(raw_instr),
         )
         .bind(
             &format!(
@@ -2930,6 +2930,71 @@ fn parse_adv_simd_shift_by_imm(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b10100) => AArch64Instr::UshllUshll2(data),
                     (0b1, 0b11100) => AArch64Instr::UcvtfVecFixedPt(data),
                     (0b1, 0b11111) => AArch64Instr::FcvtzuVecFixedPt(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_float_data_proc_1src(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_0_x_11110_xx_1_xxxxxx_10000_xxxxx_xxxxx",
+            |raw_instr: u32,
+             m: Extract<BitRange<31, 32>, u8>,
+             s: Extract<BitRange<29, 30>, u8>,
+             ptype: Extract<BitRange<22, 24>, u8>,
+             opcode: Extract<BitRange<15, 21>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = RnRd {
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (m.value, s.value, ptype.value, opcode.value) {
+                    (0b0, 0b0, 0b00, 0b000000) => AArch64Instr::FmovRegSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b000001) => AArch64Instr::FabsScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b000010) => AArch64Instr::FnegScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b000011) => AArch64Instr::FsqrtScalarSinglePrecisionVar(data),
+
+                    (0b0, 0b0, 0b00, 0b000101) => AArch64Instr::FcvtSingleToDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b000111) => AArch64Instr::FcvtSingleToHalfPrecisionVar(data),
+
+                    (0b0, 0b0, 0b00, 0b001000) => AArch64Instr::FrintnScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b001001) => AArch64Instr::FrintpScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b001010) => AArch64Instr::FrintmScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b001011) => AArch64Instr::FrintzScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b001100) => AArch64Instr::FrintaScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b001110) => AArch64Instr::FrintxScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b001111) => AArch64Instr::FrintiScalarSinglePrecisionVar(data),
+
+                    (0b0, 0b0, 0b01, 0b000000) => AArch64Instr::FmovRegDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b000001) => AArch64Instr::FabsScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b000010) => AArch64Instr::FnegScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b000011) => AArch64Instr::FsqrtScalarDoublePrecisionVar(data),
+
+                    (0b0, 0b0, 0b01, 0b000100) => AArch64Instr::FcvtDoubleToSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b000111) => AArch64Instr::FcvtDoubleToHalfPrecisionVar(data),
+
+                    (0b0, 0b0, 0b01, 0b001000) => AArch64Instr::FrintnScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b001001) => AArch64Instr::FrintpScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b001010) => AArch64Instr::FrintmScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b001011) => AArch64Instr::FrintzScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b001100) => AArch64Instr::FrintaScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b001110) => AArch64Instr::FrintxScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b001111) => AArch64Instr::FrintiScalarDoublePrecisionVar(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
