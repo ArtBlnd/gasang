@@ -228,7 +228,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "x110", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar pairwise"),
+            |raw_instr: u32| parse_adv_simd_scalar_pairwise(raw_instr),
         )
         .bind(
             &format!(
@@ -312,7 +312,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x100", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD two-register miscellaneous"),
+            |raw_instr: u32| parse_adv_simd_2reg_miscellaneous(raw_instr)
         )
         .bind(
             &format!(
@@ -484,9 +484,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "0x00_1_1_0_10_x_x00000_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
-                todo!("Advanced SIMD Load/Store single structure");
-            },
+            |raw_instr: u32| parse_adv_simd_ld_st_single_structure(raw_instr),
         )
         .bind(
             "0x00_1_1_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
@@ -2969,32 +2967,312 @@ fn parse_float_data_proc_1src(raw_instr: u32) -> AArch64Instr {
                     (0b0, 0b0, 0b00, 0b000010) => AArch64Instr::FnegScalarSinglePrecisionVar(data),
                     (0b0, 0b0, 0b00, 0b000011) => AArch64Instr::FsqrtScalarSinglePrecisionVar(data),
 
-                    (0b0, 0b0, 0b00, 0b000101) => AArch64Instr::FcvtSingleToDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b000101) => {
+                        AArch64Instr::FcvtSingleToDoublePrecisionVar(data)
+                    }
                     (0b0, 0b0, 0b00, 0b000111) => AArch64Instr::FcvtSingleToHalfPrecisionVar(data),
 
-                    (0b0, 0b0, 0b00, 0b001000) => AArch64Instr::FrintnScalarSinglePrecisionVar(data),
-                    (0b0, 0b0, 0b00, 0b001001) => AArch64Instr::FrintpScalarSinglePrecisionVar(data),
-                    (0b0, 0b0, 0b00, 0b001010) => AArch64Instr::FrintmScalarSinglePrecisionVar(data),
-                    (0b0, 0b0, 0b00, 0b001011) => AArch64Instr::FrintzScalarSinglePrecisionVar(data),
-                    (0b0, 0b0, 0b00, 0b001100) => AArch64Instr::FrintaScalarSinglePrecisionVar(data),
-                    (0b0, 0b0, 0b00, 0b001110) => AArch64Instr::FrintxScalarSinglePrecisionVar(data),
-                    (0b0, 0b0, 0b00, 0b001111) => AArch64Instr::FrintiScalarSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b001000) => {
+                        AArch64Instr::FrintnScalarSinglePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b001001) => {
+                        AArch64Instr::FrintpScalarSinglePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b001010) => {
+                        AArch64Instr::FrintmScalarSinglePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b001011) => {
+                        AArch64Instr::FrintzScalarSinglePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b001100) => {
+                        AArch64Instr::FrintaScalarSinglePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b001110) => {
+                        AArch64Instr::FrintxScalarSinglePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b001111) => {
+                        AArch64Instr::FrintiScalarSinglePrecisionVar(data)
+                    }
 
                     (0b0, 0b0, 0b01, 0b000000) => AArch64Instr::FmovRegDoublePrecisionVar(data),
                     (0b0, 0b0, 0b01, 0b000001) => AArch64Instr::FabsScalarDoublePrecisionVar(data),
                     (0b0, 0b0, 0b01, 0b000010) => AArch64Instr::FnegScalarDoublePrecisionVar(data),
                     (0b0, 0b0, 0b01, 0b000011) => AArch64Instr::FsqrtScalarDoublePrecisionVar(data),
 
-                    (0b0, 0b0, 0b01, 0b000100) => AArch64Instr::FcvtDoubleToSinglePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b000100) => {
+                        AArch64Instr::FcvtDoubleToSinglePrecisionVar(data)
+                    }
                     (0b0, 0b0, 0b01, 0b000111) => AArch64Instr::FcvtDoubleToHalfPrecisionVar(data),
 
-                    (0b0, 0b0, 0b01, 0b001000) => AArch64Instr::FrintnScalarDoublePrecisionVar(data),
-                    (0b0, 0b0, 0b01, 0b001001) => AArch64Instr::FrintpScalarDoublePrecisionVar(data),
-                    (0b0, 0b0, 0b01, 0b001010) => AArch64Instr::FrintmScalarDoublePrecisionVar(data),
-                    (0b0, 0b0, 0b01, 0b001011) => AArch64Instr::FrintzScalarDoublePrecisionVar(data),
-                    (0b0, 0b0, 0b01, 0b001100) => AArch64Instr::FrintaScalarDoublePrecisionVar(data),
-                    (0b0, 0b0, 0b01, 0b001110) => AArch64Instr::FrintxScalarDoublePrecisionVar(data),
-                    (0b0, 0b0, 0b01, 0b001111) => AArch64Instr::FrintiScalarDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b01, 0b001000) => {
+                        AArch64Instr::FrintnScalarDoublePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b001001) => {
+                        AArch64Instr::FrintpScalarDoublePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b001010) => {
+                        AArch64Instr::FrintmScalarDoublePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b001011) => {
+                        AArch64Instr::FrintzScalarDoublePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b001100) => {
+                        AArch64Instr::FrintaScalarDoublePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b001110) => {
+                        AArch64Instr::FrintxScalarDoublePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b001111) => {
+                        AArch64Instr::FrintiScalarDoublePrecisionVar(data)
+                    }
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_adv_simd_scalar_pairwise(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "01_x_11110_xx_11000_xxxxx_10_xxxxx_xxxxx",
+            |raw_instr: u32,
+             u: Extract<BitRange<29, 30>, u8>,
+             size: Extract<BitRange<22, 24>, u8>,
+             opcode: Extract<BitRange<12, 17>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvSimdScalarPairwise {
+                    size: size.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (u.value, size.value, opcode.value) {
+                    (0b0, _, 0b11011) => AArch64Instr::AddpScalar(data),
+                    (0b0, 0b00 | 0b01, 0b01100) => AArch64Instr::FmaxnmpScalarEncoding(data),
+                    (0b0, 0b00 | 0b01, 0b01101) => AArch64Instr::FaddpScalarEncoding(data),
+                    (0b0, 0b00 | 0b01, 0b01111) => AArch64Instr::FmaxpScalarEncoding(data),
+                    (0b0, 0b10 | 0b11, 0b01100) => AArch64Instr::FminnmpScalarEncoding(data),
+                    (0b0, 0b10 | 0b11, 11) => AArch64Instr::FminpScalarEncoding(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_adv_simd_ld_st_single_structure(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_0011010_x_x_00000_xxx_x_xx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             q: Extract<BitRange<30, 31>, u8>,
+             l: Extract<BitRange<22, 23>, u8>,
+             r: Extract<BitRange<21, 22>, u8>,
+             opcode: Extract<BitRange<13, 16>, u8>,
+             s: Extract<BitRange<12, 13>, u8>,
+             size: Extract<BitRange<10, 12>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvSimdLdStSingleStructure {
+                    q: q.value,
+                    s: s.value,
+                    size: size.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (l.value, r.value, opcode.value, s.value, size.value) {
+                    (0b0, 0b0, 0b000, _, _) => AArch64Instr::St1SingleStructureVar8(data),
+                    (0b0, 0b0, 0b001, _, _) => AArch64Instr::St3SingleStructureVar8(data),
+                    (0b0, 0b0, 0b010, _, 0b00 | 0b10) => {
+                        AArch64Instr::St1SingleStructureVar16(data)
+                    }
+                    (0b0, 0b0, 0b011, _, 0b00 | 0b10) => {
+                        AArch64Instr::St3SingleStructureVar16(data)
+                    }
+
+                    (0b0, 0b0, 0b100, _, 0b00) => AArch64Instr::St1SingleStructureVar32(data),
+                    (0b0, 0b0, 0b100, 0b0, 0b01) => AArch64Instr::St1SingleStructureVar64(data),
+                    (0b0, 0b0, 0b101, _, 0b00) => AArch64Instr::St3SingleStructureVar32(data),
+                    (0b0, 0b0, 0b101, 0b0, 0b01) => AArch64Instr::St3SingleStructureVar64(data),
+
+                    (0b0, 0b1, 0b000, _, _) => AArch64Instr::St2SingleStructureVar8(data),
+                    (0b0, 0b1, 0b001, _, _) => AArch64Instr::St4SingleStructureVar8(data),
+                    (0b0, 0b1, 0b010, _, 0b00 | 0b10) => {
+                        AArch64Instr::St2SingleStructureVar16(data)
+                    }
+
+                    (0b0, 0b1, 0b011, _, 0b00 | 0b10) => {
+                        AArch64Instr::St4SingleStructureVar16(data)
+                    }
+
+                    (0b0, 0b1, 0b100, _, 0b00) => AArch64Instr::St2SingleStructureVar32(data),
+                    (0b0, 0b1, 0b100, 0b0, 0b01) => AArch64Instr::St2SingleStructureVar64(data),
+                    (0b0, 0b1, 0b101, _, 0b00) => AArch64Instr::St4SingleStructureVar32(data),
+                    (0b0, 0b1, 0b101, 0b0, 0b01) => AArch64Instr::St4SingleStructureVar64(data),
+
+                    (0b1, 0b0, 0b000, _, _) => AArch64Instr::Ld1SingleStructureVar8(data),
+                    (0b1, 0b0, 0b001, _, _) => AArch64Instr::Ld3SingleStructureVar8(data),
+                    (0b1, 0b0, 0b010, _, 0b00 | 0b10) => {
+                        AArch64Instr::Ld1SingleStructureVar16(data)
+                    }
+
+                    (0b1, 0b0, 0b011, _, 0b00 | 0b10) => {
+                        AArch64Instr::Ld3SingleStructureVar16(data)
+                    }
+
+                    (0b1, 0b0, 0b100, _, 0b00) => AArch64Instr::Ld1SingleStructureVar32(data),
+                    (0b1, 0b0, 0b100, 0b0, 0b01) => AArch64Instr::Ld1SingleStructureVar64(data),
+                    (0b1, 0b0, 0b101, _, 0b00) => AArch64Instr::Ld3SingleStructureVar32(data),
+                    (0b1, 0b0, 0b101, 0b0, 0b01) => AArch64Instr::Ld3SingleStructureVar64(data),
+
+                    (0b1, 0b0, 0b110, 0b0, _) => AArch64Instr::Ld1r(data),
+                    (0b1, 0b0, 0b111, 0b0, _) => AArch64Instr::Ld3r(data),
+
+                    (0b1, 0b1, 0b000, _, _) => AArch64Instr::Ld2SingleStructureVar8(data),
+                    (0b1, 0b1, 0b001, _, _) => AArch64Instr::Ld4SingleStructureVar8(data),
+                    (0b1, 0b1, 0b010, _, 0b00 | 0b10) => {
+                        AArch64Instr::Ld2SingleStructureVar16(data)
+                    }
+
+                    (0b1, 0b1, 0b011, _, 0b00 | 0b10) => {
+                        AArch64Instr::Ld4SingleStructureVar16(data)
+                    }
+
+                    (0b1, 0b1, 0b100, _, 0b00) => AArch64Instr::Ld2SingleStructureVar32(data),
+                    (0b1, 0b1, 0b100, 0b0, 0b01) => AArch64Instr::Ld2SingleStructureVar64(data),
+                    (0b1, 0b1, 0b101, _, 0b00) => AArch64Instr::Ld4SingleStructureVar32(data),
+                    (0b1, 0b1, 0b101, 0b0, 0b01) => AArch64Instr::Ld4SingleStructureVar64(data),
+
+                    (0b1, 0b1, 0b110, 0b0, _) => AArch64Instr::Ld2r(data),
+                    (0b1, 0b1, 0b111, 0b0, _) => AArch64Instr::Ld2r(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_adv_simd_2reg_miscellaneous(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_x_01110_xx_10000_xxxxx_10_xxxxx_xxxxx",
+            |raw_instr: u32,
+             q: Extract<BitRange<30, 31>, u8>,
+             u: Extract<BitRange<29, 30>, u8>,
+             size: Extract<BitRange<22, 24>, u8>,
+             opcode: Extract<BitRange<12, 17>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = AdvSimd2RegMiscellaneous {
+                    q: q.value,
+                    size: size.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (u.value, size.value, opcode.value) {
+                    (0b0, _, 0b00000) => AArch64Instr::Rev64(data),
+                    (0b0, _, 0b00001) => AArch64Instr::Rev16Vec(data),
+                    (0b0, _, 0b00010) => AArch64Instr::Saddlp(data),
+                    (0b0, _, 0b00011) => AArch64Instr::Suqadd(data),
+                    (0b0, _, 0b00100) => AArch64Instr::ClsVec(data),
+                    (0b0, _, 0b00101) => AArch64Instr::Cnt(data),
+                    (0b0, _, 0b00110) => AArch64Instr::Sadalp(data),
+                    (0b0, _, 0b00111) => AArch64Instr::Sqabs(data),
+                    (0b0, _, 0b01000) => AArch64Instr::CmgtZero(data),
+                    (0b0, _, 0b01001) => AArch64Instr::CmeqZero(data),
+                    (0b0, _, 0b01010) => AArch64Instr::CmltZero(data),
+                    (0b0, _, 0b01011) => AArch64Instr::Abs(data),
+                    (0b0, _, 0b10010) => AArch64Instr::XtnXtn2(data),
+                    (0b0, _, 0b10100) => AArch64Instr::SqxtnSqxtn2(data),
+
+                    (0b0, 0b00 | 0b01, 0b10110) => AArch64Instr::FcvtnFcvtn2(data),
+                    (0b0, 0b00 | 0b01, 0b10111) => AArch64Instr::FcvtlFcvtl2(data),
+                    (0b0, 0b00 | 0b01, 0b11000) => AArch64Instr::FrintnVec(data),
+                    (0b0, 0b00 | 0b01, 0b11001) => AArch64Instr::FrintmVec(data),
+                    (0b0, 0b00 | 0b01, 0b11010) => AArch64Instr::FcvtnsVec(data),
+                    (0b0, 0b00 | 0b01, 0b11011) => AArch64Instr::FcvtmsVec(data),
+                    (0b0, 0b00 | 0b01, 0b11100) => AArch64Instr::FcvtasVec(data),
+                    (0b0, 0b00 | 0b01, 0b11101) => AArch64Instr::ScvtfVecInt(data),
+
+                    (0b0, 0b10 | 0b11, 0b01100) => AArch64Instr::FcmgtZero(data),
+                    (0b0, 0b10 | 0b11, 0b01101) => AArch64Instr::FcmeqZero(data),
+                    (0b0, 0b10 | 0b11, 0b01110) => AArch64Instr::FcmltZero(data),
+                    (0b0, 0b10 | 0b11, 0b01111) => AArch64Instr::FabsVec(data),
+                    (0b0, 0b10 | 0b11, 0b11000) => AArch64Instr::FrintpVec(data),
+                    (0b0, 0b10 | 0b11, 0b11001) => AArch64Instr::FrintzVec(data),
+                    (0b0, 0b10 | 0b11, 0b11010) => AArch64Instr::FcvtpsVec(data),
+                    (0b0, 0b10 | 0b11, 0b11011) => AArch64Instr::FcvtzsVecInt(data),
+                    (0b0, 0b10 | 0b11, 0b11100) => AArch64Instr::Urecpe(data),
+                    (0b0, 0b10 | 0b11, 0b11101) => AArch64Instr::Frecpe(data),
+
+                    (0b1, _, 0b00000) => AArch64Instr::Rev32Vec(data),
+                    (0b1, _, 0b00010) => AArch64Instr::Uaddlp(data),
+                    (0b1, _, 0b00011) => AArch64Instr::Usqadd(data),
+                    (0b1, _, 0b00100) => AArch64Instr::ClzVec(data),
+                    (0b1, _, 0b00110) => AArch64Instr::Uadalp(data),
+                    (0b1, _, 0b00111) => AArch64Instr::Sqneg(data),
+                    (0b1, _, 0b01000) => AArch64Instr::CmgeZero(data),
+                    (0b1, _, 0b01001) => AArch64Instr::CmleZero(data),
+                    (0b1, _, 0b01011) => AArch64Instr::NegVec(data),
+                    (0b1, _, 0b10010) => AArch64Instr::SqxtunSqxtun2(data),
+                    (0b1, _, 0b10011) => AArch64Instr::ShllShll2(data),
+                    (0b1, _, 0b10100) => AArch64Instr::UqxtnUqxtn2(data),
+
+                    (0b1, 0b00 | 0b01, 0b10110) => AArch64Instr::FcvtxnFcvtxn2(data),
+                    (0b1, 0b00 | 0b01, 0b11000) => AArch64Instr::FrintaVec(data),
+                    (0b1, 0b00 | 0b01, 0b11001) => AArch64Instr::FrintxVec(data),
+                    (0b1, 0b00 | 0b01, 0b11010) => AArch64Instr::FcvtnuVec(data),
+                    (0b1, 0b00 | 0b01, 0b11011) => AArch64Instr::FcvtmuVec(data),
+                    (0b1, 0b00 | 0b01, 0b11100) => AArch64Instr::FcvtauVec(data),
+                    (0b1, 0b00 | 0b01, 0b11101) => AArch64Instr::UcvtfVecInt(data),
+
+                    (0b1, 0b00, 0b00101) => AArch64Instr::Not(data),
+                    (0b1, 0b01, 0b00101) => AArch64Instr::RbitVec(data),
+
+                    (0b1, 0b10 | 0b11, 0b01100) => AArch64Instr::FcmgeZero(data),
+                    (0b1, 0b10 | 0b11, 0b01101) => AArch64Instr::FcmleZero(data),
+                    (0b1, 0b10 | 0b11, 0b01111) => AArch64Instr::FnegVec(data),
+                    (0b1, 0b10 | 0b11, 0b11001) => AArch64Instr::FrintiVec(data),
+                    (0b1, 0b10 | 0b11, 0b11010) => AArch64Instr::FcvtpuVec(data),
+                    (0b1, 0b10 | 0b11, 0b11011) => AArch64Instr::FcvtzuVecInt(data),
+                    (0b1, 0b10 | 0b11, 0b11100) => AArch64Instr::Ursqrte(data),
+                    (0b1, 0b10 | 0b11, 0b11101) => AArch64Instr::Frsqrte(data),
+                    (0b1, 0b10 | 0b11, 0b11111) => AArch64Instr::FsqrtVec(data),
+                    
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }

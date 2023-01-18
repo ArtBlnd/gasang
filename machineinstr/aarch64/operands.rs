@@ -288,3 +288,27 @@ pub struct AdvSimdShiftByImm {
     pub rn: u8,
     pub rd: u8,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdScalarPairwise {
+    pub size: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdLdStSingleStructure {
+    pub q: u8,
+    pub s: u8,
+    pub size: u8,
+    pub rn: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimd2RegMiscellaneous {
+    pub q: u8,
+    pub size: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
