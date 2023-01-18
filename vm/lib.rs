@@ -1,3 +1,5 @@
+mod error;
+pub use error::*;
 mod register;
 pub use register::*;
 mod instr;
