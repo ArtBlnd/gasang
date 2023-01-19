@@ -513,9 +513,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "xx00_1_0_0_00_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
-                todo!("Load/store exclusive register");
-            },
+            |raw_instr: u32| parse_load_store_exclusive_register(raw_instr),
         )
         .bind(
             "xx00_1_0_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
@@ -2697,6 +2695,60 @@ fn parse_cond_cmp_imm(raw_instr: u32) -> AArch64Instr {
                     (0b011, 0b0, 0b0) => AArch64Instr::CcmpImmVar32(data),
                     (0b101, 0b0, 0b0) => AArch64Instr::CcmnImmVar64(data),
                     (0b111, 0b0, 0b0) => AArch64Instr::CcmpImmVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_load_store_exclusive_register(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_0010000_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             size: Extract<BitRange<30, 32>, u8>,
+             l: Extract<BitRange<22, 23>, u8>,
+             rs: Extract<BitRange<16, 21>, u8>,
+             o0: Extract<BitRange<15, 16>, u8>,
+             rt2: Extract<BitRange<10, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = LoadStoreRegExclusive {
+                    rs: rs.value,
+                    rt2: rt2.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (size.value, l.value, o0.value) {
+                    (0b00, 0b0, 0b0) => AArch64Instr::Stxrb(data),
+                    (0b00, 0b1, 0b0) => AArch64Instr::Ldxrb(data),
+                    (0b01, 0b0, 0b0) => AArch64Instr::Stxrh(data),
+                    (0b01, 0b1, 0b0) => AArch64Instr::Ldxrh(data),
+                    (0b10, 0b0, 0b0) => AArch64Instr::StxrVar32(data),
+                    (0b10, 0b1, 0b0) => AArch64Instr::LdxrVar32(data),
+                    (0b11, 0b0, 0b0) => AArch64Instr::StxrVar64(data),
+                    (0b11, 0b1, 0b0) => AArch64Instr::LdxrVar64(data),
+
+                    (0b00, 0b0, 0b1) => AArch64Instr::Stlxrb(data),
+                    (0b00, 0b1, 0b1) => AArch64Instr::Ldaxrb(data),
+                    (0b01, 0b0, 0b1) => AArch64Instr::Stlxrh(data),
+                    (0b01, 0b1, 0b1) => AArch64Instr::Ldaxrh(data),
+                    (0b10, 0b0, 0b1) => AArch64Instr::StlxrVar32(data),
+                    (0b10, 0b1, 0b1) => AArch64Instr::LdaxrVar32(data),
+                    (0b11, 0b0, 0b1) => AArch64Instr::StlxrVar64(data),
+                    (0b11, 0b1, 0b1) => AArch64Instr::LdaxrVar64(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }

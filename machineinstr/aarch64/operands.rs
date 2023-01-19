@@ -265,6 +265,14 @@ pub struct CondCmpImm {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoadStoreRegExclusive {
+    pub rs: u8,
+    pub rt2: u8,
+    pub rn: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LoadStoreOrdered {
     pub rs: u8,
     pub rt2: u8,
