@@ -306,9 +306,21 @@ pub struct AdvSimdLdStSingleStructure {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct AdvSimd2RegMiscellaneous {
+pub struct QSizeRnRd {
     pub q: u8,
     pub size: u8,
     pub rn: u8,
     pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Imm16 {
+    pub imm16: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompareAndSwap {
+    pub rs: u8,
+    pub rn: u8,
+    pub rt: u8,
 }

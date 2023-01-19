@@ -27,7 +27,14 @@ where
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind("0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
-            todo!("Reserved")
+            let op0 = extract_bits32(29..31, raw_instr);
+            let op1 = extract_bits32(16..25, raw_instr);
+            let imm16 = Imm16 {imm16: extract_bits32(0..16, raw_instr) as u16};
+
+            match (op0, op1) {
+                (0b00, 0b000000000) => AArch64Instr::Udf(imm16),
+                _ => todo!("Unknown reserved instruction {:032b}", raw_instr)
+            }
         })
         .bind("1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
             todo!("SME encodings")
@@ -319,7 +326,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x110", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD across lanes"),
+            |raw_instr: u32| parse_adv_simd_across_lanes(raw_instr)
         )
         .bind(
             &format!(
@@ -464,14 +471,14 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
     }
 }
 
-// parse Load and stores instructions in AArch64
+// parse Load and stores instructions i pairn AArch64
 fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
             |raw_instr: u32| {
-                todo!("Compare and swap");
+                todo!("Compare and swap pair");
             },
         )
         .bind(
@@ -517,7 +524,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         .bind(
             "xx00_1_0_0_01_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
             |raw_instr: u32| {
-                todo!("Compare and Swap");
+                parse_compare_and_swap(raw_instr)
             },
         )
         .bind(
@@ -2902,15 +2909,15 @@ fn parse_adv_simd_shift_by_imm(raw_instr: u32) -> AArch64Instr {
                     (0b0, 0b00110) => AArch64Instr::Srsra(data),
                     (0b0, 0b01010) => AArch64Instr::Shl(data),
                     (0b0, 0b01110) => AArch64Instr::SqshlImm(data),
-                    (0b0, 0b10000) => AArch64Instr::ShrnShrn2(data),
-                    (0b0, 0b10001) => AArch64Instr::RshrnRshrn2(data),
-                    (0b0, 0b10010) => AArch64Instr::SqshrnSqshrn2(data),
-                    (0b0, 0b10011) => AArch64Instr::SqrshrnSqrshrn2(data),
-                    (0b0, 0b10100) => AArch64Instr::SshllSshll2(data),
+                    (0b0, 0b10000) => AArch64Instr::Shrn(data),
+                    (0b0, 0b10001) => AArch64Instr::Rshrn(data),
+                    (0b0, 0b10010) => AArch64Instr::Sqshrn(data),
+                    (0b0, 0b10011) => AArch64Instr::Sqrshrn(data),
+                    (0b0, 0b10100) => AArch64Instr::Sshll(data),
                     (0b0, 0b11100) => AArch64Instr::ScvtfVecFixedPt(data),
                     (0b0, 0b11111) => AArch64Instr::FcvtzsVecFixedPt(data),
 
-                    (0b10, 0b00000) => AArch64Instr::Ushr(data),
+                    (0b1, 0b00000) => AArch64Instr::Ushr(data),
                     (0b1, 0b00010) => AArch64Instr::Usra(data),
                     (0b1, 0b00100) => AArch64Instr::Urshr(data),
                     (0b1, 0b00110) => AArch64Instr::Ursra(data),
@@ -2921,11 +2928,11 @@ fn parse_adv_simd_shift_by_imm(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b01100) => AArch64Instr::Sqshlu(data),
                     (0b1, 0b01110) => AArch64Instr::UqshlImm(data),
 
-                    (0b1, 0b10000) => AArch64Instr::SqshrunSqshrun2(data),
-                    (0b1, 0b10001) => AArch64Instr::SqrshrunSqrshrun2(data),
-                    (0b1, 0b10010) => AArch64Instr::UqshrnUqshrn2(data),
-                    (0b1, 0b10011) => AArch64Instr::UqrshrnUqrshrn2(data),
-                    (0b1, 0b10100) => AArch64Instr::UshllUshll2(data),
+                    (0b1, 0b10000) => AArch64Instr::Sqshrun(data),
+                    (0b1, 0b10001) => AArch64Instr::Sqrshrun(data),
+                    (0b1, 0b10010) => AArch64Instr::Uqshrn(data),
+                    (0b1, 0b10011) => AArch64Instr::Uqrshrn(data),
+                    (0b1, 0b10100) => AArch64Instr::Ushll(data),
                     (0b1, 0b11100) => AArch64Instr::UcvtfVecFixedPt(data),
                     (0b1, 0b11111) => AArch64Instr::FcvtzuVecFixedPt(data),
 
@@ -3196,7 +3203,7 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: u32) -> AArch64Instr {
              opcode: Extract<BitRange<12, 17>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rd: Extract<BitRange<0, 5>, u8>| {
-                let data = AdvSimd2RegMiscellaneous {
+                let data = QSizeRnRd {
                     q: q.value,
                     size: size.value,
                     rn: rn.value,
@@ -3217,10 +3224,10 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: u32) -> AArch64Instr {
                     (0b0, _, 0b01010) => AArch64Instr::CmltZero(data),
                     (0b0, _, 0b01011) => AArch64Instr::Abs(data),
                     (0b0, _, 0b10010) => AArch64Instr::XtnXtn2(data),
-                    (0b0, _, 0b10100) => AArch64Instr::SqxtnSqxtn2(data),
+                    (0b0, _, 0b10100) => AArch64Instr::Sqxtn(data),
 
-                    (0b0, 0b00 | 0b01, 0b10110) => AArch64Instr::FcvtnFcvtn2(data),
-                    (0b0, 0b00 | 0b01, 0b10111) => AArch64Instr::FcvtlFcvtl2(data),
+                    (0b0, 0b00 | 0b01, 0b10110) => AArch64Instr::Fcvtn(data),
+                    (0b0, 0b00 | 0b01, 0b10111) => AArch64Instr::Fcvtl(data),
                     (0b0, 0b00 | 0b01, 0b11000) => AArch64Instr::FrintnVec(data),
                     (0b0, 0b00 | 0b01, 0b11001) => AArch64Instr::FrintmVec(data),
                     (0b0, 0b00 | 0b01, 0b11010) => AArch64Instr::FcvtnsVec(data),
@@ -3248,11 +3255,11 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: u32) -> AArch64Instr {
                     (0b1, _, 0b01000) => AArch64Instr::CmgeZero(data),
                     (0b1, _, 0b01001) => AArch64Instr::CmleZero(data),
                     (0b1, _, 0b01011) => AArch64Instr::NegVec(data),
-                    (0b1, _, 0b10010) => AArch64Instr::SqxtunSqxtun2(data),
-                    (0b1, _, 0b10011) => AArch64Instr::ShllShll2(data),
-                    (0b1, _, 0b10100) => AArch64Instr::UqxtnUqxtn2(data),
+                    (0b1, _, 0b10010) => AArch64Instr::Sqxtun(data),
+                    (0b1, _, 0b10011) => AArch64Instr::Shll(data),
+                    (0b1, _, 0b10100) => AArch64Instr::Uqxtn(data),
 
-                    (0b1, 0b00 | 0b01, 0b10110) => AArch64Instr::FcvtxnFcvtxn2(data),
+                    (0b1, 0b00 | 0b01, 0b10110) => AArch64Instr::Fcvtxn(data),
                     (0b1, 0b00 | 0b01, 0b11000) => AArch64Instr::FrintaVec(data),
                     (0b1, 0b00 | 0b01, 0b11001) => AArch64Instr::FrintxVec(data),
                     (0b1, 0b00 | 0b01, 0b11010) => AArch64Instr::FcvtnuVec(data),
@@ -3273,6 +3280,111 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b10 | 0b11, 0b11101) => AArch64Instr::Frsqrte(data),
                     (0b1, 0b10 | 0b11, 0b11111) => AArch64Instr::FsqrtVec(data),
                     
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_adv_simd_across_lanes(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_x_01110_xx_11000_xxxxx_10_xxxxx_xxxxx",
+            |raw_instr: u32,
+             q: Extract<BitRange<30, 31>, u8>,
+             u: Extract<BitRange<29, 30>, u8>,
+             size: Extract<BitRange<22, 24>, u8>,
+             opcode: Extract<BitRange<12, 17>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = QSizeRnRd {
+                    q: q.value,
+                    size: size.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match (u.value, size.value, opcode.value) {
+                    (0b0, _, 0b00011) => AArch64Instr::Saddlv(data),
+                    (0b0, _, 0b01010) => AArch64Instr::Smaxv(data),
+                    (0b0, _, 0b11010) => AArch64Instr::Sminv(data),
+                    (0b0, _, 0b11011) => AArch64Instr::Addv(data),
+
+                    (0b1, _, 0b00011) => AArch64Instr::Uaddlv(data),
+                    (0b1, _, 0b01010) => AArch64Instr::Uaddlv(data),
+                    (0b1, _, 0b11010) => AArch64Instr::Uminv(data),
+
+                    (0b1, 0b00 | 0b01, 0b01100) => AArch64Instr::FmaxnvmEncoding(data),
+                    (0b1, 0b00 | 0b01, 0b01111) => AArch64Instr::FmaxvEncoding(data),
+
+                    (0b1, 0b10 | 0b11, 0b01100) => AArch64Instr::FminnmvEncoding(data),
+                    (0b1, 0b10 | 0b11, 0b01111) => AArch64Instr::FminvEncoding(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_compare_and_swap(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_0010001_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             size: Extract<BitRange<30, 32>, u8>,
+             l: Extract<BitRange<22, 23>, u8>,
+             rs: Extract<BitRange<16, 21>, u8>,
+             o0: Extract<BitRange<15, 16>, u8>,
+             rt2: Extract<BitRange<10, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = CompareAndSwap {
+                    rs: rs.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (size.value, l.value, o0.value, rt2.value) {
+                    (0b00, 0b0, 0b0, 0b11111) => AArch64Instr::Casb(data),
+                    (0b00, 0b0, 0b1, 0b11111) => AArch64Instr::Caslb(data),
+                    (0b00, 0b1, 0b0, 0b11111) => AArch64Instr::Casab(data),
+                    (0b00, 0b1, 0b1, 0b11111) => AArch64Instr::Casalb(data),
+
+                    (0b01, 0b0, 0b0, 0b11111) => AArch64Instr::Cash(data),
+                    (0b01, 0b0, 0b1, 0b11111) => AArch64Instr::Caslh(data),
+                    (0b01, 0b1, 0b0, 0b11111) => AArch64Instr::Casah(data),
+                    (0b01, 0b1, 0b1, 0b11111) => AArch64Instr::Casalh(data),
+
+                    (0b10, 0b0, 0b0, 0b11111) => AArch64Instr::CasVar32(data),
+                    (0b10, 0b0, 0b1, 0b11111) => AArch64Instr::CaslVar32(data),
+                    (0b10, 0b1, 0b0, 0b11111) => AArch64Instr::CasaVar32(data),
+                    (0b10, 0b1, 0b1, 0b11111) => AArch64Instr::CasalVar32(data),
+
+                    (0b11, 0b0, 0b0, 0b11111) => AArch64Instr::CasVar64(data),
+                    (0b11, 0b0, 0b1, 0b11111) => AArch64Instr::CaslVar64(data),
+                    (0b11, 0b1, 0b0, 0b11111) => AArch64Instr::CasaVar64(data),
+                    (0b11, 0b1, 0b1, 0b11111) => AArch64Instr::CasalVar64(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
