@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 pub struct MemoryManagementUnit {
-    inner: Arc<MemoryManagementUnitInner>
+    inner: Arc<MemoryManagementUnitInner>,
 }
 
 impl Deref for MemoryManagementUnit {
@@ -35,7 +35,7 @@ impl MemoryManagementUnit {
 pub struct MemoryManagementUnitInner {
     // linear page table.
     page_size: usize,
-    page_table: Box<[Page]>
+    page_table: Box<[Page]>,
 }
 
 impl MemoryManagementUnitInner {

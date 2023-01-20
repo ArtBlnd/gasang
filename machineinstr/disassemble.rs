@@ -28,7 +28,7 @@ fn main() {
     let buf = &slice[ep_offset..(ep_offset + ep_size)];
 
     let reader = BitReader::new(buf.iter().cloned());
-    let mut parser = MachineInstParser::new(reader, AArch64InstrParserRule);
+    let parser = MachineInstParser::new(reader, AArch64InstrParserRule);
 
     let mut n = 0;
     for inst in parser {

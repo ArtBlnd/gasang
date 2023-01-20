@@ -11,6 +11,9 @@ name = "interpret-ir"
 path = "interpret-ir.rs"
 
 [dependencies]
+elf = "0.7.1"
+machineinstr = { version = "0.1.0", path = "../machineinstr" }
 num-traits = "0.2.15"
 slab = "0.4.7"
+smallvec = "1.10.0"
 thiserror = "1.0.38"

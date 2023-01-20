@@ -1,6 +1,5 @@
-
-use std::sync::Arc;
 use std::cell::UnsafeCell;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct HostMemory {

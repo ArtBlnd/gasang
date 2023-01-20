@@ -1,5 +1,24 @@
 use crate::interrupt::Interrupt;
 
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+
+#[derive(Debug, Clone, Copy)]
+pub struct RegId(pub usize);
+impl<T> From<T> for RegId
+where
+    T: Into<usize>,
+{
+    fn from(v: T) -> Self {
+        RegId(v.into())
+    }
+}
+
+impl Display for RegId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "reg:{}", self.0)
+    }
+}
+
 pub struct GprRegister {
     name: String,
     size: u8,

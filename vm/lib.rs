@@ -1,22 +1,22 @@
 mod error;
 pub use error::*;
-mod register;
-pub use register::*;
+
 mod interrupt;
 pub use interrupt::*;
 
-pub mod instr;
 pub mod aarch64;
-pub mod mmu;
+pub mod instr;
 pub mod memory;
-
+pub mod mmu;
+pub mod register;
 
 use slab::Slab;
 
 use crate::instr::VmInstr;
+use crate::register::*;
 
-pub type RegId = usize;
-pub type FlagId = usize;
+#[derive(Debug, Clone, Copy)]
+pub struct FlagId(pub usize);
 
 pub struct VmState {
     gpr_register: Slab<GprRegister>,
@@ -33,7 +33,7 @@ pub struct VmState {
 impl VmState {
     pub fn run(&mut self, instr: &Vec<VmInstr>) -> Result<(), Interrupt> {
         while self.ip < instr.len() {
-            instr[self.ip](self)?;
+            instr[self.ip].execute(self)?;
 
             // check control flow has been modified
             // if its modified do not increase instruction pointer.
@@ -48,37 +48,37 @@ impl VmState {
     }
 
     pub fn new_gpr_register(&mut self, name: impl AsRef<str>, size: u8) -> RegId {
-        self.gpr_register.insert(GprRegister::new(name, size))
+        RegId(self.gpr_register.insert(GprRegister::new(name, size)))
     }
 
     pub fn get_gpr_register(&mut self, id: RegId) -> Option<&mut GprRegister> {
-        self.gpr_register.get_mut(id)
+        self.gpr_register.get_mut(id.0)
     }
 
     pub fn new_fpr_register(&mut self, name: impl AsRef<str>, size: u8) -> RegId {
-        self.fpr_register.insert(FprRegister {
+        RegId(self.fpr_register.insert(FprRegister {
             name: name.as_ref().to_string(),
             size,
             value: 0.0,
-        })
+        }))
     }
 
     pub fn get_fpr_register(&mut self, id: RegId) -> Option<&mut FprRegister> {
-        self.fpr_register.get_mut(id)
+        self.fpr_register.get_mut(id.0)
     }
 
     pub fn get_flag(&mut self, id: FlagId) -> Option<bool> {
-        self.flags.get(id).cloned()
+        self.flags.get(id.0).cloned()
     }
 
     pub fn set_flag(&mut self, id: FlagId, value: bool) {
-        if let Some(v) = self.flags.get_mut(id) {
+        if let Some(v) = self.flags.get_mut(id.0) {
             *v = value;
         }
     }
 
     pub fn new_flag(&mut self, name: impl AsRef<str>) -> FlagId {
-        self.flags.insert(false)
+        FlagId(self.flags.insert(false))
     }
 
     pub fn set_cf_modified(&mut self) {

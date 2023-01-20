@@ -6,5 +6,5 @@ pub enum Interrupt {
     IntegerOverflow,
 
     #[error("Interrupting with value {0}")]
-    Interrupt(usize)
+    Interrupt(usize),
 }

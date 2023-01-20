@@ -873,12 +873,12 @@ fn parse_move_wide_imm(raw_instr: u32) -> AArch64Instr {
                 };
 
                 match (sf_opc.value, hw.value) {
-                    (0b000, 0b00 | 0b01) => AArch64Instr::Movn32(data),
-                    (0b010, 0b00 | 0b01) => AArch64Instr::Movz32(data),
-                    (0b011, 0b00 | 0b01) => AArch64Instr::Movk32(data),
-                    (0b100, _) => AArch64Instr::Movn64(data),
-                    (0b110, _) => AArch64Instr::Movz64(data),
-                    (0b111, _) => AArch64Instr::Movk64(data),
+                    (0b000, 0b00 | 0b01) => AArch64Instr::MovnVar32(data),
+                    (0b010, 0b00 | 0b01) => AArch64Instr::MovzVar32(data),
+                    (0b011, 0b00 | 0b01) => AArch64Instr::MovkVar32(data),
+                    (0b100, _) => AArch64Instr::MovnVar64(data),
+                    (0b110, _) => AArch64Instr::MovzVar64(data),
+                    (0b111, _) => AArch64Instr::MovkVar64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
             },

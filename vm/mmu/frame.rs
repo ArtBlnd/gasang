@@ -1,9 +1,9 @@
-use crate::mmu::{MemoryManagementUnitInner, Page};
 use crate::memory::HostMemory;
+use crate::mmu::{MemoryManagementUnitInner, Page};
 use crate::MMUError;
 
-use std::sync::Arc;
 use std::io::{Read, Write};
+use std::sync::Arc;
 
 pub struct Frame {
     mmu: Arc<MemoryManagementUnitInner>,

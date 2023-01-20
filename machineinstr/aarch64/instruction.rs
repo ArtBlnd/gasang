@@ -228,12 +228,12 @@ pub enum AArch64Instr {
     Csinv64(RmCondRnRd),
     Csneg64(RmCondRnRd),
 
-    Movn32(Imm16Rd),
-    Movz32(Imm16Rd),
-    Movk32(Imm16Rd),
-    Movn64(Imm16Rd),
-    Movz64(Imm16Rd),
-    Movk64(Imm16Rd),
+    MovnVar32(Imm16Rd),
+    MovzVar32(Imm16Rd),
+    MovkVar32(Imm16Rd),
+    MovnVar64(Imm16Rd),
+    MovzVar64(Imm16Rd),
+    MovkVar64(Imm16Rd),
 
     AndShiftedReg32(ShiftRmImm6RnRd),
     BicShiftedReg32(ShiftRmImm6RnRd),

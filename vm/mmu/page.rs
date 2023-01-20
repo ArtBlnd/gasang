@@ -15,5 +15,4 @@ pub enum Page {
     Callback {
         callback: Arc<dyn FnMut(&mut [u8])>,
     },
-
 }
