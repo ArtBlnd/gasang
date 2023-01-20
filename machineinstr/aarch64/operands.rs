@@ -281,7 +281,7 @@ pub struct LoadStoreOrdered {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct AdvancedSimd3Same {
+pub struct QSizeRmRnRd {
     pub q: u8,
     pub size: u8,
     pub rm: u8,
@@ -339,4 +339,40 @@ pub struct FloatingPointCompare {
     pub rm: u8,
     pub rn: u8,
     pub opcode2: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FloatingPointImmediate {
+    pub imm8: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConvBetweenFloatAndFixedPoint {
+    pub scale: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdXIndexedElem {
+    pub q: u8,
+    pub size: u8,
+    pub l: u8,
+    pub m: u8,
+    pub rm: u8,
+    pub h: u8,
+    pub rn: u8,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdvSimdScalarXIndexedElem {
+    pub size: u8,
+    pub l: u8,
+    pub m: u8,
+    pub rm: u8,
+    pub h: u8,
+    pub rn: u8,
+    pub rd: u8,
 }

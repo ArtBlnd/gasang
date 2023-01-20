@@ -33,6 +33,6 @@ fn main() {
     let mut n = 0;
     for inst in parser {
         n += 1;
-        //println!("{:08}: {:?}", n, inst);
+        println!("{:08}: {:?}", n, inst);
     }
 }
