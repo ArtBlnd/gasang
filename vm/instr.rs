@@ -32,6 +32,14 @@ pub enum VmInstr {
         dst: RegId,
     },
 
+    // Add constant to register
+    AddCst {
+        size: usize,
+        src: RegId,
+        dst: RegId,
+        value: u64,
+    },
+
     // Bitwise or constant
     OrCst {
         size: usize,
@@ -74,6 +82,10 @@ pub enum VmInstr {
         dst: RegId,
         shift: u8,
     },
+
+    Interrupt {
+        interrupt: Interrupt,
+    }
 }
 
 impl Display for VmInstr {
@@ -90,6 +102,14 @@ impl Display for VmInstr {
             }
             VmInstr::MoveCst2Reg { size, src, dst } => {
                 write!(f, "mov{} {}, {}", size, src, dst)
+            },
+            VmInstr::AddCst {
+                size,
+                src,
+                dst,
+                value,
+            } => {
+                write!(f, "add{} {}, {}, {}", size, src, dst, value)
             }
             VmInstr::OrCst {
                 size,
@@ -118,6 +138,9 @@ impl Display for VmInstr {
             }
             VmInstr::ASRCst { src, dst, shift } => {
                 write!(f, "asr {}, {}, {}", src, dst, shift)
+            },
+            VmInstr::Interrupt { interrupt } => {
+                write!(f, "int {}", interrupt)
             }
         }
     }

@@ -1,20 +1,51 @@
-use crate::instr::VmInstr;
-use crate::RegId;
+use crate::{RegId, Interrupt, VmInstr};
 use machineinstr::aarch64::*;
 
 use std::iter::Iterator;
 
 use smallvec::SmallVec;
 
+// Program counter register.
+const PC_REG: RegId = RegId(32);
+
 pub fn aarch64_translate(instr: AArch64Instr) -> impl Iterator<Item = VmInstr> {
     let mut instrs = SmallVec::<[VmInstr; 2]>::new();
 
+
+    let mut is_branch_generated = false;
     match instr {
+        AArch64Instr::Nop => {}
+        AArch64Instr::Brk(ExceptionGen { imm16, .. }) => {
+            instrs.push(VmInstr::Interrupt { interrupt: Interrupt::DebugBreakpoint(imm16 as usize) });
+        }
+
+        AArch64Instr::Svc(ExceptionGen { imm16, ..}) => {
+            instrs.push(VmInstr::Interrupt { interrupt: Interrupt::SystemCall(imm16 as usize) });
+        }
+
         AArch64Instr::MovzVar64(Imm16Rd { imm16, rd }) => {
             instrs.push(VmInstr::MoveCst2Reg {
                 size: 8,
                 src: imm16 as u64,
                 dst: rd.into(),
+            });
+        }
+
+        AArch64Instr::MovzVar32(Imm16Rd { imm16, rd }) => {
+            instrs.push(VmInstr::MoveCst2Reg {
+                size: 4,
+                src: imm16 as u64,
+                dst: rd.into(),
+            });
+        }
+
+        AArch64Instr::Adr(PcRelAddressing { immlo, immhi, rd }) => {
+            let imm = (immhi as u64) << 2 | (immlo as u64);
+            instrs.push(VmInstr::AddCst {
+                size: 8,
+                src: rd.into(),
+                dst: PC_REG,
+                value: imm,
             });
         }
 
@@ -63,6 +94,17 @@ pub fn aarch64_translate(instr: AArch64Instr) -> impl Iterator<Item = VmInstr> {
             instrs.push(i2);
         }
         v => todo!("{:?}", v),
+    }
+
+
+    // if branch did not generated, increase PC by 4(= 1 instruction)
+    if !is_branch_generated {
+        instrs.push(VmInstr::AddCst {
+            size: 8,
+            src: PC_REG,
+            dst: PC_REG,
+            value: 4,
+        });
     }
 
     instrs.into_iter()

@@ -31,7 +31,7 @@ pub struct VmState {
 }
 
 impl VmState {
-    pub fn run(&mut self, instr: &Vec<VmInstr>) -> Result<(), Interrupt> {
+    pub fn run(&mut self, instr: &Vec<VmInstr>) -> Result<usize, Interrupt> {
         while self.ip < instr.len() {
             instr[self.ip].execute(self)?;
 
@@ -44,7 +44,7 @@ impl VmState {
             }
         }
 
-        Ok(())
+        Ok(0)
     }
 
     pub fn new_gpr_register(&mut self, name: impl AsRef<str>, size: u8) -> RegId {
