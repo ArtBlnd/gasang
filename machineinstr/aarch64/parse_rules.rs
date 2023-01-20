@@ -29,11 +29,13 @@ where
         m.bind("0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
             let op0 = extract_bits32(29..31, raw_instr);
             let op1 = extract_bits32(16..25, raw_instr);
-            let imm16 = Imm16 {imm16: extract_bits32(0..16, raw_instr) as u16};
+            let imm16 = Imm16 {
+                imm16: extract_bits32(0..16, raw_instr) as u16,
+            };
 
             match (op0, op1) {
                 (0b00, 0b000000000) => AArch64Instr::Udf(imm16),
-                _ => todo!("Unknown reserved instruction {:032b}", raw_instr)
+                _ => todo!("Unknown reserved instruction {:032b}", raw_instr),
             }
         })
         .bind("1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
@@ -134,7 +136,7 @@ fn parse_aarch64_d_p_r(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "x_x_x_1_101_0000_xxxxx_000000_xxxxxxxxxx",
-            |raw_instr: u32| todo!("Add/subtract (with carry)"),
+            |raw_instr: u32| parse_add_sub_with_carry(raw_instr),
         )
         .bind(
             "x_x_x_1_101_0000_xxxxx_x00001_xxxxxxxxxx",
@@ -319,14 +321,14 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x100", "00xxxxx10"
             ),
-            |raw_instr: u32| parse_adv_simd_2reg_miscellaneous(raw_instr)
+            |raw_instr: u32| parse_adv_simd_2reg_miscellaneous(raw_instr),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x110", "00xxxxx10"
             ),
-            |raw_instr: u32| parse_adv_simd_across_lanes(raw_instr)
+            |raw_instr: u32| parse_adv_simd_across_lanes(raw_instr),
         )
         .bind(
             &format!(
@@ -423,7 +425,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxx1000"
             ),
-            |raw_instr: u32| todo!("Floating-point compare"),
+            |raw_instr: u32| parse_floating_point_compare(raw_instr)
         )
         .bind(
             &format!(
@@ -521,9 +523,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "xx00_1_0_0_01_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
-                parse_compare_and_swap(raw_instr)
-            },
+            |raw_instr: u32| parse_compare_and_swap(raw_instr),
         )
         .bind(
             "xx01_1_0_0_1x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
@@ -581,9 +581,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "xx11_1_x_0_0x_x_1xxxxx_xxxx_00_xxxxxxxxxx",
-            |raw_instr: u32| {
-                todo!("Atomic memory operations");
-            },
+            |raw_instr: u32| parse_atomic_memory_operations(raw_instr),
         )
         .bind(
             "xx11_1_x_0_0x_x_1xxxxx_xxxx_10_xxxxxxxxxx",
@@ -3331,7 +3329,6 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: u32) -> AArch64Instr {
                     (0b1, 0b10 | 0b11, 0b11100) => AArch64Instr::Ursqrte(data),
                     (0b1, 0b10 | 0b11, 0b11101) => AArch64Instr::Frsqrte(data),
                     (0b1, 0b10 | 0b11, 0b11111) => AArch64Instr::FsqrtVec(data),
-                    
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
@@ -3411,7 +3408,7 @@ fn parse_compare_and_swap(raw_instr: u32) -> AArch64Instr {
              rt2: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = CompareAndSwap {
+                let data = RsRnRt {
                     rs: rs.value,
                     rn: rn.value,
                     rt: rt.value,
@@ -3437,6 +3434,302 @@ fn parse_compare_and_swap(raw_instr: u32) -> AArch64Instr {
                     (0b11, 0b0, 0b1, 0b11111) => AArch64Instr::CaslVar64(data),
                     (0b11, 0b1, 0b0, 0b11111) => AArch64Instr::CasaVar64(data),
                     (0b11, 0b1, 0b1, 0b11111) => AArch64Instr::CasalVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_atomic_memory_operations(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_111_x_00_x_x_1_xxxxx_x_xxx_00_xxxxx_xxxxx",
+            |raw_instr: u32,
+             size: Extract<BitRange<30, 32>, u8>,
+             v: Extract<BitRange<26, 27>, u8>,
+             a: Extract<BitRange<23, 24>, u8>,
+             r: Extract<BitRange<22, 23>, u8>,
+             rs: Extract<BitRange<16, 21>, u8>,
+             o3: Extract<BitRange<15, 16>, u8>,
+             opc: Extract<BitRange<12, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = RsRnRt {
+                    rs: rs.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (
+                    size.value, v.value, a.value, r.value, rs.value, o3.value, opc.value,
+                ) {
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclrbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeorbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsetbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminbVar(data),
+                    (0b00, 0b0, 0b0, 0b0, _, 0b1, 0b000) => AArch64Instr::SwpbVar(data),
+
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclrlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeorlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminlbVar(data),
+                    (0b00, 0b0, 0b0, 0b1, _, 0b1, 0b000) => AArch64Instr::SwplbVar(data),
+
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclrabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeorabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsetabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminabVar(data),
+                    (0b00, 0b0, 0b1, 0b0, _, 0b1, 0b000) => AArch64Instr::SwpabVar(data),
+
+                    (0b00, 0b0, 0b1, 0b0, _, 0b1, 0b100) => AArch64Instr::Ldaprb(data),
+
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddalbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclralbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeoralbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetalbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxalbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminalbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxalbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminalbVar(data),
+                    (0b00, 0b0, 0b1, 0b1, _, 0b1, 0b000) => AArch64Instr::SwpalbVar(data),
+
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddhVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclrhVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeorhVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsethVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxhVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminhVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxhVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminhVar(data),
+                    (0b01, 0b0, 0b0, 0b0, _, 0b1, 0b000) => AArch64Instr::SwphVar(data),
+
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclrlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeorlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminlhVar(data),
+                    (0b01, 0b0, 0b0, 0b1, _, 0b1, 0b000) => AArch64Instr::SwplhVar(data),
+
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclrahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeorahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsetahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminahVar(data),
+                    (0b01, 0b0, 0b1, 0b0, _, 0b1, 0b000) => AArch64Instr::SwpahVar(data),
+
+                    (0b01, 0b0, 0b1, 0b0, _, 0b1, 0b100) => AArch64Instr::Ldaprh(data),
+
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddalhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclralhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeoralhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetalhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxalhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminalhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxalhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminalhVar(data),
+                    (0b01, 0b0, 0b1, 0b1, _, 0b1, 0b000) => AArch64Instr::SwpalhVar(data),
+
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclrVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeorVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsetVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminVar32(data),
+                    (0b10, 0b0, 0b0, 0b0, _, 0b1, 0b000) => AArch64Instr::SwpVar32(data),
+
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclrlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeorlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminlVar32(data),
+                    (0b10, 0b0, 0b0, 0b1, _, 0b1, 0b000) => AArch64Instr::SwplVar32(data),
+
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddaVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclraVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeoraVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsetaVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxaVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminaVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxaVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminaVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b1, 0b000) => AArch64Instr::SwpaVar32(data),
+                    (0b10, 0b0, 0b1, 0b0, _, 0b1, 0b100) => AArch64Instr::LdaprVar32(data),
+
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddalVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclralVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeoralVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetalVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxalVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminalVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxalVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminalVar32(data),
+                    (0b10, 0b0, 0b1, 0b1, _, 0b1, 0b000) => AArch64Instr::SwpalVar32(data),
+
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclrVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeorVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsetVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminVar64(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b1, 0b000) => AArch64Instr::SwpVar64(data),
+
+                    (0b11, 0b0, 0b0, 0b0, _, 0b1, 0b010) => AArch64Instr::St64bv0(data),
+                    (0b11, 0b0, 0b0, 0b0, _, 0b1, 0b011) => AArch64Instr::St64bv(data),
+                    (0b11, 0b0, 0b0, 0b0, 0b11111, 0b1, 0b001) => AArch64Instr::St64b(data),
+                    (0b11, 0b0, 0b0, 0b0, 0b11111, 0b1, 0b101) => AArch64Instr::Ld64b(data),
+
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclrlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeorlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminlVar64(data),
+                    (0b11, 0b0, 0b0, 0b1, _, 0b1, 0b000) => AArch64Instr::SwplVar64(data),
+
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b000) => AArch64Instr::LdaddaVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b001) => AArch64Instr::LdclraVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b010) => AArch64Instr::LdeoraVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b011) => AArch64Instr::LdsetaVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b100) => AArch64Instr::LdsmaxaVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b101) => AArch64Instr::LdsminaVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b110) => AArch64Instr::LdumaxaVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b0, 0b111) => AArch64Instr::LduminaVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b1, 0b000) => AArch64Instr::SwpaVar64(data),
+                    (0b11, 0b0, 0b1, 0b0, _, 0b1, 0b100) => AArch64Instr::LdaprVar64(data),
+
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b000) => AArch64Instr::LdaddalVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b001) => AArch64Instr::LdclralVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b010) => AArch64Instr::LdeoralVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b011) => AArch64Instr::LdsetalVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b100) => AArch64Instr::LdsmaxalVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b101) => AArch64Instr::LdsminalVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b110) => AArch64Instr::LdumaxalVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b0, 0b111) => AArch64Instr::LduminalVar64(data),
+                    (0b11, 0b0, 0b1, 0b1, _, 0b1, 0b000) => AArch64Instr::SwpalVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_add_sub_with_carry(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_x_x_11010000_xxxxx_000000_xxxxx_xxxxx",
+            |raw_instr: u32,
+             sf_op_s: Extract<BitRange<29, 32>, u8>,
+             rm: Extract<BitRange<16, 21>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rd: Extract<BitRange<0, 5>, u8>| {
+                let data = RmRnRd {
+                    rm: rm.value,
+                    rn: rn.value,
+                    rd: rd.value,
+                };
+
+                match sf_op_s.value {
+                    0b000 => AArch64Instr::AdcVar32(data),
+                    0b001 => AArch64Instr::AdcsVar32(data),
+                    0b010 => AArch64Instr::SbcVar32(data),
+                    0b011 => AArch64Instr::SbcsVar32(data),
+
+                    0b100 => AArch64Instr::AdcVar64(data),
+                    0b101 => AArch64Instr::AdcsVar64(data),
+                    0b110 => AArch64Instr::SbcVar64(data),
+                    0b111 => AArch64Instr::SbcsVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        return instr;
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_floating_point_compare(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "x_0_x_11110_xx_1_xxxxx_xx_1000_xxxxx_xxxxx",
+            |raw_instr: u32,
+             m: Extract<BitRange<31, 32>, u8>,
+             s: Extract<BitRange<29, 30>, u8>,
+             ptype: Extract<BitRange<22, 24>, u8>,
+             rm: Extract<BitRange<16, 21>, u8>,
+             op: Extract<BitRange<14, 16>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             opcode2: Extract<BitRange<0, 5>, u8>| {
+                let data = FloatingPointCompare {
+                    ptype: ptype.value,
+                    rm: rm.value,
+                    rn: rn.value,
+                    opcode2: opcode2.value,
+                };
+
+                match (m.value, s.value, ptype.value, op.value, opcode2.value) {
+                    (0b0, 0b0, 0b00, 0b00, 0b00000 | 0b01000)
+                    | (0b0, 0b0, 0b01, 0b00, 0b00000 | 0b01000)
+                    | (0b0, 0b0, 0b11, 0b01, 0b00000 | 0b01000) => AArch64Instr::Fcmp(data),
+
+                    (0b0, 0b0, 0b00, 0b00, 0b10000 | 0b11000)
+                    | (0b0, 0b0, 0b01, 0b00, 0b10000 | 0b11000)
+                    | (0b0, 0b0, 0b11, 0b01, 0b10000 | 0b11000) => AArch64Instr::Fcmp(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }

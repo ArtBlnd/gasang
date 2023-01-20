@@ -327,8 +327,16 @@ pub struct Imm16 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CompareAndSwap {
+pub struct RsRnRt {
     pub rs: u8,
     pub rn: u8,
     pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FloatingPointCompare {
+    pub ptype: u8,
+    pub rm: u8,
+    pub rn: u8,
+    pub opcode2: u8,
 }
