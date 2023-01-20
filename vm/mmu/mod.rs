@@ -3,10 +3,8 @@ pub use frame::*;
 mod page;
 pub use page::*;
 
-
 use crate::error::MMUError;
 
-use std::cell::UnsafeCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -29,29 +27,12 @@ impl DerefMut for MemoryManagementUnit {
 }
 
 impl MemoryManagementUnit {
-    pub unsafe fn frame(&self, page_addr: usize) -> Result<Frame, MMUError> {
-        let page_id = page_addr / self.page_size;
-        let page_offs = page_addr % self.page_size;
-
-        let Some(page) = self.page_table.get(page_id) else {
-            return Err(MMUError::PageNotMapped);
-        };
-
-        match page {
-            Page::Unmapped => Err(MMUError::PageNotMapped),
-            Page::Memory { offs } => {
-                Ok(Frame::Memory {
-                    mmu_access: self.inner.clone(),
-                    offs: *offs + page_offs
-                })
-            }
-        }
+    pub unsafe fn frame(&self, addr: usize) -> Result<Frame, MMUError> {
+        Ok(Frame::new(self.inner.clone(), addr))
     }
 }
 
 pub struct MemoryManagementUnitInner {
-    memory: UnsafeCell<Box<[u8]>>,
-
     // linear page table.
     page_size: usize,
     page_table: Box<[Page]>
@@ -60,8 +41,6 @@ pub struct MemoryManagementUnitInner {
 impl MemoryManagementUnitInner {
     pub fn new(size: usize, page_size: usize, page_cnts: usize) -> Self {
         MemoryManagementUnitInner {
-            memory: UnsafeCell::new(vec![0; size].into_boxed_slice()),
-
             page_size,
             page_table: vec![Page::Unmapped; page_cnts].into_boxed_slice(),
         }
@@ -76,7 +55,7 @@ impl MemoryManagementUnitInner {
         Ok(page)
     }
 
-    pub fn query(&mut self, addr: usize) -> Result<&Page, MMUError> {
+    pub fn query(&self, addr: usize) -> Result<&Page, MMUError> {
         let page_id = addr / self.page_size;
         let Some(page) = self.page_table.get(page_id) else {
             return Err(MMUError::PageNotMapped);

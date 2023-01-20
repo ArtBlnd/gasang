@@ -2,16 +2,18 @@ mod error;
 pub use error::*;
 mod register;
 pub use register::*;
-mod instr;
-pub use instr::*;
 mod interrupt;
 pub use interrupt::*;
-mod aarch64;
-pub use aarch64::*;
-mod mmu;
-pub use mmu::*;
+
+pub mod instr;
+pub mod aarch64;
+pub mod mmu;
+pub mod memory;
+
 
 use slab::Slab;
+
+use crate::instr::VmInstr;
 
 pub type RegId = usize;
 pub type FlagId = usize;
