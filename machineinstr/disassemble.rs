@@ -31,8 +31,12 @@ fn main() {
     let parser = MachineInstParser::new(reader, AArch64InstrParserRule);
 
     let mut n = 0;
+    let start = std::time::Instant::now();
     for inst in parser {
         n += 1;
-        println!("{:08}: {:?}", n, inst);
+        // println!("{:08}: {:?}", n, inst);
     }
+    let end = std::time::Instant::now();
+
+    println!("{n} {:?}", end - start);
 }

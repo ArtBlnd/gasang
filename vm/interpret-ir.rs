@@ -5,7 +5,7 @@ use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule};
 use machineinstr::utils::BitReader;
 use machineinstr::MachineInstParser;
 
-use vm::aarch64::aarch64_translate;
+use vm::aarch64::AArch64VM;
 
 fn main() {
     // Get first argument
@@ -32,11 +32,5 @@ fn main() {
     let reader = BitReader::new(buf.iter().cloned());
     let parser = MachineInstParser::new(reader, AArch64InstrParserRule);
 
-    let mut n = 0;
-    for inst in parser {
-        for instr in aarch64_translate(inst) {
-            println!("{:08}: {}", n, instr);
-            n += 1;
-        }
-    }
+    todo!();
 }

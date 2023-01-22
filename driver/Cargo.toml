@@ -10,4 +10,5 @@ elf = "0.7.1"
 
 
 machineinstr = { path = "../machineinstr" }
+vm = { version = "0.1.0", path = "../vm" }
 

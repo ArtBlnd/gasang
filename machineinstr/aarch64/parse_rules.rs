@@ -363,7 +363,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "1x", "xxxx", "xxxxxxxx0"
             ),
-            |raw_instr: u32| parse_adv_simd_vec_x_indexed_elem(raw_instr)
+            |raw_instr: u32| parse_adv_simd_vec_x_indexed_elem(raw_instr),
         )
         .bind(
             &format!(
@@ -426,14 +426,14 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxx1000"
             ),
-            |raw_instr: u32| parse_floating_point_compare(raw_instr)
+            |raw_instr: u32| parse_floating_point_compare(raw_instr),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxxx100"
             ),
-            |raw_instr: u32| parse_floating_point_immediate(raw_instr)
+            |raw_instr: u32| parse_floating_point_immediate(raw_instr),
         )
         .bind(
             &format!(
@@ -1186,7 +1186,7 @@ fn parse_hints(raw_instr: u32) -> AArch64Instr {
                     (0b0000, 0b011) => AArch64Instr::Wfi,
                     (0b0000, 0b100) => AArch64Instr::Sev,
                     (0b0000, 0b101) => AArch64Instr::Sevl,
-                    
+
                     (0b0000, 0b111) => AArch64Instr::Xpaclri,
                     (0b0001, 0b000) => AArch64Instr::Pacia1716Var,
                     (0b0001, 0b010) => AArch64Instr::Pacib1716Var,
@@ -1223,7 +1223,7 @@ fn parse_pc_rel_addressing(raw_instr: u32) -> AArch64Instr {
             "x_xx_10000_xxxxxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: u32,
              op: Extract<BitRange<31, 32>, u8>,
-             immlo: Extract<BitRange<29, 30>, u8>,
+             immlo: Extract<BitRange<29, 31>, u8>,
              immhi: Extract<BitRange<5, 24>, u32>,
              rd: Extract<BitRange<0, 5>, u8>| {
                 let data = PcRelAddressing {
@@ -3788,7 +3788,7 @@ fn parse_advanced_simd_permute(raw_instr: u32) -> AArch64Instr {
                     0b001 => AArch64Instr::Uzp1(data),
                     0b010 => AArch64Instr::Trn1(data),
                     0b011 => AArch64Instr::Zip1(data),
-                    
+
                     0b101 => AArch64Instr::Uzp2(data),
                     0b110 => AArch64Instr::Trn2(data),
                     0b111 => AArch64Instr::Zip2(data),
@@ -3881,8 +3881,12 @@ fn parse_floating_point_immediate(raw_instr: u32) -> AArch64Instr {
                 };
 
                 match (m.value, s.value, ptype.value, imm5.value) {
-                    (0b0, 0b0, 0b00, 0b00000) => AArch64Instr::FmovScalarImmSinglePrecisionVar(data),
-                    (0b0, 0b0, 0b01, 0b00000) => AArch64Instr::FmovScalarImmDoublePrecisionVar(data),
+                    (0b0, 0b0, 0b00, 0b00000) => {
+                        AArch64Instr::FmovScalarImmSinglePrecisionVar(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00000) => {
+                        AArch64Instr::FmovScalarImmDoublePrecisionVar(data)
+                    }
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
@@ -3913,33 +3917,71 @@ fn parse_conv_between_float_and_fixed_point(raw_instr: u32) -> AArch64Instr {
              scale: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rd: Extract<BitRange<0, 5>, u8>| {
-                let data = ConvBetweenFloatAndFixedPoint{
+                let data = ConvBetweenFloatAndFixedPoint {
                     scale: scale.value,
                     rn: rn.value,
                     rd: rd.value,
                 };
 
-                match (sf.value, s.value, ptype.value, rmode.value, opcode.value, scale.value) {
-                    (0b0, 0b0, 0b00, 0b00, 0b010, _) => AArch64Instr::ScvtfScalarFixedPt32ToSinglePrecision(data),
-                    (0b0, 0b0, 0b00, 0b00, 0b011, _) => AArch64Instr::UcvtfScalarFixedPt32ToSinglePrecision(data),
-                    (0b0, 0b0, 0b00, 0b11, 0b000, _) => AArch64Instr::FcvtzsScalarFixedPtSinglePrecisionTo32(data),
-                    (0b0, 0b0, 0b00, 0b11, 0b001, _) => AArch64Instr::FcvtzuScalarFixedPtSinglePrecisionTo32(data),
+                match (
+                    sf.value,
+                    s.value,
+                    ptype.value,
+                    rmode.value,
+                    opcode.value,
+                    scale.value,
+                ) {
+                    (0b0, 0b0, 0b00, 0b00, 0b010, _) => {
+                        AArch64Instr::ScvtfScalarFixedPt32ToSinglePrecision(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b00, 0b011, _) => {
+                        AArch64Instr::UcvtfScalarFixedPt32ToSinglePrecision(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b11, 0b000, _) => {
+                        AArch64Instr::FcvtzsScalarFixedPtSinglePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b00, 0b11, 0b001, _) => {
+                        AArch64Instr::FcvtzuScalarFixedPtSinglePrecisionTo32(data)
+                    }
 
-                    (0b0, 0b0, 0b01, 0b00, 0b010, _) => AArch64Instr::ScvtfScalarFixedPt32ToDoublePrecision(data),
-                    (0b0, 0b0, 0b01, 0b00, 0b011, _) => AArch64Instr::UcvtfScalarFixedPt32ToDoublePrecision(data),
-                    (0b0, 0b0, 0b01, 0b11, 0b000, _) => AArch64Instr::FcvtzsScalarFixedPtDoublePrecisionTo32(data),
-                    (0b0, 0b0, 0b01, 0b11, 0b001, _) => AArch64Instr::FcvtzuScalarFixedPtDoublePrecisionTo32(data),
+                    (0b0, 0b0, 0b01, 0b00, 0b010, _) => {
+                        AArch64Instr::ScvtfScalarFixedPt32ToDoublePrecision(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b00, 0b011, _) => {
+                        AArch64Instr::UcvtfScalarFixedPt32ToDoublePrecision(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b11, 0b000, _) => {
+                        AArch64Instr::FcvtzsScalarFixedPtDoublePrecisionTo32(data)
+                    }
+                    (0b0, 0b0, 0b01, 0b11, 0b001, _) => {
+                        AArch64Instr::FcvtzuScalarFixedPtDoublePrecisionTo32(data)
+                    }
 
-                    (0b1, 0b0, 0b00, 0b00, 0b010, _) => AArch64Instr::ScvtfScalarFixedPt64ToSinglePrecision(data),
-                    (0b1, 0b0, 0b00, 0b00, 0b011, _) => AArch64Instr::UcvtfScalarFixedPt64ToSinglePrecision(data),
-                    (0b1, 0b0, 0b00, 0b11, 0b000, _) => AArch64Instr::FcvtzsScalarFixedPtSinglePrecisionTo64(data),
-                    (0b1, 0b0, 0b00, 0b11, 0b001, _) => AArch64Instr::FcvtzuScalarFixedPtSinglePrecisionTo64(data),
+                    (0b1, 0b0, 0b00, 0b00, 0b010, _) => {
+                        AArch64Instr::ScvtfScalarFixedPt64ToSinglePrecision(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b00, 0b011, _) => {
+                        AArch64Instr::UcvtfScalarFixedPt64ToSinglePrecision(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b11, 0b000, _) => {
+                        AArch64Instr::FcvtzsScalarFixedPtSinglePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b00, 0b11, 0b001, _) => {
+                        AArch64Instr::FcvtzuScalarFixedPtSinglePrecisionTo64(data)
+                    }
 
-                    (0b1, 0b0, 0b01, 0b00, 0b010, _) => AArch64Instr::ScvtfScalarFixedPt64ToDoublePrecision(data),
-                    (0b1, 0b0, 0b01, 0b00, 0b011, _) => AArch64Instr::UcvtfScalarFixedPt64ToDoublePrecision(data),
-                    (0b1, 0b0, 0b01, 0b11, 0b000, _) => AArch64Instr::FcvtzsScalarFixedPtDoublePrecisionTo64(data),
-                    (0b1, 0b0, 0b01, 0b11, 0b001, _) => AArch64Instr::FcvtzuScalarFixedPtDoublePrecisionTo64(data),
-                    
+                    (0b1, 0b0, 0b01, 0b00, 0b010, _) => {
+                        AArch64Instr::ScvtfScalarFixedPt64ToDoublePrecision(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b00, 0b011, _) => {
+                        AArch64Instr::UcvtfScalarFixedPt64ToDoublePrecision(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b11, 0b000, _) => {
+                        AArch64Instr::FcvtzsScalarFixedPtDoublePrecisionTo64(data)
+                    }
+                    (0b1, 0b0, 0b01, 0b11, 0b001, _) => {
+                        AArch64Instr::FcvtzuScalarFixedPtDoublePrecisionTo64(data)
+                    }
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
@@ -4011,7 +4053,7 @@ fn parse_adv_simd_vec_x_indexed_elem(raw_instr: u32) -> AArch64Instr {
              h: Extract<BitRange<11, 12>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rd: Extract<BitRange<0, 5>, u8>| {
-                let data = AdvSimdXIndexedElem{
+                let data = AdvSimdXIndexedElem {
                     q: q.value,
                     size: size.value,
                     l: l.value,
@@ -4060,7 +4102,6 @@ fn parse_adv_simd_vec_x_indexed_elem(raw_instr: u32) -> AArch64Instr {
     }
 }
 
-
 fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: u32) -> AArch64Instr {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
@@ -4076,7 +4117,7 @@ fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: u32) -> AArch64Instr {
              h: Extract<BitRange<11, 12>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rd: Extract<BitRange<0, 5>, u8>| {
-                let data = AdvSimdXIndexedElem{
+                let data = AdvSimdXIndexedElem {
                     q: 0b1,
                     size: size.value,
                     l: l.value,

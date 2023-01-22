@@ -326,7 +326,6 @@ pub enum AArch64Instr {
     AutiaspVar,
     AutibzVar,
     AutibspVar,
-    
 
     Adr(PcRelAddressing),
     Adrp(PcRelAddressing),
@@ -992,4 +991,3 @@ pub enum AArch64Instr {
     UmullByElem(AdvSimdXIndexedElem),
     FmulxByElemEncoding(AdvSimdXIndexedElem),
 }
-

@@ -19,10 +19,11 @@ impl Display for RegId {
     }
 }
 
+#[derive(Debug)]
 pub struct GprRegister {
     name: String,
     size: u8,
-    value: usize,
+    value: u64,
 }
 
 impl GprRegister {
@@ -42,55 +43,55 @@ impl GprRegister {
         self.size
     }
 
-    pub fn set(&mut self, value: usize) {
+    pub fn set(&mut self, value: u64) {
         self.value = value;
     }
 
-    pub fn get(&self) -> usize {
+    pub fn get(&self) -> u64 {
         self.value
     }
 
-    pub fn add(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn add(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value += value;
         Ok(())
     }
 
-    pub fn sub(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn sub(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value -= value;
         Ok(())
     }
 
-    pub fn mul(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn mul(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value *= value;
         Ok(())
     }
 
-    pub fn div(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn div(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value /= value;
         Ok(())
     }
 
-    pub fn shr(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn shr(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value >>= value;
         Ok(())
     }
 
-    pub fn shl(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn shl(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value <<= value;
         Ok(())
     }
 
-    pub fn or(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn or(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value |= value;
         Ok(())
     }
 
-    pub fn and(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn and(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value &= value;
         Ok(())
     }
 
-    pub fn xor(&mut self, value: usize) -> Result<(), Interrupt> {
+    pub fn xor(&mut self, value: u64) -> Result<(), Interrupt> {
         self.value ^= value;
         Ok(())
     }
@@ -101,6 +102,7 @@ impl GprRegister {
     }
 }
 
+#[derive(Debug)]
 pub struct FprRegister {
     pub name: String,
     pub size: u8,
