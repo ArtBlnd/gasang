@@ -735,7 +735,7 @@ where
         let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
         let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
         let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+        let op10: u64 = extract_bits32(R10::range(), raw_instr) as u64;
 
         (self)(
             raw_instr,
@@ -777,7 +777,7 @@ where
             },
             Extract {
                 __p: PhantomData,
-                value: T10::from_u64(op9).unwrap(),
+                value: T10::from_u64(op10).unwrap(),
             },
         )
     }
@@ -883,8 +883,8 @@ where
         let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
         let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
         let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R11::range(), raw_instr) as u64;
+        let op10: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+        let op11: u64 = extract_bits32(R11::range(), raw_instr) as u64;
 
         (self)(
             raw_instr,
@@ -926,11 +926,11 @@ where
             },
             Extract {
                 __p: PhantomData,
-                value: T10::from_u64(op9).unwrap(),
+                value: T10::from_u64(op10).unwrap(),
             },
             Extract {
                 __p: PhantomData,
-                value: T11::from_u64(op9).unwrap(),
+                value: T11::from_u64(op11).unwrap(),
             },
         )
     }
@@ -1043,9 +1043,9 @@ where
         let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
         let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
         let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R11::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R12::range(), raw_instr) as u64;
+        let op10: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+        let op11: u64 = extract_bits32(R11::range(), raw_instr) as u64;
+        let op12: u64 = extract_bits32(R12::range(), raw_instr) as u64;
 
         (self)(
             raw_instr,
@@ -1087,15 +1087,15 @@ where
             },
             Extract {
                 __p: PhantomData,
-                value: T10::from_u64(op9).unwrap(),
+                value: T10::from_u64(op10).unwrap(),
             },
             Extract {
                 __p: PhantomData,
-                value: T11::from_u64(op9).unwrap(),
+                value: T11::from_u64(op11).unwrap(),
             },
             Extract {
                 __p: PhantomData,
-                value: T12::from_u64(op9).unwrap(),
+                value: T12::from_u64(op12).unwrap(),
             },
         )
     }
@@ -1215,10 +1215,10 @@ where
         let op7: u64 = extract_bits32(R7::range(), raw_instr) as u64;
         let op8: u64 = extract_bits32(R8::range(), raw_instr) as u64;
         let op9: u64 = extract_bits32(R9::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R10::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R11::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R12::range(), raw_instr) as u64;
-        let op9: u64 = extract_bits32(R13::range(), raw_instr) as u64;
+        let op10: u64 = extract_bits32(R10::range(), raw_instr) as u64;
+        let op11: u64 = extract_bits32(R11::range(), raw_instr) as u64;
+        let op12: u64 = extract_bits32(R12::range(), raw_instr) as u64;
+        let op13: u64 = extract_bits32(R13::range(), raw_instr) as u64;
 
         (self)(
             raw_instr,
@@ -1260,19 +1260,19 @@ where
             },
             Extract {
                 __p: PhantomData,
-                value: T10::from_u64(op9).unwrap(),
+                value: T10::from_u64(op10).unwrap(),
             },
             Extract {
                 __p: PhantomData,
-                value: T11::from_u64(op9).unwrap(),
+                value: T11::from_u64(op11).unwrap(),
             },
             Extract {
                 __p: PhantomData,
-                value: T12::from_u64(op9).unwrap(),
+                value: T12::from_u64(op12).unwrap(),
             },
             Extract {
                 __p: PhantomData,
-                value: T13::from_u64(op9).unwrap(),
+                value: T13::from_u64(op13).unwrap(),
             },
         )
     }
