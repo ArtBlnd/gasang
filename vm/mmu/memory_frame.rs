@@ -1,7 +1,6 @@
-use crate::mmu::{HostMemory, MmuData, Page};
+use crate::mmu::{MmuData, Page};
 use crate::MMUError;
 
-use std::io::{Read, Write};
 use std::sync::Arc;
 
 pub struct MemoryFrame {
