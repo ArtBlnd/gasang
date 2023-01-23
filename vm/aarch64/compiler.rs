@@ -20,7 +20,6 @@ impl AArch64Compiler {
     pub fn compile_instr(&self, instr: AArch64Instr) -> impl Iterator<Item = VmInstrOp> {
         let mut instrs = SmallVec::<[VmInstrOp; 2]>::new();
 
-        let mut is_branch_generated = false;
         match instr {
             AArch64Instr::Nop => {}
             AArch64Instr::Brk(ExceptionGen { imm16, .. }) => {
@@ -106,16 +105,6 @@ impl AArch64Compiler {
                 instrs.push(i2);
             }
             v => todo!("{:?}", v),
-        }
-
-        // if branch did not generated, increase PC by 4(= 1 instruction)
-        if !is_branch_generated {
-            instrs.push(VmInstrOp::AddCst {
-                size: 8,
-                src: self.pc_reg,
-                dst: self.pc_reg,
-                value: 4,
-            });
         }
 
         instrs.into_iter()
