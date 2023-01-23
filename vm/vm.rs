@@ -14,7 +14,7 @@ pub struct VmContext {
 
 #[derive(Debug)]
 pub struct Vm {
-    ctx: Option<Arc<VmContext>>,
+    ctx: Arc<VmContext>,
     mmu: Mmu,
     jump_table: JumpTable,
 
@@ -31,9 +31,7 @@ pub struct Vm {
 
 impl Vm {
     pub fn run(&mut self) -> Result<usize, Interrupt> {
-        let ctx = self.ctx.take().unwrap();
-        let r = self.run_inner(&ctx);
-        self.ctx = Some(ctx);
+        let r = self.run_inner(&self.ctx.clone());
         return r;
     }
 
@@ -90,7 +88,7 @@ impl Vm {
         self.ipr = cp_ipr;
     }
 
-    pub unsafe fn memory_frame(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
+    pub unsafe fn mem(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
         self.mmu.frame(addr)
     }
 

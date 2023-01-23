@@ -160,7 +160,7 @@ impl VmInstrOp {
                 state.gpr(*dst).set(*src);
             }
             Self::MoveReg2Mem { size, src, dst } => {
-                let mut frame = state.memory_frame(*dst)?;
+                let mut frame = state.mem(*dst)?;
 
                 let src = state.gpr(*src).get();
                 match size {
