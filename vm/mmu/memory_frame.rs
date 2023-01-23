@@ -1,24 +1,24 @@
-use crate::memory::HostMemory;
-use crate::mmu::{MemoryManagementUnitInner, Page};
+use crate::mmu::{MmuData, Page, HostMemory};
 use crate::MMUError;
 
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-pub struct Frame {
-    mmu: Arc<MemoryManagementUnitInner>,
+pub struct MemoryFrame {
+    mmu: Arc<MmuData>,
     addr: usize,
 }
 
-impl Frame {
-    pub fn new(mmu: Arc<MemoryManagementUnitInner>, addr: usize) -> Self {
-        Frame {
+impl MemoryFrame {
+    pub fn new(mmu: Arc<MmuData>, addr: usize) -> Self {
+        MemoryFrame {
             mmu: mmu.clone(),
             addr,
         }
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, MMUError> {
+        let page = self.mmu.query(self.addr)?;
         todo!()
     }
 

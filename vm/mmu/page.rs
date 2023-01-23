@@ -1,4 +1,4 @@
-use crate::memory::HostMemory;
+use crate::mmu::HostMemory;
 
 use std::sync::Arc;
 

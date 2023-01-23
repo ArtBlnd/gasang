@@ -7,7 +7,6 @@ pub use interrupt::*;
 pub mod aarch64;
 pub mod control_flow;
 pub mod instr;
-pub mod memory;
 pub mod mmu;
 pub mod register;
 
