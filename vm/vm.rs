@@ -37,14 +37,15 @@ impl Vm {
 
     fn run_inner(&mut self, ctx: &VmContext) -> Result<usize, Interrupt> {
         while self.ipv < ctx.vm_instr.len() {
+            let instr = &ctx.vm_instr[self.ipv];
             unsafe {
-                ctx.vm_instr[self.ipv].op.execute(self)?;
+                instr.op.execute(self)?;
             }
 
             // check control flow has been modified
             // if its modified do not increase instruction pointer.
             if !self.ip_modified {
-                // inc_ip
+                self.inc_ip(instr.size as u64);
             } else {
                 self.ip_modified = false;
             }
