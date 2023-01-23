@@ -1,5 +1,6 @@
+use crate::mmu::MemoryFrame;
 use crate::register::*;
-use crate::{Interrupt, Vm};
+use crate::{Interrupt, Vm, VmContext};
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
@@ -11,6 +12,9 @@ pub struct VmInstr {
 
 #[derive(Debug, Clone)]
 pub enum VmInstrOp {
+    // =========================
+    // MOVE INSTRUCTIONS
+
     // move register to register
     MoveReg2Reg {
         size: u8,
@@ -38,6 +42,25 @@ pub enum VmInstrOp {
         src: u64,
         dst: RegId,
     },
+
+    MoveIpr2Reg {
+        size: u8,
+        dst: RegId,
+    },
+
+    // =========================
+    // CONTROL FLOW INSTRUCTIONS
+    JumpIpr {
+        dst: RegId,
+    },
+
+    JumpIpv {
+        dst: usize,
+        dst_ipr: u64,
+    },
+
+    // =========================
+    // ARITHMETIC INSTRUCTIONS
 
     // Add constant to register
     AddCst {
@@ -90,6 +113,8 @@ pub enum VmInstrOp {
         shift: u8,
     },
 
+    // =========================
+    // SPEICAL INSTRUCTIONS
     Interrupt {
         interrupt: Interrupt,
     },
@@ -110,6 +135,17 @@ impl Display for VmInstrOp {
             VmInstrOp::MoveCst2Reg { size, src, dst } => {
                 write!(f, "mov{} {}, {}", size, src, dst)
             }
+            VmInstrOp::MoveIpr2Reg { size, dst } => {
+                write!(f, "mov{} ipr, {}", size, dst)
+            }
+
+            VmInstrOp::JumpIpr { dst } => {
+                write!(f, "jmp_ipr {}", dst)
+            }
+            VmInstrOp::JumpIpv { dst, dst_ipr } => {
+                write!(f, "jmp_ipv {}:{}", dst, dst_ipr)
+            }
+
             VmInstrOp::AddCst {
                 size,
                 src,
@@ -154,15 +190,15 @@ impl Display for VmInstrOp {
 }
 
 impl VmInstrOp {
-    pub unsafe fn execute(&self, state: &mut Vm) -> Result<(), Interrupt> {
+    pub unsafe fn execute(&self, vm: &mut Vm, vm_ctx: &VmContext) -> Result<(), Interrupt> {
         match self {
             Self::MoveCst2Reg { src, dst, .. } => {
-                state.gpr(*dst).set(*src);
+                vm.gpr(*dst).set(*src);
             }
             Self::MoveReg2Mem { size, src, dst } => {
-                let mut frame = state.mem(*dst)?;
+                let mut frame = vm.mem(*dst)?;
 
-                let src = state.gpr(*src).get();
+                let src = vm.gpr(*src).get();
                 match size {
                     1 => frame.write_u8(src as u8)?,
                     2 => frame.write_u16(src as u16)?,
@@ -171,11 +207,30 @@ impl VmInstrOp {
                     _ => unreachable!("bad size: {}", size),
                 };
             }
+            Self::MoveMem2Reg { size, src, dst } => {
+                let mut frame = vm.mem(*src)?;
+
+                let dst = vm.gpr(*dst);
+                match size {
+                    1 => dst.set(frame.read_u8()? as u64),
+                    2 => dst.set(frame.read_u16()? as u64),
+                    4 => dst.set(frame.read_u32()? as u64),
+                    8 => dst.set(frame.read_u64()? as u64),
+                    _ => unreachable!("bad size: {}", size),
+                };
+            }
             Self::MoveReg2Reg { size, src, dst } => {
-                let src = state.gpr(*src).get();
-                let dst = state.gpr(*dst);
+                let src = vm.gpr(*src).get();
+                let dst = vm.gpr(*dst);
 
                 dst.set(src & make_mask(*size));
+            }
+
+            Self::MoveIpr2Reg { size, dst } => {
+                let ipr = vm.ipr();
+                let dst = vm.gpr(*dst);
+
+                dst.set(ipr & make_mask(*size));
             }
 
             Self::AddCst {
@@ -184,8 +239,8 @@ impl VmInstrOp {
                 dst,
                 value,
             } => {
-                let src = state.gpr(*src).get();
-                let dst = state.gpr(*dst);
+                let src = vm.gpr(*src).get();
+                let dst = vm.gpr(*dst);
 
                 let result = src.wrapping_add(*value);
 
@@ -199,8 +254,8 @@ impl VmInstrOp {
             }
 
             Self::LSLCst { src, dst, shift } => {
-                let src = state.gpr(*src).get();
-                let dst = state.gpr(*dst);
+                let src = vm.gpr(*src).get();
+                let dst = vm.gpr(*dst);
 
                 let result = src << shift;
                 dst.set(result);
@@ -212,9 +267,9 @@ impl VmInstrOp {
                 dst,
                 value,
             } => {
-                let src = state.gpr(*src).get();
-                let value = state.gpr(*value).get();
-                let dst = state.gpr(*dst);
+                let src = vm.gpr(*src).get();
+                let value = vm.gpr(*value).get();
+                let dst = vm.gpr(*dst);
 
                 let result = src | value;
                 dst.set(result & make_mask(*size));

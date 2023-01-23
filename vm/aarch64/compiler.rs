@@ -52,10 +52,13 @@ impl AArch64Compiler {
 
             AArch64Instr::Adr(PcRelAddressing { immlo, immhi, rd }) => {
                 let imm = sign_extend((immhi as u64) << 2 | (immlo as u64), 20);
+                let reg = self.gpr_registers[rd as usize];
+
+                instrs.push(VmInstrOp::MoveIpr2Reg { size: 8, dst: reg });
                 instrs.push(VmInstrOp::AddCst {
                     size: 8,
-                    src: self.pc_reg,
-                    dst: self.gpr_registers[rd as usize],
+                    src: reg,
+                    dst: reg,
                     value: imm,
                 });
             }
@@ -128,7 +131,7 @@ const fn decode_shift(shift: u8) -> ShiftType {
     }
 }
 
-pub const fn sign_extend(value: u64, size: u8) -> u64 {
+const fn sign_extend(value: u64, size: u8) -> u64 {
     let mask = 1 << (size - 1);
     let sign = value & mask;
     if sign != 0 {

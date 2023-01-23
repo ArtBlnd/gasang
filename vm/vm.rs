@@ -7,6 +7,9 @@ use crate::{Interrupt, MMUError};
 use slab::Slab;
 use std::sync::Arc;
 
+pub const CARRY_FLAG: u64 = 1 << 0;
+pub const OVERFLOW_FLAG: u64 = 1 << 1;
+
 #[derive(Debug)]
 pub struct VmContext {
     pub vm_instr: Vec<VmInstr>,
@@ -38,8 +41,11 @@ impl Vm {
     fn run_inner(&mut self, ctx: &VmContext) -> Result<usize, Interrupt> {
         while self.ipv < ctx.vm_instr.len() {
             let instr = &ctx.vm_instr[self.ipv];
+
+            // executing vm is unsafe because it modifies memory in unsafe way
+            // do not try to modify memory from mmu outsize of vm execution.
             unsafe {
-                instr.op.execute(self)?;
+                instr.op.execute(self, ctx)?;
             }
 
             // check control flow has been modified
@@ -52,6 +58,10 @@ impl Vm {
         }
 
         Ok(0)
+    }
+
+    pub fn ipr(&self) -> u64 {
+        self.ipr
     }
 
     pub fn inc_ip(&mut self, offset: u64) {

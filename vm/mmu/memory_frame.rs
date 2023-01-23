@@ -18,7 +18,6 @@ impl MemoryFrame {
     }
 
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, MMUError> {
-        let page = self.mmu.query(self.addr)?;
         todo!()
     }
 
