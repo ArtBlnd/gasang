@@ -1,13 +1,12 @@
 use std::cell::UnsafeCell;
 use std::sync::Arc;
 
-
 // Host Memory
 //
 // This is the memory that is allocated by the host. It is used to store the
-// guest memory as unsafe way. Note that accessing the memory outside of VM 
+// guest memory as unsafe way. Note that accessing the memory outside of VM
 // is very dangerous.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HostMemory {
     memory: Arc<UnsafeCell<Box<[u8]>>>,
 }

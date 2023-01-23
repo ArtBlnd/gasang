@@ -3,15 +3,7 @@ use crate::interrupt::Interrupt;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 #[derive(Debug, Clone, Copy)]
-pub struct RegId(pub usize);
-impl<T> From<T> for RegId
-where
-    T: Into<usize>,
-{
-    fn from(v: T) -> Self {
-        RegId(v.into())
-    }
-}
+pub struct RegId(pub u8);
 
 impl Display for RegId {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {

@@ -2,7 +2,7 @@ use crate::mmu::HostMemory;
 
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Page {
     Unmapped,
     Memory {
@@ -11,8 +11,5 @@ pub enum Page {
         readable: bool,
         writable: bool,
         executable: bool,
-    },
-    Callback {
-        callback: Arc<dyn FnMut(&mut [u8])>,
     },
 }

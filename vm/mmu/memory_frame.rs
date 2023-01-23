@@ -1,4 +1,4 @@
-use crate::mmu::{MmuData, Page, HostMemory};
+use crate::mmu::{HostMemory, MmuData, Page};
 use crate::MMUError;
 
 use std::io::{Read, Write};

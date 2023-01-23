@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, Error)]
+use crate::MMUError;
+
+#[derive(Clone, Debug, Error)]
 pub enum Interrupt {
     #[error("integer_ovf")]
     IntegerOverflow,
@@ -16,4 +18,7 @@ pub enum Interrupt {
 
     #[error("exit {0}")]
     Exit(usize),
+
+    #[error("Page Fault")]
+    PageFault(#[from] MMUError),
 }

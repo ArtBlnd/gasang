@@ -10,11 +10,11 @@ use crate::error::MMUError;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-
 // Memory Management Unit
 //
-// This is the core of the virtual memory system. It manages the mapping between 
+// This is the core of the virtual memory system. It manages the mapping between
 // virtual address and VM host address and callbacks. also manages the page table.
+#[derive(Debug, Clone)]
 pub struct Mmu {
     inner: Arc<MmuData>,
 }
@@ -42,8 +42,9 @@ impl Mmu {
 
 // Internal Memory Management Unit Data
 //
-// This is the internal data of the Mmu. It is used to implement the Deref and 
+// This is the internal data of the Mmu. It is used to implement the Deref and
 // DerefMut traits. It is not recommended to use this struct directly.
+#[derive(Debug)]
 pub struct MmuData {
     page_size: usize,
     page_table: Box<[Page]>,

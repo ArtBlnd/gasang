@@ -1,15 +1,13 @@
-use crate::{Interrupt, RegId, VmInstr};
+use crate::instr::VmInstrOp;
+use crate::register::RegId;
+use crate::Interrupt;
 use machineinstr::aarch64::*;
 
 use std::iter::Iterator;
 
 use smallvec::SmallVec;
 
-// Program counter register.
-const PC_REG: RegId = RegId(32);
-const PSTATE_REG: RegId = RegId(33);
-
-pub struct AArch64Translater {
+pub struct AArch64Compiler {
     pub gpr_registers: [RegId; 32],
     pub fpr_registers: [RegId; 32],
 
@@ -18,27 +16,27 @@ pub struct AArch64Translater {
     pub pstate_reg: RegId,
 }
 
-impl AArch64Translater {
-    pub fn translate(&self, instr: AArch64Instr) -> impl Iterator<Item = VmInstr> {
-        let mut instrs = SmallVec::<[VmInstr; 2]>::new();
+impl AArch64Compiler {
+    pub fn compile_instr(&self, instr: AArch64Instr) -> impl Iterator<Item = VmInstrOp> {
+        let mut instrs = SmallVec::<[VmInstrOp; 2]>::new();
 
         let mut is_branch_generated = false;
         match instr {
             AArch64Instr::Nop => {}
             AArch64Instr::Brk(ExceptionGen { imm16, .. }) => {
-                instrs.push(VmInstr::Interrupt {
+                instrs.push(VmInstrOp::Interrupt {
                     interrupt: Interrupt::DebugBreakpoint(imm16 as usize),
                 });
             }
 
             AArch64Instr::Svc(ExceptionGen { imm16, .. }) => {
-                instrs.push(VmInstr::Interrupt {
+                instrs.push(VmInstrOp::Interrupt {
                     interrupt: Interrupt::SystemCall(imm16 as usize),
                 });
             }
 
             AArch64Instr::MovzVar64(Imm16Rd { imm16, rd }) => {
-                instrs.push(VmInstr::MoveCst2Reg {
+                instrs.push(VmInstrOp::MoveCst2Reg {
                     size: 8,
                     src: imm16 as u64,
                     dst: self.gpr_registers[rd as usize],
@@ -46,7 +44,7 @@ impl AArch64Translater {
             }
 
             AArch64Instr::MovzVar32(Imm16Rd { imm16, rd }) => {
-                instrs.push(VmInstr::MoveCst2Reg {
+                instrs.push(VmInstrOp::MoveCst2Reg {
                     size: 4,
                     src: imm16 as u64,
                     dst: self.gpr_registers[rd as usize],
@@ -55,7 +53,7 @@ impl AArch64Translater {
 
             AArch64Instr::Adr(PcRelAddressing { immlo, immhi, rd }) => {
                 let imm = sign_extend((immhi as u64) << 2 | (immlo as u64), 20);
-                instrs.push(VmInstr::AddCst {
+                instrs.push(VmInstrOp::AddCst {
                     size: 8,
                     src: self.pc_reg,
                     dst: self.gpr_registers[rd as usize],
@@ -75,29 +73,29 @@ impl AArch64Translater {
                 let rd: RegId = self.gpr_registers[rd as usize];
 
                 let i1 = match decode_shift(shift) {
-                    ShiftType::LSL => VmInstr::LSLCst {
+                    ShiftType::LSL => VmInstrOp::LSLCst {
                         src: rm,
                         dst: rd,
                         shift: imm6,
                     },
-                    ShiftType::LSR => VmInstr::LSRCst {
+                    ShiftType::LSR => VmInstrOp::LSRCst {
                         src: rm,
                         dst: rd,
                         shift: imm6,
                     },
-                    ShiftType::ASR => VmInstr::ASRCst {
+                    ShiftType::ASR => VmInstrOp::ASRCst {
                         src: rm,
                         dst: rd,
                         shift: imm6,
                     },
-                    ShiftType::ROR => VmInstr::RORCst {
+                    ShiftType::ROR => VmInstrOp::RORCst {
                         src: rm,
                         dst: rd,
                         shift: imm6,
                     },
                 };
 
-                let i2 = VmInstr::OrReg {
+                let i2 = VmInstrOp::OrReg {
                     size: 8,
                     src: rd,
                     dst: rd,
@@ -112,7 +110,7 @@ impl AArch64Translater {
 
         // if branch did not generated, increase PC by 4(= 1 instruction)
         if !is_branch_generated {
-            instrs.push(VmInstr::AddCst {
+            instrs.push(VmInstrOp::AddCst {
                 size: 8,
                 src: self.pc_reg,
                 dst: self.pc_reg,

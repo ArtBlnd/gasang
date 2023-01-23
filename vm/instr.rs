@@ -1,40 +1,47 @@
-use crate::{FlagId, Interrupt, RegId, VmState};
+use crate::register::*;
+use crate::{Interrupt, Vm};
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 #[derive(Debug, Clone)]
-pub enum VmInstr {
+pub struct VmInstr {
+    pub op: VmInstrOp,
+    pub size: u8,
+}
+
+#[derive(Debug, Clone)]
+pub enum VmInstrOp {
     // move register to register
     MoveReg2Reg {
-        size: usize,
+        size: u8,
         src: RegId,
         dst: RegId,
     },
 
     // Move register to memory
     MoveReg2Mem {
-        size: usize,
-        src: usize,
-        dst: RegId,
-    },
-
-    // Move memory to register
-    MoveMem2Reg {
-        size: usize,
+        size: u8,
         src: RegId,
         dst: usize,
     },
 
+    // Move memory to register
+    MoveMem2Reg {
+        size: u8,
+        src: usize,
+        dst: RegId,
+    },
+
     // Move constant to register
     MoveCst2Reg {
-        size: usize,
+        size: u8,
         src: u64,
         dst: RegId,
     },
 
     // Add constant to register
     AddCst {
-        size: usize,
+        size: u8,
         src: RegId,
         dst: RegId,
         value: u64,
@@ -42,14 +49,14 @@ pub enum VmInstr {
 
     // Bitwise or constant
     OrCst {
-        size: usize,
+        size: u8,
         src: RegId,
         dst: RegId,
         value: u64,
     },
     // Bitwise or register
     OrReg {
-        size: usize,
+        size: u8,
         src: RegId,
         dst: RegId,
         value: RegId,
@@ -88,22 +95,22 @@ pub enum VmInstr {
     },
 }
 
-impl Display for VmInstr {
+impl Display for VmInstrOp {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            VmInstr::MoveReg2Reg { size, src, dst } => {
+            VmInstrOp::MoveReg2Reg { size, src, dst } => {
                 write!(f, "mov{} {}, {}", size, src, dst)
             }
-            VmInstr::MoveReg2Mem { size, src, dst } => {
+            VmInstrOp::MoveReg2Mem { size, src, dst } => {
                 write!(f, "mov{} {}, {}", size, src, dst)
             }
-            VmInstr::MoveMem2Reg { size, src, dst } => {
+            VmInstrOp::MoveMem2Reg { size, src, dst } => {
                 write!(f, "mov{} {}, {}", size, src, dst)
             }
-            VmInstr::MoveCst2Reg { size, src, dst } => {
+            VmInstrOp::MoveCst2Reg { size, src, dst } => {
                 write!(f, "mov{} {}, {}", size, src, dst)
             }
-            VmInstr::AddCst {
+            VmInstrOp::AddCst {
                 size,
                 src,
                 dst,
@@ -111,7 +118,7 @@ impl Display for VmInstr {
             } => {
                 write!(f, "add{} {}, {}, {}", size, src, dst, value)
             }
-            VmInstr::OrCst {
+            VmInstrOp::OrCst {
                 size,
                 src,
                 dst,
@@ -119,7 +126,7 @@ impl Display for VmInstr {
             } => {
                 write!(f, "or{} {}, {}, {}", size, src, dst, value)
             }
-            VmInstr::OrReg {
+            VmInstrOp::OrReg {
                 size,
                 src,
                 dst,
@@ -127,37 +134,46 @@ impl Display for VmInstr {
             } => {
                 write!(f, "or{} {}, {}, {}", size, src, dst, value)
             }
-            VmInstr::LSRCst { src, dst, shift } => {
+            VmInstrOp::LSRCst { src, dst, shift } => {
                 write!(f, "lsr {}, {}, {}", src, dst, shift)
             }
-            VmInstr::LSLCst { src, dst, shift } => {
+            VmInstrOp::LSLCst { src, dst, shift } => {
                 write!(f, "lsl {}, {}, {}", src, dst, shift)
             }
-            VmInstr::RORCst { src, dst, shift } => {
+            VmInstrOp::RORCst { src, dst, shift } => {
                 write!(f, "ror {}, {}, {}", src, dst, shift)
             }
-            VmInstr::ASRCst { src, dst, shift } => {
+            VmInstrOp::ASRCst { src, dst, shift } => {
                 write!(f, "asr {}, {}, {}", src, dst, shift)
             }
-            VmInstr::Interrupt { interrupt } => {
+            VmInstrOp::Interrupt { interrupt } => {
                 write!(f, "int {}", interrupt)
             }
         }
     }
 }
 
-impl VmInstr {
-    pub fn execute(&self, state: &mut VmState) -> Result<(), Interrupt> {
+impl VmInstrOp {
+    pub unsafe fn execute(&self, state: &mut Vm) -> Result<(), Interrupt> {
         match self {
             Self::MoveCst2Reg { src, dst, .. } => {
-                state.get_gpr_register(*dst).unwrap().set(*src);
+                state.gpr(*dst).set(*src);
             }
-            Self::MoveMem2Reg { size, src, dst } => {
-                todo!()
+            Self::MoveReg2Mem { size, src, dst } => {
+                let mut frame = state.memory_frame(*dst)?;
+
+                let src = state.gpr(*src).get();
+                match size {
+                    1 => frame.write_u8(src as u8)?,
+                    2 => frame.write_u16(src as u16)?,
+                    4 => frame.write_u32(src as u32)?,
+                    8 => frame.write_u64(src as u64)?,
+                    _ => unreachable!("bad size: {}", size),
+                };
             }
             Self::MoveReg2Reg { size, src, dst } => {
-                let src = state.get_gpr_register(*src).unwrap().get();
-                let dst = state.get_gpr_register(*dst).unwrap();
+                let src = state.gpr(*src).get();
+                let dst = state.gpr(*dst);
 
                 dst.set(src & make_mask(*size));
             }
@@ -168,8 +184,8 @@ impl VmInstr {
                 dst,
                 value,
             } => {
-                let src = state.get_gpr_register(*src).unwrap().get();
-                let dst = state.get_gpr_register(*dst).unwrap();
+                let src = state.gpr(*src).get();
+                let dst = state.gpr(*dst);
 
                 let result = src.wrapping_add(*value);
 
@@ -179,12 +195,12 @@ impl VmInstr {
             }
 
             Self::Interrupt { interrupt } => {
-                return Err(*interrupt);
+                return Err(interrupt.clone());
             }
 
             Self::LSLCst { src, dst, shift } => {
-                let src = state.get_gpr_register(*src).unwrap().get();
-                let dst = state.get_gpr_register(*dst).unwrap();
+                let src = state.gpr(*src).get();
+                let dst = state.gpr(*dst);
 
                 let result = src << shift;
                 dst.set(result);
@@ -196,9 +212,9 @@ impl VmInstr {
                 dst,
                 value,
             } => {
-                let src = state.get_gpr_register(*src).unwrap().get();
-                let value = state.get_gpr_register(*value).unwrap().get();
-                let dst = state.get_gpr_register(*dst).unwrap();
+                let src = state.gpr(*src).get();
+                let value = state.gpr(*value).get();
+                let dst = state.gpr(*dst);
 
                 let result = src | value;
                 dst.set(result & make_mask(*size));
@@ -210,7 +226,7 @@ impl VmInstr {
     }
 }
 
-const fn make_mask(size: usize) -> u64 {
+const fn make_mask(size: u8) -> u64 {
     match size {
         1 => 0xff,
         2 => 0xffff,
