@@ -17,12 +17,61 @@ impl MemoryFrame {
         }
     }
 
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, MMUError> {
-        todo!()
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<(), MMUError> {
+        let mut addr = self.addr;
+        let mut read = 0;
+        
+        while read < buf.len() {
+            let page = self.mmu.query(addr)?;
+            let page_offs_beg = addr % self.mmu.page_size;
+            let page_offs_end = usize::min(self.mmu.page_size, buf.len() - read);
+
+            match page {
+                Page::Unmapped => return Err(MMUError::PageNotMapped),
+                Page::Memory { memory, readable, .. } => {
+                    // Check if the page is readable
+                    if !readable {
+                        return Err(MMUError::AccessViolation);
+                    }
+
+                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    buf.copy_from_slice(mem);
+                    read += mem.len();
+                    addr += mem.len();
+                },
+            }
+        }
+        
+
+        Ok(())
     }
 
     pub fn write(&mut self, buf: &[u8]) -> Result<(), MMUError> {
-        todo!()
+        let mut addr = self.addr;
+        let mut writ = 0;
+
+        while writ < buf.len() {
+            let page = self.mmu.query(addr)?;
+            let page_offs_beg = addr % self.mmu.page_size;
+            let page_offs_end = usize::min(self.mmu.page_size, buf.len() - writ);
+
+            match page {
+                Page::Unmapped => return Err(MMUError::PageNotMapped),
+                Page::Memory { memory, writable, .. } => {
+                    // Check if the page is writable
+                    if !writable {
+                        return Err(MMUError::AccessViolation);
+                    }
+
+                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    mem.copy_from_slice(buf);
+                    writ += mem.len();
+                    addr += mem.len();
+                },
+            }
+        }
+
+        Ok(())
     }
 
     pub fn read_u8(&mut self) -> Result<u8, MMUError> {

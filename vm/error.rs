@@ -7,4 +7,7 @@ pub enum MMUError {
 
     #[error("Page already mapped")]
     PageAlreadyMapped,
+
+    #[error("Access violation")]
+    AccessViolation,
 }
