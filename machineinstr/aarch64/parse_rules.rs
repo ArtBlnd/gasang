@@ -1,5 +1,6 @@
 use crate::aarch64::*;
 use crate::bit_patterns::*;
+use crate::instr::NativeInstr;
 use crate::utils::{extract_bits32, BitReader};
 use crate::MachineInstrParserRule;
 
@@ -9,14 +10,14 @@ use once_cell::sync::Lazy;
 pub struct AArch64InstrParserRule;
 
 impl MachineInstrParserRule for AArch64InstrParserRule {
-    type MachineInstr = AArch64Instr;
+    type MachineInstr = NativeInstr<AArch64Instr>;
 
     fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<Self::MachineInstr>
     where
         I: Iterator<Item = u8>,
     {
         // Todo features : FEAT_PAuth, FEAT_LSE
-        parse_aarch64_instr(buf)
+        parse_aarch64_instr(buf).map(|v| NativeInstr { op: v, size: 4 })
     }
 }
 

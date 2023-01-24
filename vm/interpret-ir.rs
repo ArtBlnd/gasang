@@ -5,8 +5,6 @@ use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule};
 use machineinstr::utils::BitReader;
 use machineinstr::MachineInstParser;
 
-use vm::aarch64::AArch64VM;
-
 fn main() {
     // Get first argument
     let args: Vec<String> = std::env::args().collect();

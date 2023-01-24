@@ -34,9 +34,23 @@ impl Deref for Mmu {
 }
 
 impl Mmu {
+    pub fn new(page_size: usize, page_cnts: usize) -> Self {
+        Mmu {
+            inner: Arc::new(MmuData::new(page_size, page_cnts)),
+        }
+    }
+
     // Create a memory frame from a virtual address
-    pub unsafe fn frame(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
+    pub fn frame(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
         Ok(MemoryFrame::new(self.inner.clone(), addr))
+    }
+
+    pub fn mmap(&mut self, page: Page, addr: usize) -> Result<(), MMUError> {
+        assert!(addr % self.page_size == 0);
+        let page_id = addr / self.page_size;
+        self.page_table[page_id] = page;
+
+        Ok(())
     }
 }
 

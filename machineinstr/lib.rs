@@ -1,4 +1,5 @@
 pub mod aarch64;
+pub mod instr;
 pub mod utils;
 
 mod bit_patterns;

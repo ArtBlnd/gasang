@@ -1,3 +1,4 @@
+use crate::jump_table::JumpId;
 use crate::mmu::MemoryFrame;
 use crate::register::*;
 use crate::{Interrupt, Vm, VmContext};
@@ -50,12 +51,16 @@ pub enum VmInstrOp {
 
     // =========================
     // CONTROL FLOW INSTRUCTIONS
-    JumpIpr {
+    JumpIprReg {
         dst: RegId,
     },
 
+    JumpIprCnt {
+        dst_offs: i64,
+    },
+
     JumpIpv {
-        dst: usize,
+        dst: JumpId,
         dst_ipr: u64,
     },
 
@@ -139,7 +144,10 @@ impl Display for VmInstrOp {
                 write!(f, "mov{} ipr, {}", size, dst)
             }
 
-            VmInstrOp::JumpIpr { dst } => {
+            VmInstrOp::JumpIprReg { dst } => {
+                write!(f, "jmp_ipr {}", dst)
+            }
+            VmInstrOp::JumpIprCnt { dst_offs: dst } => {
                 write!(f, "jmp_ipr {}", dst)
             }
             VmInstrOp::JumpIpv { dst, dst_ipr } => {
@@ -231,6 +239,20 @@ impl VmInstrOp {
                 let dst = vm.gpr(*dst);
 
                 dst.set(ipr & make_mask(*size));
+            }
+
+            Self::JumpIprReg { dst } => {
+                let dst = vm.gpr(*dst).get();
+                vm.jump2ipr(vm_ctx, dst);
+            }
+
+            Self::JumpIprCnt { dst_offs: dst } => {
+                vm.jump2ipr_rel(vm_ctx, *dst);
+            }
+
+            Self::JumpIpv { dst, dst_ipr } => {
+                let dst = vm_ctx.jump_table.jumpid2ipv(*dst);
+                vm.jump2ipv(dst, *dst_ipr);
             }
 
             Self::AddCst {

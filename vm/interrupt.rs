@@ -21,4 +21,7 @@ pub enum Interrupt {
 
     #[error("Page Fault")]
     PageFault(#[from] MMUError),
+
+    #[error("Need recompile")]
+    NeedRecompile,
 }
