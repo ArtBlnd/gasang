@@ -5,6 +5,13 @@ use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule};
 use machineinstr::utils::BitReader;
 use machineinstr::MachineInstParser;
 
+use vm::aarch64::{compile_text_segment, AArch64Compiler};
+use vm::register::{FprRegister, GprRegister, RegId};
+
+use vm::VmContext;
+
+use slab::Slab;
+
 fn main() {
     // Get first argument
     let args: Vec<String> = std::env::args().collect();
@@ -27,8 +34,23 @@ fn main() {
 
     let buf = &slice[ep_offset..(ep_offset + ep_size)];
 
-    let reader = BitReader::new(buf.iter().cloned());
-    let parser = MachineInstParser::new(reader, AArch64InstrParserRule);
+    let mut gpr_storage = Slab::new();
+    let mut fpr_storage = Slab::new();
 
-    todo!();
+    // initialize AArch64 registers.
+    let pstate_reg = RegId(gpr_storage.insert(GprRegister::new("pstate", 8)) as u8);
+    let gpr_registers: [RegId; 32] = (0..32)
+        .map(|i| RegId(gpr_storage.insert(GprRegister::new(format!("x{i}"), 8)) as u8))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    let fpr_registers: [RegId; 32] = (0..32)
+        .map(|i| RegId(fpr_storage.insert(FprRegister::new(format!("f{i}"), 8)) as u8))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+
+    let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg);
+    let mut vm_ctx = VmContext::new();
+    compile_text_segment(text_section.sh_addr as usize, buf, &compiler, &mut vm_ctx);
 }

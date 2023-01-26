@@ -1,4 +1,4 @@
-use crate::instr::VmInstr;
+use crate::instruction::{execute_instr, VmIr};
 use crate::jump_table::JumpTable;
 use crate::mmu::{MemoryFrame, Mmu};
 use crate::register::*;
@@ -13,9 +13,8 @@ pub const OVERFLOW_FLAG: u64 = 1 << 1;
 
 #[derive(Debug)]
 pub struct VmContext {
-    pub vm_instr: Vec<VmInstr>,
+    pub vm_instr: Vec<u8>,
     pub jump_table: JumpTable,
-    pub mmu: Mmu,
 }
 
 impl VmContext {
@@ -23,12 +22,11 @@ impl VmContext {
         Self {
             vm_instr: Vec::new(),
             jump_table: JumpTable::new(0x1000),
-            mmu: todo!(),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Vm {
     ctx: Arc<VmContext>,
 
@@ -52,18 +50,21 @@ impl Vm {
 
     fn run_inner(&mut self, ctx: &VmContext) -> Result<usize, Interrupt> {
         while self.ipv < ctx.vm_instr.len() {
-            let instr = &ctx.vm_instr[self.ipv];
+            let ir: VmIr = VmIr::from_ref(&ctx.vm_instr[self.ipv..]);
+
+            let curr_size = ir.curr_size() as usize;
+            let orgn_size = ir.real_size();
 
             // executing vm is unsafe because it modifies memory in unsafe way
             // do not try to modify memory from mmu outsize of vm execution.
             unsafe {
-                instr.op.execute(self, ctx)?;
+                execute_instr(ir, self, ctx)?;
             }
 
             // check control flow has been modified
             // if its modified do not increase instruction pointer.
             if !self.ip_modified {
-                self.inc_ip(instr.size as u64);
+                self.inc_ip(curr_size, orgn_size as u64);
             } else {
                 self.ip_modified = false;
             }
@@ -76,9 +77,9 @@ impl Vm {
         self.ipr
     }
 
-    pub fn inc_ip(&mut self, offset: u64) {
-        self.ipv += 1;
-        self.ipr += offset;
+    pub fn inc_ip(&mut self, ipv_offset: usize, ipr_offset: u64) {
+        self.ipv += ipv_offset;
+        self.ipr += ipr_offset;
     }
 
     pub fn jump2ipv(&mut self, ipv: usize, ipr: u64) {
@@ -108,7 +109,7 @@ impl Vm {
 
             let instr = &ctx.vm_instr[cp_ipv];
             cp_ipv -= 1;
-            cp_ipr -= instr.size as u64;
+            // cp_ipr -= instr.size as u64;
         }
 
         self.ipr2ipv_cache.insert(cp_ipr, cp_ipv);
@@ -124,7 +125,7 @@ impl Vm {
     }
 
     pub fn mem(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
-        self.ctx.mmu.frame(addr)
+        todo!()
     }
 
     pub fn gpr(&mut self, id: RegId) -> &mut GprRegister {

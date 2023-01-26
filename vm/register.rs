@@ -11,7 +11,7 @@ impl Display for RegId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct GprRegister {
     name: String,
     size: u8,
@@ -94,9 +94,19 @@ impl GprRegister {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FprRegister {
     pub name: String,
     pub size: u8,
     pub value: f64,
+}
+
+impl FprRegister {
+    pub fn new(name: impl AsRef<str>, size: u8) -> Self {
+        Self {
+            name: name.as_ref().to_string(),
+            size,
+            value: 0.0,
+        }
+    }
 }

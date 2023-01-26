@@ -44,14 +44,6 @@ impl Mmu {
     pub fn frame(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
         Ok(MemoryFrame::new(self.inner.clone(), addr))
     }
-
-    pub fn mmap(&mut self, page: Page, addr: usize) -> Result<(), MMUError> {
-        assert!(addr % self.page_size == 0);
-        let page_id = addr / self.page_size;
-        self.page_table[page_id] = page;
-
-        Ok(())
-    }
 }
 
 // Internal Memory Management Unit Data

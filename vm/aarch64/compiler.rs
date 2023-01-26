@@ -1,6 +1,7 @@
-use crate::instr::VmInstrOp;
+use crate::instruction::*;
 use crate::register::RegId;
 use crate::Interrupt;
+
 use machineinstr::aarch64::*;
 
 use std::iter::Iterator;
@@ -8,109 +9,109 @@ use std::iter::Iterator;
 use smallvec::SmallVec;
 
 pub struct AArch64Compiler {
-    pub gpr_registers: [RegId; 32],
-    pub fpr_registers: [RegId; 32],
+    gpr_registers: [RegId; 32],
+    fpr_registers: [RegId; 32],
 
-    // Program counter register.
-    pub pc_reg: RegId,
-    pub pstate_reg: RegId,
+    pstate_reg: RegId,
 }
 
 impl AArch64Compiler {
-    pub fn compile_instr(&self, instr: AArch64Instr) -> impl Iterator<Item = VmInstrOp> {
-        let mut instrs = SmallVec::<[VmInstrOp; 2]>::new();
+    pub fn new(gpr_registers: [RegId; 32], fpr_registers: [RegId; 32], pstate_reg: RegId) -> Self {
+        Self {
+            gpr_registers,
+            fpr_registers,
+            pstate_reg,
+        }
+    }
+
+    pub fn gpr(&self, reg: u8) -> RegId {
+        self.gpr_registers[reg as usize]
+    }
+
+    pub fn fpr(&self, reg: u8) -> RegId {
+        self.fpr_registers[reg as usize]
+    }
+
+    pub fn compile_instr(
+        &self,
+        orgn_size: u8, // original instruction size
+        prev_size: u8, // previous instruction size
+        instr: AArch64Instr,
+    ) -> SmallVec<[u8; 8]> {
+        let mut out = SmallVec::new();
 
         match instr {
-            AArch64Instr::Nop => {}
-            AArch64Instr::Brk(ExceptionGen { imm16, .. }) => {
-                instrs.push(VmInstrOp::Interrupt {
-                    interrupt: Interrupt::DebugBreakpoint(imm16 as usize),
-                });
+            AArch64Instr::MovzVar32(operand) | AArch64Instr::MovzVar64(operand) => {
+                let op = Reg1U16 {
+                    op1: self.gpr(operand.rd),
+                    imm16: operand.imm16,
+                }
+                .build(IROP_MOV_16CST2REG);
+
+                let curr_size = 2 + op.len() as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op);
             }
 
-            AArch64Instr::Svc(ExceptionGen { imm16, .. }) => {
-                instrs.push(VmInstrOp::Interrupt {
-                    interrupt: Interrupt::SystemCall(imm16 as usize),
-                });
+            AArch64Instr::Nop => {
+                let curr_size = 2;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
             }
 
-            AArch64Instr::MovzVar64(Imm16Rd { imm16, rd }) => {
-                instrs.push(VmInstrOp::MoveCst2Reg {
-                    size: 8,
-                    src: imm16 as u64,
-                    dst: self.gpr_registers[rd as usize],
-                });
+            AArch64Instr::Adr(operand) => {
+                let imm = sign_extend((operand.immhi as u64) << 2 | (operand.immlo as u64), 20);
+
+                let op1 = Reg1 {
+                    op1: self.gpr(operand.rd),
+                }
+                .build(IROP_MOV_IPR2REG);
+                let op2 = Reg1U32 {
+                    op1: self.gpr(operand.rd),
+                    imm32: imm as u32,
+                }
+                .build(IROP_UADD_IMM32);
+
+                let curr_size = 2 + op1.len() as u8 + op2.len() as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op1);
+                out.extend_from_slice(&op2);
             }
 
-            AArch64Instr::MovzVar32(Imm16Rd { imm16, rd }) => {
-                instrs.push(VmInstrOp::MoveCst2Reg {
-                    size: 4,
-                    src: imm16 as u64,
-                    dst: self.gpr_registers[rd as usize],
-                });
-            }
+            AArch64Instr::OrrShiftedReg64(operand) => {
+                let rm = self.gpr(operand.rm);
+                let rn = self.gpr(operand.rm);
+                let rd = self.gpr(operand.rm);
 
-            AArch64Instr::Adr(PcRelAddressing { immlo, immhi, rd }) => {
-                let imm = sign_extend((immhi as u64) << 2 | (immlo as u64), 20);
-                let reg = self.gpr_registers[rd as usize];
-
-                instrs.push(VmInstrOp::MoveIpr2Reg { size: 8, dst: reg });
-                instrs.push(VmInstrOp::AddCst {
-                    size: 8,
-                    src: reg,
-                    dst: reg,
-                    value: imm,
-                });
-            }
-
-            AArch64Instr::OrrShiftedReg64(ShiftRmImm6RnRd {
-                shift,
-                rm,
-                imm6,
-                rn,
-                rd,
-            }) => {
-                let rm: RegId = self.gpr_registers[rm as usize];
-                let rn: RegId = self.gpr_registers[rn as usize];
-                let rd: RegId = self.gpr_registers[rd as usize];
-
-                let i1 = match decode_shift(shift) {
-                    ShiftType::LSL => VmInstrOp::LSLCst {
-                        src: rm,
-                        dst: rd,
-                        shift: imm6,
-                    },
-                    ShiftType::LSR => VmInstrOp::LSRCst {
-                        src: rm,
-                        dst: rd,
-                        shift: imm6,
-                    },
-                    ShiftType::ASR => VmInstrOp::ASRCst {
-                        src: rm,
-                        dst: rd,
-                        shift: imm6,
-                    },
-                    ShiftType::ROR => VmInstrOp::RORCst {
-                        src: rm,
-                        dst: rd,
-                        shift: imm6,
-                    },
+                let i1 = match decode_shift(operand.shift) {
+                    ShiftType::LSL => IROP_LEFT_SHIFT_IMM8,
+                    ShiftType::LSR => IROP_LRIGHT_SHIFT_IMM8,
+                    ShiftType::ASR => IROP_AMRIGHT_SHIFT_IMM8,
+                    ShiftType::ROR => IROP_ROTATE_IMM8,
                 };
 
-                let i2 = VmInstrOp::OrReg {
-                    size: 8,
-                    src: rd,
-                    dst: rd,
-                    value: rn,
-                };
+                let op1 = Reg2U8 {
+                    op1: rm,
+                    op2: rd,
+                    imm8: operand.imm6,
+                }.build(i1);
 
-                instrs.push(i1);
-                instrs.push(i2);
+                let op2 = Reg3 {
+                    op1: rd,
+                    op2: rd,
+                    op3: rn,
+                }.build(IROP_OR);
+
+                let curr_size = 2 + op1.len() as u8 + op2.len() as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op1);
+                out.extend_from_slice(&op2);
             }
-            v => todo!("{:?}", v),
+
+            
+            _ => unimplemented!("unknown instruction: {:?}", instr),
         }
 
-        instrs.into_iter()
+        out
     }
 }
 
