@@ -28,27 +28,27 @@ impl VmContext {
 
 #[derive(Clone, Debug)]
 pub struct Vm {
-    ctx: Arc<VmContext>,
+    pub(crate) ctx: Arc<VmContext>,
 
-    gpr_registers: Slab<GprRegister>,
-    fpr_registers: Slab<FprRegister>,
+    pub(crate) gpr_registers: Slab<GprRegister>,
+    pub(crate) fpr_registers: Slab<FprRegister>,
 
     // instruction pointer
-    ipv: usize,
-    ipr: u64,
-    ipr2ipv_cache: HashMap<u64, usize>,
-    ip_modified: bool,
+    pub(crate) ipv: usize,
+    pub(crate) ipr: u64,
+    pub(crate) ipr2ipv_cache: HashMap<u64, usize>,
+    pub(crate) ip_modified: bool,
 
-    flags: u64,
+    pub(crate) flags: u64,
 }
 
 impl Vm {
-    pub fn run(&mut self) -> Result<usize, Interrupt> {
+    pub fn run(&mut self) -> Result<u64, Interrupt> {
         let r = self.run_inner(&self.ctx.clone());
         return r;
     }
 
-    fn run_inner(&mut self, ctx: &VmContext) -> Result<usize, Interrupt> {
+    fn run_inner(&mut self, ctx: &VmContext) -> Result<u64, Interrupt> {
         while self.ipv < ctx.vm_instr.len() {
             let ir: VmIr = VmIr::from_ref(&ctx.vm_instr[self.ipv..]);
 

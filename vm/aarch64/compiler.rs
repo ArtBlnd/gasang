@@ -69,7 +69,7 @@ impl AArch64Compiler {
                     op1: self.gpr(operand.rd),
                     imm32: imm as u32,
                 }
-                .build(IROP_UADD_IMM32);
+                .build(IROP_UADD_CST32);
 
                 let curr_size = 2 + op1.len() as u8 + op2.len() as u8;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -93,13 +93,15 @@ impl AArch64Compiler {
                     op1: rm,
                     op2: rd,
                     imm8: operand.imm6,
-                }.build(i1);
+                }
+                .build(i1);
 
                 let op2 = Reg3 {
                     op1: rd,
                     op2: rd,
                     op3: rn,
-                }.build(IROP_OR);
+                }
+                .build(IROP_OR_REG3);
 
                 let curr_size = 2 + op1.len() as u8 + op2.len() as u8;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -107,7 +109,28 @@ impl AArch64Compiler {
                 out.extend_from_slice(&op2);
             }
 
-            
+            AArch64Instr::Svc(operand) => {
+                let op = U16 {
+                    imm16: operand.imm16,
+                }
+                .build(IROP_SVC);
+
+                let curr_size = 2 + op.len() as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op);
+            }
+
+            AArch64Instr::Brk(operand) => {
+                let op = U16 {
+                    imm16: operand.imm16,
+                }
+                .build(IROP_BRK);
+
+                let curr_size = 2 + op.len() as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op);
+            }
+
             _ => unimplemented!("unknown instruction: {:?}", instr),
         }
 

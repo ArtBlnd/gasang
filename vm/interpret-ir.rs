@@ -52,5 +52,5 @@ fn main() {
 
     let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg);
     let mut vm_ctx = VmContext::new();
-    compile_text_segment(text_section.sh_addr as usize, buf, &compiler, &mut vm_ctx);
+    compile_text_segment(text_section.sh_addr, buf, &compiler, &mut vm_ctx);
 }

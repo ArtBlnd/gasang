@@ -1,10 +1,10 @@
 use crate::instruction::*;
 
 //Dst = Val0 + Val1
-pub const IROP_UADD: u8 = 0b0000_0000;
-pub const IROP_USUB: u8 = 0b0000_0001;
-pub const IROP_UMUL: u8 = 0b0000_0010;
-pub const IROP_UDIV: u8 = 0b0000_0011;
+pub const IROP_UADD_REG3: u8 = 0b0000_0000;
+pub const IROP_USUB_REG3: u8 = 0b0000_0001;
+pub const IROP_UMUL_REG3: u8 = 0b0000_0010;
+pub const IROP_UDIV_REG3: u8 = 0b0000_0011;
 //Dst += Const(1byte)
 pub const IROP_UADD_CST8: u8 = 0b0000_0100;
 pub const IROP_USUB_CST8: u8 = 0b0000_0101;
@@ -22,15 +22,15 @@ pub const IROP_UMUL_CST64: u8 = 0b0000_1110;
 pub const IROP_UDIV_CST64: u8 = 0b0000_1111;
 
 //Dst = Val0 (|, &, ^) Val1
-pub const IROP_OR: u8 = 0b0001_0000;
-pub const IROP_AND: u8 = 0b0001_0001;
-pub const IROP_XOR: u8 = 0b0001_0010;
+pub const IROP_OR_REG3: u8 = 0b0001_0000;
+pub const IROP_AND_REG3: u8 = 0b0001_0001;
+pub const IROP_XOR_REG3: u8 = 0b0001_0010;
 
 //Shifts
-pub const IROP_LEFT_SHIFT_CST8: u8 = 0b0001_0011;
-pub const IROP_LRIGHT_SHIFT_CST8: u8 = 0b0001_0100; //Logical Right Shift
-pub const IROP_ROTATE_CST8: u8 = 0b0001_0101;
-pub const IROP_AMRIGHT_SHIFT_CST8: u8 = 0b0001_0110; // Arithmetic Right Shift
+pub const IROP_LEFT_SHIFT_IMM8: u8 = 0b0001_0011;
+pub const IROP_LRIGHT_SHIFT_IMM8: u8 = 0b0001_0100; //Logical Right Shift
+pub const IROP_ROTATE_IMM8: u8 = 0b0001_0101;
+pub const IROP_AMRIGHT_SHIFT_IMM8: u8 = 0b0001_0110; // Arithmetic Right Shift
 
 //Memory Instructions
 pub const IROP_MOV_REG2MEM_REG: u8 = 0b0001_0111;

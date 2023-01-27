@@ -23,7 +23,7 @@ pub unsafe fn execute_instr_inner(
     vm_ctx: &VmContext,
 ) -> Result<(), Interrupt> {
     match opcode {
-        IROP_UADD => {
+        IROP_UADD_REG3 => {
             todo!()
         }
 

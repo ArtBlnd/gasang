@@ -1,5 +1,7 @@
 mod compiler;
 pub use compiler::*;
+mod engine;
+pub use engine::*;
 
 use crate::jump_table::{JumpId, JumpTable};
 use crate::register::RegId;
@@ -15,7 +17,7 @@ use crate::instruction::*;
 use std::collections::HashMap;
 
 pub fn compile_text_segment(
-    addr: usize,
+    addr: u64,
     data: &[u8],
     compiler: &AArch64Compiler,
     vm_ctx: &mut VmContext,
@@ -31,6 +33,6 @@ pub fn compile_text_segment(
         // vm_ctx.vm_instr.extend_from_slice(&instr);
 
         ipr += native_instr.size as u64;
-        // prev_size = conv_len_to_instr_sz(instr.len() as u8);
+        prev_size = instr.len() as u8;
     }
 }
