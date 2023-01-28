@@ -10,6 +10,8 @@ struct Section {
 
 pub struct Image {
     image: Vec<u8>,
+    image_code_entry: u64,
+
     sections: HashMap<String, Section>,
 }
 
@@ -17,8 +19,19 @@ impl Image {
     pub fn from_image(image: Vec<u8>) -> Self {
         Self {
             image,
+            image_code_entry: 0,
+
             sections: HashMap::new(),
         }
+    }
+
+    pub fn set_entrypoint(&mut self, ep: u64) -> &mut Self {
+        self.image_code_entry = ep;
+        self
+    }
+
+    pub fn entrypoint(&self) -> u64 {
+        self.image_code_entry
     }
 
     // Add secment into image
@@ -28,11 +41,13 @@ impl Image {
         sec_addr: u64,
         beg: usize,
         end: usize,
-    ) {
+    ) -> &mut Self {
         self.sections.insert(
             sec_name.as_ref().to_string(),
             Section { sec_addr, beg, end },
         );
+
+        self
     }
 
     pub fn sections(&self) -> impl Iterator<Item = &str> {
