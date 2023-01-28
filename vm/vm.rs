@@ -26,6 +26,10 @@ impl VmContext {
             mmu: Mmu::new(),
         }
     }
+
+    pub fn get_instr(&self, ipv: usize) -> VmIr {
+        VmIr::from_ref(&self.vm_instr[ipv..])
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -51,13 +55,10 @@ impl Vm {
         return r;
     }
 
-    fn current_instr<'r>(&self, ctx: &'r VmContext) -> VmIr<'r> {
-        VmIr::from_ref(&ctx.vm_instr[self.ipv..])
-    }
 
     fn run_inner(&mut self, ctx: &VmContext) -> Result<u64, Interrupt> {
         while self.ipv < ctx.vm_instr.len() {
-            let ir = self.current_instr(ctx);
+            let ir = ctx.get_instr(self.ipv);
 
             let curr_size = ir.curr_size() as usize;
             let orgn_size = ir.real_size();
@@ -114,9 +115,9 @@ impl Vm {
                 break;
             }
 
-            let instr = &ctx.vm_instr[cp_ipv];
-            cp_ipv -= 1;
-            // cp_ipr -= instr.size as u64;
+            let instr = ctx.get_instr(cp_ipv);
+            cp_ipv -= instr.curr_size() as usize;
+            cp_ipr -= instr.real_size() as u64;
         }
 
         self.ipr2ipv_cache.insert(cp_ipr, cp_ipv);
