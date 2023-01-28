@@ -28,5 +28,5 @@ pub enum Interrupt {
 }
 
 pub trait InterruptModel {
-    unsafe fn interrupt(int: Interrupt, vm: &mut Vm, vm_ctx: &VmContext);
+    unsafe fn interrupt(&self, int: Interrupt, vm: &mut Vm, vm_ctx: &VmContext);
 }

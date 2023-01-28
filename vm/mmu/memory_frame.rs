@@ -1,4 +1,4 @@
-use crate::mmu::{MmuData, Page};
+use crate::mmu::{MmuData, Page, PAGE_SIZE};
 use crate::MMUError;
 
 use std::sync::Arc;
@@ -22,8 +22,8 @@ impl MemoryFrame {
 
         while read < buf.len() {
             let page = self.mmu.query(addr)?;
-            let page_offs_beg = (addr % 0x1000) as usize;
-            let page_offs_end = (usize::min(0x1000, buf.len() - read)) as usize;
+            let page_offs_beg = (addr % PAGE_SIZE) as usize;
+            let page_offs_end = (usize::min(PAGE_SIZE as usize, buf.len() - read)) as usize;
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),
@@ -35,7 +35,7 @@ impl MemoryFrame {
                         return Err(MMUError::AccessViolation);
                     }
 
-                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end] };
                     buf.copy_from_slice(mem);
                     read += mem.len();
                     addr += mem.len() as u64;
@@ -52,8 +52,8 @@ impl MemoryFrame {
 
         while writ < buf.len() {
             let page = self.mmu.query(addr)?;
-            let page_offs_beg = (addr % 0x1000) as usize;
-            let page_offs_end = (usize::min(0x1000, buf.len() - writ)) as usize;
+            let page_offs_beg = (addr % PAGE_SIZE) as usize;
+            let page_offs_end = (usize::min(PAGE_SIZE as usize, buf.len() - writ)) as usize;
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),
@@ -65,7 +65,7 @@ impl MemoryFrame {
                         return Err(MMUError::AccessViolation);
                     }
 
-                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end] };
                     mem.copy_from_slice(buf);
                     writ += mem.len();
                     addr += mem.len() as u64;

@@ -142,6 +142,22 @@ impl<'r> VmIr<'r> {
         v
     }
 
+    pub fn reg1i32(&self, offset: &mut usize) -> Reg1I32 {
+        let v = Reg1I32 {
+            op1: RegId(*self.get(*offset).unwrap()),
+            imm32: i32::from_le_bytes([
+                *self.get(1 + *offset).unwrap(),
+                *self.get(2 + *offset).unwrap(),
+                *self.get(3 + *offset).unwrap(),
+                *self.get(4 + *offset).unwrap(),
+            ]),
+        };
+
+        *offset += 5;
+
+        v
+    }
+
     pub fn reg1u64(&self, offset: &mut usize) -> Reg1U64 {
         let v = Reg1U64 {
             op1: RegId(*self.get(*offset).unwrap()),

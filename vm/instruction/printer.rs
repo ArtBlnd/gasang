@@ -46,6 +46,11 @@ pub fn print_irop(op: u8, offset: &mut usize, instr: &VmIr<'_>) -> String {
             format!("uadd {}, {}", op1.op1, op1.imm32)
         }
 
+        IROP_IADD_CST32 => {
+            let op1 = instr.reg1i32(offset);
+            format!("iadd {}, {}", op1.op1, op1.imm32)
+        }
+
         IROP_USUB_CST32 => {
             let op1 = instr.reg1u32(offset);
             format!("usub {}, {}", op1.op1, op1.imm32)
@@ -96,21 +101,21 @@ pub fn print_irop(op: u8, offset: &mut usize, instr: &VmIr<'_>) -> String {
         }
 
         IROP_LLEFT_SHIFT_IMM8 => {
-            let op1 = instr.reg1u8(offset);
-            format!("lshl {}, {}", op1.op1, op1.imm8)
+            let op1 = instr.reg2u8(offset);
+            format!("lshl {}, {} {}", op1.op1, op1.op2, op1.imm8)
         }
         IROP_LRIGHT_SHIFT_IMM8 => {
-            let op1 = instr.reg1u8(offset);
-            format!("lshr {}, {}", op1.op1, op1.imm8)
+            let op1 = instr.reg2u8(offset);
+            format!("lshr {}, {} {}", op1.op1, op1.op2, op1.imm8)
         }
 
         IROP_ROTATE_IMM8 => {
-            let op1 = instr.reg1u8(offset);
-            format!("rot {}, {}", op1.op1, op1.imm8)
+            let op1 = instr.reg2u8(offset);
+            format!("rot {}, {} {}", op1.op1, op1.op2, op1.imm8)
         }
 
         IROP_ARIGHT_SHIFT_IMM8 => {
-            let op1 = instr.reg1u8(offset);
+            let op1 = instr.reg2u8(offset);
             format!("ashr {}, {}", op1.op1, op1.imm8)
         }
 

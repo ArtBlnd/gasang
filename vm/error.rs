@@ -10,4 +10,7 @@ pub enum MMUError {
 
     #[error("Access violation")]
     AccessViolation,
+
+    #[error("Page fault")]
+    PageFault,
 }

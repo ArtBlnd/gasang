@@ -1,10 +1,8 @@
 use crate::{Interrupt, InterruptModel, Vm, VmContext};
 
-use std::slice::from_raw_parts;
-
 pub struct AArch64UnixInterruptModel;
-impl InterruptModel for Interrupt {
-    unsafe fn interrupt(int: Interrupt, vm: &mut Vm, vm_ctx: &VmContext) {
+impl InterruptModel for AArch64UnixInterruptModel {
+    unsafe fn interrupt(&self, int: Interrupt, vm: &mut Vm, vm_ctx: &VmContext) {
         match int {
             Interrupt::SystemCall(_) => {
                 let nr_reg = vm.reg_by_name("x8").unwrap();
@@ -41,7 +39,7 @@ pub unsafe fn handle_sys_call(nr: u64, args: [u64; 6], vm: &mut Vm, vm_ctx: &VmC
             buf.resize(size as usize, 0);
 
             // get memory frame and read string data
-            let mut frame = vm.mem(data).unwrap();
+            let mut frame = vm.mem(data);
             frame.read(&mut buf).unwrap();
 
             let chars = std::str::from_utf8_unchecked(&buf);

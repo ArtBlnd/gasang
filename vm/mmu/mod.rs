@@ -8,7 +8,9 @@ pub use page::*;
 use crate::error::MMUError;
 
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+
+const PAGE_SIZE: u64 = 65536;
 
 // Memory Management Unit
 //
@@ -16,7 +18,7 @@ use std::sync::Arc;
 // virtual address and VM host address and callbacks. also manages the page table.
 #[derive(Debug, Clone)]
 pub struct Mmu {
-    inner: Arc<MmuData>,
+    inner: Arc<MmuData>, 
 }
 
 impl DerefMut for Mmu {
@@ -41,8 +43,8 @@ impl Mmu {
     }
 
     // Create a memory frame from a virtual address
-    pub fn frame(&self, addr: u64) -> Result<MemoryFrame, MMUError> {
-        Ok(MemoryFrame::new(self.inner.clone(), addr))
+    pub fn frame(&self, addr: u64) -> MemoryFrame {
+        MemoryFrame::new(self.inner.clone(), addr)
     }
 }
 
@@ -52,29 +54,36 @@ impl Mmu {
 // DerefMut traits. It is not recommended to use this struct directly.
 #[derive(Debug)]
 pub struct MmuData {
-    page_table: PageTable,
+    page_table: RwLock<PageTable>,
 }
 
 impl MmuData {
     pub fn new() -> Self {
         MmuData {
-            page_table: PageTable::new(),
+            page_table: RwLock::new(PageTable::new()),
         }
     }
 
-    pub fn query(&self, addr: u64) -> Result<&Page, MMUError> {
-        let Some(page) = self.page_table.get_ref(addr) else {
-            return Err(MMUError::PageNotMapped);
+    pub fn query(&self, addr: u64) -> Result<Page, MMUError> {
+        let pt = self.page_table.read().unwrap();
+
+        let Some(page) = pt.get_ref(addr) else {
+            return Err(MMUError::PageFault);
         };
 
-        Ok(page)
+        Ok(page.clone())
     }
 
-    pub fn query_mut(&mut self, addr: u64) -> Result<&mut Page, MMUError> {
-        let Some(page) = self.page_table.get_mut(addr) else {
-            return Err(MMUError::PageNotMapped);
-        };
+    pub fn mmap(&self, addr: u64, size: u64, readable: bool, writable: bool, executable: bool) {
+        let mut pt = self.page_table.write().unwrap();
 
-        Ok(page)
+        let mut offset = 0u64;
+        
+        while size > offset {
+            let page = pt.get_or_mmap(addr + offset, || Page::Unmapped);
+            *page = Page::Memory { memory: HostMemory::new(PAGE_SIZE as usize), readable, writable, executable };
+
+            offset += PAGE_SIZE;
+        }
     }
 }

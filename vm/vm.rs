@@ -13,9 +13,9 @@ pub const OVERFLOW_FLAG: u64 = 1 << 1;
 
 #[derive(Debug)]
 pub struct VmContext {
-    vm_instr: Vec<u8>,
-    jump_table: JumpTable,
-    mmu: Mmu,
+    pub vm_instr: Vec<u8>,
+    pub jump_table: JumpTable,
+    pub mmu: Mmu,
 }
 
 impl VmContext {
@@ -88,6 +88,11 @@ impl Vm {
         self.ipr
     }
 
+    pub fn inc_ip_current(&mut self) {
+        let instr = self.ctx.get_instr(self.ipv);
+        self.inc_ip(instr.curr_size() as usize, instr.real_size() as u64);
+    }
+
     pub fn inc_ip(&mut self, ipv_offset: usize, ipr_offset: u64) {
         self.ipv += ipv_offset;
         self.ipr += ipr_offset;
@@ -135,7 +140,7 @@ impl Vm {
         self.jump2ipr(ctx, ipr);
     }
 
-    pub fn mem(&self, addr: u64) -> Result<MemoryFrame, MMUError> {
+    pub fn mem(&self, addr: u64) -> MemoryFrame {
         self.ctx.mmu.frame(addr)
     }
 

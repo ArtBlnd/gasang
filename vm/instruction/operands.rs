@@ -92,6 +92,7 @@ impl Reg1U64 {
     }
 }
 
+
 pub struct Reg1U16 {
     pub op1: RegId,
     pub imm16: u16,
@@ -101,6 +102,18 @@ impl Reg1U16 {
     pub fn build(self, opcode: u8) -> [u8; 4] {
         let imm = self.imm16.to_le_bytes();
         [opcode, self.op1.0, imm[0], imm[1]]
+    }
+}
+
+pub struct Reg1I32 {
+    pub op1: RegId,
+    pub imm32: i32,
+}
+
+impl Reg1I32 {
+    pub fn build(self, opcode: u8) -> [u8; 6] {
+        let imm = self.imm32.to_le_bytes();
+        [opcode, self.op1.0, imm[0], imm[1], imm[2], imm[3]]
     }
 }
 

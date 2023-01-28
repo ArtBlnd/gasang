@@ -37,4 +37,6 @@ pub fn compile_text_segment(
         ipr += native_instr.size as u64;
         prev_size = instr.len() as u8;
     }
+
+    
 }

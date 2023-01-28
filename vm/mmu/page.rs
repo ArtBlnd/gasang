@@ -1,4 +1,4 @@
-use crate::mmu::HostMemory;
+use crate::mmu::{HostMemory, PAGE_SIZE};
 
 #[derive(Debug, Clone)]
 pub enum Page {
@@ -14,7 +14,7 @@ pub enum Page {
 
 #[derive(Debug)]
 pub struct PageTableDepth0 {
-    table: [Page; 0x10000],
+    table: [Page; 4096],
 }
 
 #[derive(Debug)]
@@ -46,60 +46,96 @@ impl PageTable {
         }
     }
 
+    pub fn get_mem_offset(addr: u64) -> usize {
+        (addr & 0x0000_0000_0000_FFFF) as usize
+    }
+
     pub fn get_mut(&mut self, addr: u64) -> Option<&mut Page> {
-        let p4_index = (addr >> 39) & 0x1FF;
-        let p3_index = (addr >> 30) & 0x1FF;
-        let p2_index = (addr >> 21) & 0x1FF;
-        let p1_index = (addr >> 12) & 0x1FF;
+        let d3_offset = ((addr & 0xFFF0_0000_0000_0000) >> 52) as usize;
+        let d2_offset = ((addr & 0x000F_FF00_0000_0000) >> 40) as usize;
+        let d1_offset = ((addr & 0x0000_00FF_F000_0000) >> 28) as usize;
+        let pg_offset = ((addr & 0x0000_0000_0FFF_0000) >> 16) as usize;
 
-        let p4 = self.root.table[p4_index as usize].as_mut()?;
-        let p3 = p4.table[p3_index as usize].as_mut()?;
-        let p2 = p3.table[p2_index as usize].as_mut()?;
-
-        Some(&mut p2.table[p1_index as usize])
+        Some(
+            &mut self.root.table[d3_offset].as_mut()?.table[d2_offset]
+                .as_mut()?
+                .table[d1_offset]
+                .as_mut()?
+                .table[pg_offset],
+        )
     }
 
     pub fn get_ref(&self, addr: u64) -> Option<&Page> {
-        let p4_index = (addr >> 39) & 0x1FF;
-        let p3_index = (addr >> 30) & 0x1FF;
-        let p2_index = (addr >> 21) & 0x1FF;
-        let p1_index = (addr >> 12) & 0x1FF;
+        let d3_offset = ((addr & 0xFFF0_0000_0000_0000) >> 52) as usize;
+        let d2_offset = ((addr & 0x000F_FF00_0000_0000) >> 40) as usize;
+        let d1_offset = ((addr & 0x0000_00FF_F000_0000) >> 28) as usize;
+        let pg_offset = ((addr & 0x0000_0000_0FFF_0000) >> 16) as usize;
 
-        let p4 = self.root.table[p4_index as usize].as_ref()?;
-        let p3 = p4.table[p3_index as usize].as_ref()?;
-        let p2 = p3.table[p2_index as usize].as_ref()?;
-
-        Some(&p2.table[p1_index as usize])
+        Some(
+            &self.root.table[d3_offset].as_ref()?.table[d2_offset]
+                .as_ref()?
+                .table[d1_offset]
+                .as_ref()?
+                .table[pg_offset],
+        )
     }
 
     pub fn get_or_mmap<F>(&mut self, addr: u64, f: F) -> &mut Page
     where
         F: FnOnce() -> Page,
     {
-        let p4_index = (addr >> 39) & 0x1FF;
-        let p3_index = (addr >> 30) & 0x1FF;
-        let p2_index = (addr >> 21) & 0x1FF;
-        let p1_index = (addr >> 12) & 0x1FF;
+        let d3_offset = ((addr & 0xFFF0_0000_0000_0000) >> 52) as usize;
+        let d2_offset = ((addr & 0x000F_FF00_0000_0000) >> 40) as usize;
+        let d1_offset = ((addr & 0x0000_00FF_F000_0000) >> 28) as usize;
+        let pg_offset = ((addr & 0x0000_0000_0FFF_0000) >> 16) as usize;
 
-        let p4 = self.root.table[p4_index as usize].get_or_insert_with(|| {
+        let pt = &mut self.root;
+        let pt = pt.table[d3_offset].get_or_insert_with(|| {
             Box::new(PageTableDepth2 {
                 table: std::array::from_fn(|_| None),
             })
         });
 
-        let p3 = p4.table[p3_index as usize].get_or_insert_with(|| {
+        let pt = pt.table[d2_offset].get_or_insert_with(|| {
             Box::new(PageTableDepth1 {
                 table: std::array::from_fn(|_| None),
             })
         });
 
-        let p2 = p3.table[p2_index as usize].get_or_insert_with(|| {
+        let pt = pt.table[d1_offset].get_or_insert_with(|| {
             Box::new(PageTableDepth0 {
                 table: std::array::from_fn(|_| Page::Unmapped),
             })
         });
 
-        p2.table[p1_index as usize] = f();
-        &mut p2.table[p1_index as usize]
+        if let Page::Unmapped = pt.table[pg_offset] {
+            pt.table[pg_offset] = f();
+        }
+
+        &mut pt.table[pg_offset]
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let mut table = PageTable::new();
+
+        table.get_or_mmap(0xCAFE_BABE_DEAD_BEEE, || Page::Memory {
+            memory: HostMemory::new(PAGE_SIZE as usize),
+            readable: true,
+            writable: true,
+            executable: true,
+        });
+
+        let page = table.root;
+
+        let page = page.table[3247].as_ref().unwrap();
+        let page = page.table[3770].as_ref().unwrap();
+        let page = page.table[3053].as_ref().unwrap();
+        let _ = &page.table[3757];
     }
 }

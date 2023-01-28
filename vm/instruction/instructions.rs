@@ -15,6 +15,11 @@ pub const IROP_UADD_CST32: u8 = 0b0000_1000;
 pub const IROP_USUB_CST32: u8 = 0b0000_1001;
 pub const IROP_UMUL_CST32: u8 = 0b0000_1010;
 pub const IROP_UDIV_CST32: u8 = 0b0000_1011;
+
+pub const IROP_IADD_CST32: u8 = 0b1000_1000;
+pub const IROP_ISUB_CST32: u8 = 0b1000_1001;
+pub const IROP_IMUL_CST32: u8 = 0b1000_1010;
+pub const IROP_IDIV_CST32: u8 = 0b1000_1011;
 //Dst += Const(8byte)
 pub const IROP_UADD_CST64: u8 = 0b0000_1100;
 pub const IROP_USUB_CST64: u8 = 0b0000_1101;
