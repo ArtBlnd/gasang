@@ -6,7 +6,7 @@ use crate::instruction::instructions::*;
 
 #[inline]
 pub unsafe fn execute_instr(ir: VmIr, vm: &mut Vm, vm_ctx: &VmContext) -> Result<(), Interrupt> {
-    let mut offset = 0;
+    let mut offset = 2;
     while let Some(opcode) = ir.opcode(&mut offset) {
         execute_instr_inner(&mut offset, opcode, &ir, vm, vm_ctx)?;
     }

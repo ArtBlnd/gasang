@@ -27,10 +27,10 @@ pub const IROP_AND_REG3: u8 = 0b0001_0001;
 pub const IROP_XOR_REG3: u8 = 0b0001_0010;
 
 //Shifts
-pub const IROP_LEFT_SHIFT_IMM8: u8 = 0b0001_0011;
+pub const IROP_LLEFT_SHIFT_IMM8: u8 = 0b0001_0011;
 pub const IROP_LRIGHT_SHIFT_IMM8: u8 = 0b0001_0100; //Logical Right Shift
 pub const IROP_ROTATE_IMM8: u8 = 0b0001_0101;
-pub const IROP_AMRIGHT_SHIFT_IMM8: u8 = 0b0001_0110; // Arithmetic Right Shift
+pub const IROP_ARIGHT_SHIFT_IMM8: u8 = 0b0001_0110; // Arithmetic Right Shift
 
 //Memory Instructions
 pub const IROP_MOV_REG2MEM_REG: u8 = 0b0001_0111;
@@ -43,6 +43,6 @@ pub const IROP_MOV_IPR2REG: u8 = 0b0001_1100;
 pub const IROP_MOV_REG2REG: u8 = 0b0001_1101;
 
 //Special Instructions
-pub const IROP_SVC: u8 = 0b000_0000;
-pub const IROP_BRK: u8 = 0b000_0000;
-pub const IROP_NOP: u8 = 0b000_0000;
+pub const IROP_SVC: u8 = 0b001_1110;
+pub const IROP_BRK: u8 = 0b001_1111;
+pub const IROP_NOP: u8 = 0b010_0000;

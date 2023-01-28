@@ -53,4 +53,13 @@ fn main() {
     let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg);
     let mut vm_ctx = VmContext::new();
     compile_text_segment(text_section.sh_addr, buf, &compiler, &mut vm_ctx);
+
+    let v = vm_ctx.get_instr(0).len();
+    let mut offs = 0;
+    while offs < v {
+        let ir = vm_ctx.get_instr(offs);
+        println!("{}", ir);
+
+        offs += ir.curr_size() as usize;
+    }
 }

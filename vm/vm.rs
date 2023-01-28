@@ -30,6 +30,10 @@ impl VmContext {
     pub fn get_instr(&self, ipv: usize) -> VmIr {
         VmIr::from_ref(&self.vm_instr[ipv..])
     }
+
+    pub fn insert_instr(&mut self, inst: &[u8]) {
+        self.vm_instr.extend_from_slice(inst);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -54,7 +58,6 @@ impl Vm {
         let r = self.run_inner(&self.ctx.clone());
         return r;
     }
-
 
     fn run_inner(&mut self, ctx: &VmContext) -> Result<u64, Interrupt> {
         while self.ipv < ctx.vm_instr.len() {
@@ -93,7 +96,7 @@ impl Vm {
     pub fn jump2ipv(&mut self, ipv: usize, ipr: u64) {
         self.ip_modified = true;
         self.ipv = ipv;
-        self.ipr = ipr as u64;
+        self.ipr = ipr;
     }
 
     pub fn jump2ipr(&mut self, ctx: &VmContext, ipr: u64) {

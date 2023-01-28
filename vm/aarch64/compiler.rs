@@ -83,9 +83,9 @@ impl AArch64Compiler {
                 let rd = self.gpr(operand.rm);
 
                 let i1 = match decode_shift(operand.shift) {
-                    ShiftType::LSL => IROP_LEFT_SHIFT_IMM8,
+                    ShiftType::LSL => IROP_LLEFT_SHIFT_IMM8,
                     ShiftType::LSR => IROP_LRIGHT_SHIFT_IMM8,
-                    ShiftType::ASR => IROP_AMRIGHT_SHIFT_IMM8,
+                    ShiftType::ASR => IROP_ARIGHT_SHIFT_IMM8,
                     ShiftType::ROR => IROP_ROTATE_IMM8,
                 };
 
