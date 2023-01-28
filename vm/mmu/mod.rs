@@ -34,14 +34,14 @@ impl Deref for Mmu {
 }
 
 impl Mmu {
-    pub fn new(page_size: usize, page_cnts: usize) -> Self {
+    pub fn new() -> Self {
         Mmu {
-            inner: Arc::new(MmuData::new(page_size, page_cnts)),
+            inner: Arc::new(MmuData::new()),
         }
     }
 
     // Create a memory frame from a virtual address
-    pub fn frame(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
+    pub fn frame(&self, addr: u64) -> Result<MemoryFrame, MMUError> {
         Ok(MemoryFrame::new(self.inner.clone(), addr))
     }
 }
@@ -52,30 +52,26 @@ impl Mmu {
 // DerefMut traits. It is not recommended to use this struct directly.
 #[derive(Debug)]
 pub struct MmuData {
-    page_size: usize,
-    page_table: Box<[Page]>,
+    page_table: PageTable,
 }
 
 impl MmuData {
-    pub fn new(page_size: usize, page_cnts: usize) -> Self {
+    pub fn new() -> Self {
         MmuData {
-            page_size,
-            page_table: vec![Page::Unmapped; page_cnts].into_boxed_slice(),
+            page_table: PageTable::new(),
         }
     }
 
-    pub fn query(&self, addr: usize) -> Result<&Page, MMUError> {
-        let page_id = addr / self.page_size;
-        let Some(page) = self.page_table.get(page_id) else {
+    pub fn query(&self, addr: u64) -> Result<&Page, MMUError> {
+        let Some(page) = self.page_table.get_ref(addr) else {
             return Err(MMUError::PageNotMapped);
         };
 
         Ok(page)
     }
 
-    pub fn query_mut(&mut self, addr: usize) -> Result<&mut Page, MMUError> {
-        let page_id = addr / self.page_size;
-        let Some(page) = self.page_table.get_mut(page_id) else {
+    pub fn query_mut(&mut self, addr: u64) -> Result<&mut Page, MMUError> {
+        let Some(page) = self.page_table.get_mut(addr) else {
             return Err(MMUError::PageNotMapped);
         };
 

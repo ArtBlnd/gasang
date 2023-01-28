@@ -13,8 +13,9 @@ pub const OVERFLOW_FLAG: u64 = 1 << 1;
 
 #[derive(Debug)]
 pub struct VmContext {
-    pub vm_instr: Vec<u8>,
-    pub jump_table: JumpTable,
+    vm_instr: Vec<u8>,
+    jump_table: JumpTable,
+    mmu: Mmu,
 }
 
 impl VmContext {
@@ -22,6 +23,7 @@ impl VmContext {
         Self {
             vm_instr: Vec::new(),
             jump_table: JumpTable::new(0x1000),
+            mmu: Mmu::new(),
         }
     }
 }
@@ -32,6 +34,7 @@ pub struct Vm {
 
     pub(crate) gpr_registers: Slab<GprRegister>,
     pub(crate) fpr_registers: Slab<FprRegister>,
+    pub(crate) regs_byname: HashMap<String, RegId>,
 
     // instruction pointer
     pub(crate) ipv: usize,
@@ -48,9 +51,13 @@ impl Vm {
         return r;
     }
 
+    fn current_instr<'r>(&self, ctx: &'r VmContext) -> VmIr<'r> {
+        VmIr::from_ref(&ctx.vm_instr[self.ipv..])
+    }
+
     fn run_inner(&mut self, ctx: &VmContext) -> Result<u64, Interrupt> {
         while self.ipv < ctx.vm_instr.len() {
-            let ir: VmIr = VmIr::from_ref(&ctx.vm_instr[self.ipv..]);
+            let ir = self.current_instr(ctx);
 
             let curr_size = ir.curr_size() as usize;
             let orgn_size = ir.real_size();
@@ -124,8 +131,8 @@ impl Vm {
         self.jump2ipr(ctx, ipr);
     }
 
-    pub fn mem(&self, addr: usize) -> Result<MemoryFrame, MMUError> {
-        todo!()
+    pub fn mem(&self, addr: u64) -> Result<MemoryFrame, MMUError> {
+        self.ctx.mmu.frame(addr)
     }
 
     pub fn gpr(&mut self, id: RegId) -> &mut GprRegister {
@@ -138,6 +145,10 @@ impl Vm {
         self.fpr_registers
             .get_mut(id.0 as usize)
             .expect("Bad fpr register id")
+    }
+
+    pub fn reg_by_name(&self, name: impl AsRef<str>) -> Option<RegId> {
+        self.regs_byname.get(name.as_ref()).copied()
     }
 
     pub fn dump(&self) {

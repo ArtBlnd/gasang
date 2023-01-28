@@ -14,7 +14,7 @@ fn main() {
     let file_elf = ElfBytes::<AnyEndian>::minimal_parse(&file_buf).unwrap();
 
     let mut image = Image::from_image(file_buf.to_vec());
-    
+
     let Ok((Some(sec_headers), Some(strtbl))) = file_elf.section_headers_with_strtab() else {
         panic!("Bad elf file!");
     };
@@ -26,9 +26,6 @@ fn main() {
 
         image.add_section(name, sec.sh_addr, beg as usize, end as usize);
     }
-    
 
     todo!();
 }
-
-

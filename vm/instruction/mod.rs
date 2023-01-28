@@ -5,7 +5,7 @@ pub use instructions::*;
 mod executer;
 pub use executer::*;
 
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use crate::register::RegId;
 

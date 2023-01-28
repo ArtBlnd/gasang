@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 pub struct MemoryFrame {
     mmu: Arc<MmuData>,
-    addr: usize,
+    addr: u64,
 }
 
 impl MemoryFrame {
-    pub fn new(mmu: Arc<MmuData>, addr: usize) -> Self {
+    pub fn new(mmu: Arc<MmuData>, addr: u64) -> Self {
         MemoryFrame {
             mmu: mmu.clone(),
             addr,
@@ -22,8 +22,8 @@ impl MemoryFrame {
 
         while read < buf.len() {
             let page = self.mmu.query(addr)?;
-            let page_offs_beg = addr % self.mmu.page_size;
-            let page_offs_end = usize::min(self.mmu.page_size, buf.len() - read);
+            let page_offs_beg = (addr % 0x1000) as usize;
+            let page_offs_end = (usize::min(0x1000, buf.len() - read)) as usize;
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),
@@ -38,7 +38,7 @@ impl MemoryFrame {
                     let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
                     buf.copy_from_slice(mem);
                     read += mem.len();
-                    addr += mem.len();
+                    addr += mem.len() as u64;
                 }
             }
         }
@@ -52,8 +52,8 @@ impl MemoryFrame {
 
         while writ < buf.len() {
             let page = self.mmu.query(addr)?;
-            let page_offs_beg = addr % self.mmu.page_size;
-            let page_offs_end = usize::min(self.mmu.page_size, buf.len() - writ);
+            let page_offs_beg = (addr % 0x1000) as usize;
+            let page_offs_end = (usize::min(0x1000, buf.len() - writ)) as usize;
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),
@@ -68,7 +68,7 @@ impl MemoryFrame {
                     let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
                     mem.copy_from_slice(buf);
                     writ += mem.len();
-                    addr += mem.len();
+                    addr += mem.len() as u64;
                 }
             }
         }
