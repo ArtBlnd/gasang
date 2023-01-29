@@ -49,6 +49,11 @@ pub unsafe fn handle_sys_call(nr: u64, args: [u64; 6], vm: &mut Vm, vm_ctx: &VmC
                 println!("{}", chars);
             }
         }
+
+        // exit_group arg0:error_code
+        0x5e => {
+            std::process::exit(args[0] as i32);
+        }
         _ => unimplemented!("unknown interrupt! {}", nr),
     }
 }
