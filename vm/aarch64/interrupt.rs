@@ -35,17 +35,16 @@ pub unsafe fn handle_sys_call(nr: u64, args: [u64; 6], vm: &mut Vm, vm_ctx: &VmC
             let size = args[2];
 
             // make a memory for buffer reading
-            let mut buf = Vec::new();
-            buf.resize(size as usize, 0);
+            let mut buf = Vec::with_capacity(size as usize);
+            buf.set_len(size as usize);
 
-            // get memory frame and read string data
+            // get memory frame and read data
             let mut frame = vm.mem(data);
             frame.read(&mut buf).unwrap();
 
-            let chars = std::str::from_utf8_unchecked(&buf);
-
             const STDOUT: u64 = 1;
             if args[0] == STDOUT {
+                let chars = std::str::from_utf8_unchecked(&buf);
                 println!("{}", chars);
             }
         }
