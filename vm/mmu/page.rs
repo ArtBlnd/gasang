@@ -1,4 +1,4 @@
-use crate::mmu::{HostMemory, PAGE_SIZE};
+use crate::mmu::HostMemory;
 
 #[derive(Debug, Clone)]
 pub enum Page {
@@ -119,6 +119,7 @@ impl PageTable {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::mmu::PAGE_SIZE;
 
     #[test]
     fn test() {

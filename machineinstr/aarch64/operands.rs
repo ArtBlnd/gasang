@@ -28,7 +28,8 @@ pub struct ShImm12RnRd {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Imm12RnRt {
+pub struct SizeImm12RnRt {
+    pub size: u8,
     pub imm12: u16,
     pub rn: u8,
     pub rt: u8,

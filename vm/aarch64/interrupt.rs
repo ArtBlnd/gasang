@@ -27,7 +27,7 @@ impl InterruptModel for AArch64UnixInterruptModel {
     }
 }
 
-pub unsafe fn handle_sys_call(nr: u64, args: [u64; 6], vm: &mut Vm, vm_ctx: &VmContext) {
+pub unsafe fn handle_sys_call(nr: u64, args: [u64; 6], vm: &mut Vm, _vm_ctx: &VmContext) {
     match nr {
         // write arg0:fd arg1:buf arg0: length
         0x40 => {
@@ -45,7 +45,7 @@ pub unsafe fn handle_sys_call(nr: u64, args: [u64; 6], vm: &mut Vm, vm_ctx: &VmC
             const STDOUT: u64 = 1;
             if args[0] == STDOUT {
                 let chars = std::str::from_utf8_unchecked(&buf);
-                println!("{}", chars);
+                println!("{chars}");
             }
         }
 

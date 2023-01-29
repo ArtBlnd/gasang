@@ -5,22 +5,23 @@ pub mod utils;
 mod bit_patterns;
 
 use std::iter::Iterator;
+use utility::*;
 
 pub trait MachineInstrParserRule {
     type MachineInstr;
 
-    fn parse<I>(&mut self, buf: &mut utils::BitReader<I>) -> Option<Self::MachineInstr>
+    fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<Self::MachineInstr>
     where
         I: Iterator<Item = u8>;
 }
 
 pub struct MachineInstParser<I, R> {
-    buf: utils::BitReader<I>,
+    buf: BitReader<I>,
     rule: R,
 }
 
 impl<I, R> MachineInstParser<I, R> {
-    pub fn new(buf: utils::BitReader<I>, rule: R) -> Self {
+    pub fn new(buf: BitReader<I>, rule: R) -> Self {
         Self { buf, rule }
     }
 }

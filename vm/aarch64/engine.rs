@@ -1,9 +1,9 @@
 use crate::aarch64::interrupt::AArch64UnixInterruptModel;
-use crate::aarch64::{compile_text_segment, AArch64Compiler};
+use crate::aarch64::{compile_code, AArch64Compiler};
 use crate::engine::Engine;
 use crate::image::Image;
 use crate::register::{FprRegister, GprRegister, RegId};
-use crate::{InterruptModel, MMUError, Vm, VmContext};
+use crate::{InterruptModel, Vm, VmContext};
 
 use slab::Slab;
 
@@ -47,8 +47,9 @@ impl Engine for AArch64VMEngine {
             .try_into()
             .unwrap();
         let pstate_reg = RegId(gpr_storage.insert(GprRegister::new("pstate", 8)) as u8);
+        let stack_reg = RegId(gpr_storage.insert(GprRegister::new("sp", 8)) as u8);
 
-        let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg);
+        let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg, stack_reg);
         let mut vm_ctx = VmContext::new();
         build_image(&image, &compiler, &mut vm_ctx);
 
@@ -92,7 +93,7 @@ pub fn build_image(image: &Image, compiler: &AArch64Compiler, vm_ctx: &mut VmCon
         let data = image.section_data(sec_name);
 
         match sec_name {
-            ".text" => compile_text_segment(addr, data, compiler, vm_ctx),
+            ".text" => compile_code(addr, data, compiler, vm_ctx),
             ".rodata" => unsafe {
                 vm_ctx.mmu.mmap(addr, data.len() as u64, true, true, false);
                 vm_ctx.mmu.frame(addr).write(data).unwrap();

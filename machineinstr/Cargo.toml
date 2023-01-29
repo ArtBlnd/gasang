@@ -14,3 +14,4 @@ path = "disassemble.rs"
 num-traits = "0.2.15"
 elf = "0.7.1"
 once_cell = "1.17.0"
+utility = { version = "0.1.0", path = "../utility" }

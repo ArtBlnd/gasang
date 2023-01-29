@@ -1,7 +1,4 @@
-use crate::instruction::VmIr;
 use crate::register::RegId;
-
-use std::convert::From;
 
 pub const VMIR_REG1: u8 = 0b0000;
 pub const VMIR_REG2: u8 = 0b0001;
@@ -66,6 +63,21 @@ impl Reg2U8 {
     }
 }
 
+pub struct Reg2U32 {
+    pub op1: RegId,
+    pub op2: RegId,
+    pub imm32: u32,
+}
+
+impl Reg2U32 {
+    pub fn build(self, opcode: u8) -> [u8; 7] {
+        let imm = self.imm32.to_le_bytes();
+        [
+            opcode, self.op1.0, self.op2.0, imm[0], imm[1], imm[2], imm[3],
+        ]
+    }
+}
+
 pub struct Reg1U32 {
     pub op1: RegId,
     pub imm32: u32,
@@ -116,6 +128,31 @@ impl Reg1I32 {
     }
 }
 
+pub struct Reg2I16 {
+    pub op1: RegId,
+    pub op2: RegId,
+    pub imm16: i16,
+}
+
+impl Reg2I16 {
+    pub fn build(self, opcode: u8) -> [u8; 5] {
+        let imm = self.imm16.to_le_bytes();
+        [opcode, self.op1.0, self.op2.0, imm[0], imm[1]]
+    }
+}
+
+pub struct Reg1I16 {
+    pub op1: RegId,
+    pub imm16: i16,
+}
+
+impl Reg1I16 {
+    pub fn build(self, opcode: u8) -> [u8; 4] {
+        let imm = self.imm16.to_le_bytes();
+        [opcode, self.op1.0, imm[0], imm[1]]
+    }
+}
+
 pub struct U16 {
     pub imm16: u16,
 }
@@ -124,6 +161,28 @@ impl U16 {
     pub fn build(self, opcode: u8) -> [u8; 3] {
         let imm = self.imm16.to_le_bytes();
         [opcode, imm[0], imm[1]]
+    }
+}
+
+pub struct I32 {
+    pub imm32: i32,
+}
+
+impl I32 {
+    pub fn build(self, opcode: u8) -> [u8; 5] {
+        let imm = self.imm32.to_le_bytes();
+        [opcode, imm[0], imm[1], imm[2], imm[3]]
+    }
+}
+
+pub struct U32 {
+    pub imm32: u32,
+}
+
+impl U32 {
+    pub fn build(self, opcode: u8) -> [u8; 5] {
+        let imm = self.imm32.to_le_bytes();
+        [opcode, imm[0], imm[1], imm[2], imm[3]]
     }
 }
 

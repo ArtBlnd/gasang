@@ -23,7 +23,7 @@ impl InstrVisitor for InstrPrinter {
 
     fn visit_reg2(&mut self, op: u8, operand: Reg2) {
         self.0.push(match op {
-            IROP_MOV_REG2MEM_REG => format!("mov {}, *({})", operand.op1, operand.op2),
+            IROP_USTORE_REG2REG => format!("mov {}, *({})", operand.op1, operand.op2),
             IROP_MOV_REG2REG => format!("mov {}, {}", operand.op1, operand.op2),
             _ => unimplemented!(),
         });
@@ -74,7 +74,6 @@ impl InstrVisitor for InstrPrinter {
             IROP_USUB_CST32 => format!("usub {}, {}", operand.op1, operand.imm32),
             IROP_UMUL_CST32 => format!("umul {}, {}", operand.op1, operand.imm32),
             IROP_UDIV_CST32 => format!("udiv {}, {}", operand.op1, operand.imm32),
-            IROP_MOV_REG2MEM_CST => format!("mov {}, *({})", operand.op1, operand.imm32),
             _ => unimplemented!(),
         });
     }
@@ -112,13 +111,22 @@ impl InstrVisitor for InstrPrinter {
         });
     }
 
-    fn visit_reg2i64(&mut self, op: u8, operand: Reg2I64) {}
+    fn visit_i32(&mut self, op: u8, operand: I32) {
+        self.0.push(match op {
+            IROP_JMP => format!("jmp {}", operand.imm32),
+            IROP_BR_IPR_REL32 => format!("jmp_ipr {}", operand.imm32),
+            _IROP_JMP_IPV_REL32 => format!("jmp_ipv {}", operand.imm32),
+            _ => unimplemented!(),
+        });
+    }
 
-    fn visit_reg1i64(&mut self, op: u8, operand: Reg1I64) {}
+    fn visit_reg2i64(&mut self, _op: u8, _operand: Reg2I64) {}
+
+    fn visit_reg1i64(&mut self, _op: u8, _operand: Reg1I64) {}
 
     fn visit_no_operand(&mut self, op: u8) {
         self.0.push(match op {
-            IROP_NOP => format!("nop"),
+            IROP_NOP => "nop".to_string(),
             _ => unimplemented!(),
         });
     }

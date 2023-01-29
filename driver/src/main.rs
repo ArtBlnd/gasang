@@ -27,7 +27,7 @@ fn main() {
         let end = sec.sh_offset + sec.sh_size;
 
         if name == ".text" {
-            image.set_entrypoint(sec.sh_addr as u64);
+            image.set_entrypoint(sec.sh_addr);
         }
 
         image.add_section(name, sec.sh_addr, beg as usize, end as usize);

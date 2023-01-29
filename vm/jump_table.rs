@@ -37,8 +37,7 @@ impl JumpTable {
     }
 
     pub fn new_jump(&mut self, ipv: usize) -> JumpId {
-        let jumpid = JumpId(self.ipv_table.insert(ipv) as u32);
-        jumpid
+        JumpId(self.ipv_table.insert(ipv) as u32)
     }
 
     pub fn jumpid2ipv(&self, jumpid: JumpId) -> usize {
@@ -64,7 +63,7 @@ impl JumpTable {
             };
 
             if cp.ipr > ipr {
-                return cp.clone();
+                return *cp;
             }
 
             cp_offset += 1;

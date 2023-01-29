@@ -1,13 +1,8 @@
 use elf::endian::AnyEndian;
 use elf::ElfBytes;
 
-use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule};
-use machineinstr::utils::BitReader;
-use machineinstr::MachineInstParser;
-
-use vm::aarch64::{compile_text_segment, AArch64Compiler};
+use vm::aarch64::{compile_code, AArch64Compiler};
 use vm::register::{FprRegister, GprRegister, RegId};
-
 use vm::VmContext;
 
 use slab::Slab;
@@ -39,6 +34,7 @@ fn main() {
 
     // initialize AArch64 registers.
     let pstate_reg = RegId(gpr_storage.insert(GprRegister::new("pstate", 8)) as u8);
+    let stack_reg = RegId(gpr_storage.insert(GprRegister::new("sp", 8)) as u8);
     let gpr_registers: [RegId; 32] = (0..32)
         .map(|i| RegId(gpr_storage.insert(GprRegister::new(format!("x{i}"), 8)) as u8))
         .collect::<Vec<_>>()
@@ -50,15 +46,15 @@ fn main() {
         .try_into()
         .unwrap();
 
-    let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg);
+    let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg, stack_reg);
     let mut vm_ctx = VmContext::new();
-    compile_text_segment(text_section.sh_addr, buf, &compiler, &mut vm_ctx);
+    compile_code(text_section.sh_addr, buf, &compiler, &mut vm_ctx);
 
     let v = vm_ctx.get_instr(0).len();
     let mut offs = 0;
     while offs < v {
         let ir = vm_ctx.get_instr(offs);
-        println!("{}", ir);
+        println!("{ir}");
 
         offs += ir.curr_size() as usize;
     }

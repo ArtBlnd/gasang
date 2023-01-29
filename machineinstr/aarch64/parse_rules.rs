@@ -1,8 +1,9 @@
 use crate::aarch64::*;
 use crate::bit_patterns::*;
 use crate::instr::NativeInstr;
-use crate::utils::{extract_bits32, BitReader};
 use crate::MachineInstrParserRule;
+
+use utility::{extract_bits32, BitReader};
 
 use once_cell::sync::Lazy;
 
@@ -40,10 +41,10 @@ where
                 _ => todo!("Unknown reserved instruction {:032b}", raw_instr),
             }
         })
-        .bind("1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+        .bind("1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx", |_raw_instr: u32| {
             todo!("SME encodings")
         })
-        .bind("x_xx_0010_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
+        .bind("x_xx_0010_xxxxxxxxxxxxxxxxxxxxxxxxx", |_raw_instr: u32| {
             todo!("SVE encodings")
         })
         .bind("x_xx_100x_xxxxxxxxxxxxxxxxxxxxxxxxx", |raw_instr: u32| {
@@ -106,7 +107,7 @@ fn parse_aarch64_d_p_i(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -118,58 +119,55 @@ fn parse_aarch64_d_p_r(raw_instr: u32) -> AArch64Instr {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "x_0_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx",
-            |raw_instr: u32| parse_data_proc_2src(raw_instr),
+            parse_data_proc_2src,
         )
         .bind(
             "x_1_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx",
-            |raw_instr: u32| parse_data_proc_1src(raw_instr),
+            parse_data_proc_1src,
         )
         .bind(
             "x_x_x_0_101_0xxx_xxxxx_xxxxxx_xxxxxxxxxx",
-            |raw_instr: u32| parse_logical_shifted_register(raw_instr),
+            parse_logical_shifted_register,
         )
         .bind(
             "x_x_x_0_101_1xx0_xxxxx_xxxxxx_xxxxxxxxxx",
-            |raw_instr: u32| parse_add_sub_shifted_reg(raw_instr),
+            parse_add_sub_shifted_reg,
         )
         .bind(
             "x_x_x_0_101_1xx1_xxxxx_xxxxxx_xxxxxxxxxx",
-            |raw_instr: u32| parse_add_sub_ext_reg(raw_instr),
+            parse_add_sub_ext_reg,
         )
         .bind(
             "x_x_x_1_101_0000_xxxxx_000000_xxxxxxxxxx",
-            |raw_instr: u32| parse_add_sub_with_carry(raw_instr),
+            parse_add_sub_with_carry,
         )
         .bind(
             "x_x_x_1_101_0000_xxxxx_x00001_xxxxxxxxxx",
-            |raw_instr: u32| todo!("Rotate Right into flags"),
+            |_raw_instr: u32| todo!("Rotate Right into flags"),
         )
         .bind(
             "x_x_x_1_101_0000_xxxxx_xx0010_xxxxxxxxxx",
-            |raw_instr: u32| todo!("Evaluate into flags"),
+            |_raw_instr: u32| todo!("Evaluate into flags"),
         )
         .bind(
             "x_x_x_1_101_0010_xxxxx_xxxx0x_xxxxxxxxxx",
-            |raw_instr: u32| parse_cond_cmp_reg(raw_instr),
+            parse_cond_cmp_reg,
         )
         .bind(
             "x_x_x_1_101_0010_xxxxx_xxxx1x_xxxxxxxxxx",
-            |raw_instr: u32| parse_cond_cmp_imm(raw_instr),
+            parse_cond_cmp_imm,
         )
-        .bind(
-            "x_x_x_1_101_0100_xxxxx_xxxxxx_xxxxxxxxxx",
-            |raw_instr: u32| parse_cond_sel(raw_instr),
-        )
+        .bind("x_x_x_1_101_0100_xxxxx_xxxxxx_xxxxxxxxxx", parse_cond_sel)
         .bind(
             "x_x_x_1_101_1xxx_xxxxx_xxxxxx_xxxxxxxxxx",
-            |raw_instr: u32| parse_data_proccessing_3src(raw_instr),
+            parse_data_proccessing_3src,
         );
 
         m
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -183,168 +181,168 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0100", "0x", "x101", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Cryptographic AES"),
+            |_raw_instr: u32| todo!("Cryptographic AES"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0101", "0x", "x0xx", "xxx0xxx00"
             ),
-            |raw_instr: u32| todo!("Cryptographic three-register SHA"),
+            |_raw_instr: u32| todo!("Cryptographic three-register SHA"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0101", "0x", "x101", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Cryptographic two-register SHA"),
+            |_raw_instr: u32| todo!("Cryptographic two-register SHA"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "00", "00xx", "xxx0xxxx1"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar copy"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar copy"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "10xx", "xxx00xxx1"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar three same FP16"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar three same FP16"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "1111", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar two-register miscellaneous FP16"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar two-register miscellaneous FP16"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "x0xx", "xxx1xxxx1"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar three same extra"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar three same extra"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "x100", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar two-register miscellaneous"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar two-register miscellaneous"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "x110", "00xxxxx10"
             ),
-            |raw_instr: u32| parse_adv_simd_scalar_pairwise(raw_instr),
+            parse_adv_simd_scalar_pairwise,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "x1xx", "xxxxxxx00"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar three different"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar three different"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "0x", "x1xx", "xxxxxxxx1"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar three same"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar three same"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "10", "xxxx", "xxxxxxxx1"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD scalar shifted by immediate"),
+            |_raw_instr: u32| todo!("Advanced SIMD scalar shifted by immediate"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "01x1", "1x", "xxxx", "xxxxxxxx0"
             ),
-            |raw_instr: u32| parse_adv_simd_scalar_x_indexed_elem(raw_instr),
+            parse_adv_simd_scalar_x_indexed_elem,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0x00", "0x", "x0xx", "xxx0xxx00"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD table lookup"),
+            |_raw_instr: u32| todo!("Advanced SIMD table lookup"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0x00", "0x", "x0xx", "xxx0xxx10"
             ),
-            |raw_instr: u32| parse_advanced_simd_permute(raw_instr),
+            parse_advanced_simd_permute,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0x10", "0x", "x0xx", "xxx0xxxx0"
             ),
-            |raw_instr: u32| parse_advanced_simd_extract(raw_instr),
+            parse_advanced_simd_extract,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "00", "00xx", "xxx0xxxx1"
             ),
-            |raw_instr: u32| parse_advanced_simd_copy(raw_instr),
+            parse_advanced_simd_copy,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "10xx", "xxx00xxx1"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD three same (FP16)"),
+            |_raw_instr: u32| todo!("Advanced SIMD three same (FP16)"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "1111", "00xxxxx10"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD two-register miscellaneous (FP16)"),
+            |_raw_instr: u32| todo!("Advanced SIMD two-register miscellaneous (FP16)"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x0xx", "xxx1xxxx1"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD three-register extension"),
+            |_raw_instr: u32| todo!("Advanced SIMD three-register extension"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x100", "00xxxxx10"
             ),
-            |raw_instr: u32| parse_adv_simd_2reg_miscellaneous(raw_instr),
+            parse_adv_simd_2reg_miscellaneous,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x110", "00xxxxx10"
             ),
-            |raw_instr: u32| parse_adv_simd_across_lanes(raw_instr),
+            parse_adv_simd_across_lanes,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x1xx", "xxxxxxx00"
             ),
-            |raw_instr: u32| todo!("Advanced SIMD three different"),
+            |_raw_instr: u32| todo!("Advanced SIMD three different"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "0x", "x1xx", "xxxxxxxx1"
             ),
-            |raw_instr: u32| parse_advanced_simd_three_same(raw_instr),
+            parse_advanced_simd_three_same,
         )
         .bind(
             &format!(
@@ -364,112 +362,112 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: u32) -> AArch64Instr {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "1x", "xxxx", "xxxxxxxx0"
             ),
-            |raw_instr: u32| parse_adv_simd_vec_x_indexed_elem(raw_instr),
+            parse_adv_simd_vec_x_indexed_elem,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "1100", "00", "10xx", "xxx10xxxx"
             ),
-            |raw_instr: u32| todo!("Cryptographic three-register, imm2"),
+            |_raw_instr: u32| todo!("Cryptographic three-register, imm2"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "1100", "00", "11xx", "xxx1x00xx"
             ),
-            |raw_instr: u32| todo!("Cryptographic three-reigster SHA 512"),
+            |_raw_instr: u32| todo!("Cryptographic three-reigster SHA 512"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "1100", "00", "xxxx", "xxx0xxxxx"
             ),
-            |raw_instr: u32| todo!("Cryptographic four-register"),
+            |_raw_instr: u32| todo!("Cryptographic four-register"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "1100", "01", "00xx", "xxxxxxxxx"
             ),
-            |raw_instr: u32| todo!("XAR"),
+            |_raw_instr: u32| todo!("XAR"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "1100", "01", "1000", "0001000xx"
             ),
-            |raw_instr: u32| todo!("Cryptographic two-register SHA 512"),
+            |_raw_instr: u32| todo!("Cryptographic two-register SHA 512"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x0xx", "xxxxxxxxx"
             ),
-            |raw_instr: u32| parse_conv_between_float_and_fixed_point(raw_instr),
+            parse_conv_between_float_and_fixed_point,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxx000000"
             ),
-            |raw_instr: u32| parse_conv_between_float_and_int(raw_instr),
+            parse_conv_between_float_and_int,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxx10000"
             ),
-            |raw_instr: u32| parse_float_data_proc_1src(raw_instr),
+            parse_float_data_proc_1src,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxx1000"
             ),
-            |raw_instr: u32| parse_floating_point_compare(raw_instr),
+            parse_floating_point_compare,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxxx100"
             ),
-            |raw_instr: u32| parse_floating_point_immediate(raw_instr),
+            parse_floating_point_immediate,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxxxx01"
             ),
-            |raw_instr: u32| todo!("Floating-point conditional compare"),
+            |_raw_instr: u32| todo!("Floating-point conditional compare"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxxxx10"
             ),
-            |raw_instr: u32| parse_float_data_proc_2src(raw_instr),
+            parse_float_data_proc_2src,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "0x", "x1xx", "xxxxxxx11"
             ),
-            |raw_instr: u32| parse_floating_point_conditional_select(raw_instr),
+            parse_floating_point_conditional_select,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "x0x1", "1x", "xxxx", "xxxxxxxxx"
             ),
-            |raw_instr: u32| parse_fp_data_processing_3src(raw_instr),
+            parse_fp_data_processing_3src,
         );
 
         m
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -481,130 +479,130 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Compare and swap pair");
             },
         )
         .bind(
             "0x00_1_1_0_00_x_000000_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_adv_simd_ld_st_multi_structures(raw_instr),
+            parse_adv_simd_ld_st_multi_structures,
         )
         .bind(
             "0x00_1_1_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr),
+            parse_adv_simd_ld_st_multi_structures_post_indexed,
         )
         .bind(
             "0x00_1_1_0_10_x_x00000_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_adv_simd_ld_st_single_structure(raw_instr),
+            parse_adv_simd_ld_st_single_structure,
         )
         .bind(
             "0x00_1_1_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Advanced SIMD Load/Store single structure(post-indexed)");
             },
         )
         .bind(
             "1101_1_0_0_1x_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Load/store memory tags");
             },
         )
         .bind(
             "1x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Load/store exclusive pair");
             },
         )
         .bind(
             "xx00_1_0_0_00_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_exclusive_register(raw_instr),
+            parse_load_store_exclusive_register,
         )
         .bind(
             "xx00_1_0_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_ordered(raw_instr),
+            parse_load_store_ordered,
         )
         .bind(
             "xx00_1_0_0_01_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_compare_and_swap(raw_instr),
+            parse_compare_and_swap,
         )
         .bind(
             "xx01_1_0_0_1x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("LDAPR/STLR(unscaled immediate)");
             },
         )
         .bind(
             "xx01_1_x_0_0x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Load register (literal)");
             },
         )
         .bind(
             "xx01_1_x_0_1x_x_0xxxxx_xxxx_01_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Memory Copy and Memory Set");
             },
         )
         .bind(
             "xx10_1_x_0_00_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Load/Store no allocate pair (offset)");
             },
         )
         .bind(
             "xx10_1_x_0_01_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_pair_post_indexed(raw_instr),
+            parse_load_store_reg_pair_post_indexed,
         )
         .bind(
             "xx10_1_x_0_10_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_pair_offset(raw_instr),
+            parse_load_store_reg_pair_offset,
         )
         .bind(
             "xx10_1_x_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_pair_pre_indexed(raw_instr),
+            parse_load_store_reg_pair_pre_indexed,
         )
         .bind(
             "xx11_1_x_0_0x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_unscaled_imm(raw_instr),
+            parse_load_store_reg_unscaled_imm,
         )
         .bind(
             "xx11_1_x_0_0x_x_0xxxxx_xxxx_01_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_imm_post_indexed(raw_instr),
+            parse_load_store_reg_imm_post_indexed,
         )
         .bind(
             "xx11_1_x_0_0x_x_0xxxxx_xxxx_10_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Load/Store register (unprevilaged)");
             },
         )
         .bind(
             "xx11_1_x_0_0x_x_0xxxxx_xxxx_11_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_imm_pre_indexed(raw_instr),
+            parse_load_store_reg_imm_pre_indexed,
         )
         .bind(
             "xx11_1_x_0_0x_x_1xxxxx_xxxx_00_xxxxxxxxxx",
-            |raw_instr: u32| parse_atomic_memory_operations(raw_instr),
+            parse_atomic_memory_operations,
         )
         .bind(
             "xx11_1_x_0_0x_x_1xxxxx_xxxx_10_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_reg_offset(raw_instr),
+            parse_load_store_reg_reg_offset,
         )
         .bind(
             "xx11_1_x_0_0x_x_1xxxxx_xxxx_x1_xxxxxxxxxx",
-            |raw_instr: u32| {
+            |_raw_instr: u32| {
                 todo!("Load/Store register (pac)"); // Need to do FEAT_PAuth feature instructions
             },
         )
         .bind(
             "xx11_1_x_0_1x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |raw_instr: u32| parse_load_store_reg_unsigned_imm(raw_instr),
+            parse_load_store_reg_unsigned_imm,
         );
 
         m
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -621,7 +619,7 @@ fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: u32) -> AArch64
         .bind("110_101_00xxxxxxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
             parse_exception_gen(raw_instr)
         })
-        .bind("110_101_01000000110001_xxxxxxx_xxxxx", |raw_instr: u32| {
+        .bind("110_101_01000000110001_xxxxxxx_xxxxx", |_raw_instr: u32| {
             todo!("System Instruction with Register Argument");
         })
         .bind("110_101_01000000110010_xxxxxxx_11111", |raw_instr: u32| {
@@ -630,13 +628,13 @@ fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: u32) -> AArch64
         .bind("110_101_01000000110011_xxxxxxx_xxxxx", |raw_instr: u32| {
             parse_barriers(raw_instr)
         })
-        .bind("110_101_0100000xxx0100_xxxxxxx_xxxxx", |raw_isntr: u32| {
+        .bind("110_101_0100000xxx0100_xxxxxxx_xxxxx", |_raw_isntr: u32| {
             todo!("PSTATE")
         })
-        .bind("110_101_0100100xxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+        .bind("110_101_0100100xxxxxxx_xxxxxxx_xxxxx", |_raw_instr: u32| {
             todo!("System with results")
         })
-        .bind("110_101_0100x01xxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
+        .bind("110_101_0100x01xxxxxxx_xxxxxxx_xxxxx", |_raw_instr: u32| {
             todo!("System instructions")
         })
         .bind("110_101_0100x1xxxxxxxx_xxxxxxx_xxxxx", |raw_instr: u32| {
@@ -659,7 +657,7 @@ fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: u32) -> AArch64
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -702,7 +700,7 @@ fn parse_add_sub_shifted_reg(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -744,7 +742,7 @@ fn parse_add_sub_immediate(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -794,7 +792,7 @@ fn parse_fp_data_processing_3src(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -812,7 +810,8 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: u32) -> AArch64Instr {
              imm12: Extract<BitRange<10, 22>, u16>,
              rm: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = Imm12RnRt {
+                let data = SizeImm12RnRt {
+                    size: size.value,
                     imm12: imm12.value,
                     rn: rm.value,
                     rt: rt.value,
@@ -852,7 +851,7 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -889,7 +888,7 @@ fn parse_move_wide_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -916,8 +915,8 @@ fn parse_uncond_branch_reg(raw_instr: u32) -> AArch64Instr {
                     z: z as u8,
                     op: op as u8,
                     a: a as u8,
-                    rn: rn,
-                    rm: rm,
+                    rn,
+                    rm,
                 };
 
                 match (opc.value, op2.value, op3.value, rn, rm) {
@@ -971,7 +970,7 @@ fn parse_uncond_branch_reg(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -999,7 +998,7 @@ fn parse_uncond_branch_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1032,7 +1031,7 @@ fn parse_cond_branch_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1075,7 +1074,7 @@ fn parse_cond_sel(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1111,7 +1110,7 @@ fn parse_test_and_branch_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1166,7 +1165,7 @@ fn parse_logical_shifted_register(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1211,7 +1210,7 @@ fn parse_hints(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1245,7 +1244,7 @@ fn parse_pc_rel_addressing(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1287,7 +1286,7 @@ fn parse_exception_gen(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1356,7 +1355,7 @@ fn parse_load_store_reg_reg_offset(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1401,7 +1400,7 @@ fn parse_add_sub_ext_reg(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1444,7 +1443,7 @@ fn parse_bitfield(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1489,7 +1488,7 @@ fn parse_logical_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1537,7 +1536,7 @@ fn parse_load_store_reg_pair_offset(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1577,7 +1576,7 @@ fn parse_add_sub_imm_with_tags(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1604,7 +1603,7 @@ fn parse_extract(raw_instr: u32) -> AArch64Instr {
                 };
 
                 match (sf_op21.value, n.value, o0.value, imms.value) {
-                    (0b000, 0b0, 0b0, imms) if ((imms ^ 0b000000) & 0b100000) == 0b000000 => {
+                    (0b000, 0b0, 0b0, imms) if (imms & 0b100000) == 0b000000 => {
                         AArch64Instr::Extr32(data)
                     }
                     (0b100, 1, 0, _) => AArch64Instr::Extr64(data),
@@ -1617,7 +1616,7 @@ fn parse_extract(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1661,7 +1660,7 @@ fn parse_data_proc_1src(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1696,7 +1695,7 @@ fn parse_cmp_and_branch_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1743,7 +1742,7 @@ fn parse_data_proccessing_3src(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1761,7 +1760,8 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = Imm12RnRt {
+                let data = SizeImm12RnRt {
+                    size: size.value,
                     imm12: imm9.value,
                     rn: rn.value,
                     rt: rt.value,
@@ -1802,7 +1802,7 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1842,7 +1842,7 @@ fn parse_sys_reg_mov(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1890,7 +1890,7 @@ fn parse_load_store_reg_pair_pre_indexed(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1938,7 +1938,7 @@ fn parse_load_store_reg_pair_post_indexed(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -1986,7 +1986,7 @@ fn parse_data_proc_2src(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2004,7 +2004,8 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = Imm12RnRt {
+                let data = SizeImm12RnRt {
+                    size: size.value,
                     imm12: imm9.value,
                     rn: rn.value,
                     rt: rt.value,
@@ -2045,7 +2046,7 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2063,7 +2064,8 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = Imm12RnRt {
+                let data = SizeImm12RnRt {
+                    size: size.value,
                     imm12: imm9.value,
                     rn: rn.value,
                     rt: rt.value,
@@ -2104,7 +2106,7 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2136,7 +2138,7 @@ fn parse_barriers(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2179,7 +2181,7 @@ fn parse_advanced_simd_copy(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2220,7 +2222,7 @@ fn parse_cond_cmp_reg(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2271,7 +2273,7 @@ fn parse_adv_simd_ld_st_multi_structures(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2308,7 +2310,7 @@ fn parse_advanced_simd_extract(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2404,7 +2406,7 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: u32) -> AArch64
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2608,7 +2610,7 @@ fn parse_conv_between_float_and_int(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2681,7 +2683,7 @@ fn parse_adv_simd_modified_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2722,7 +2724,7 @@ fn parse_cond_cmp_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2776,7 +2778,7 @@ fn parse_load_store_exclusive_register(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2821,7 +2823,7 @@ fn parse_load_store_ordered(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -2946,7 +2948,7 @@ fn parse_advanced_simd_three_same(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3014,7 +3016,7 @@ fn parse_adv_simd_shift_by_imm(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3111,7 +3113,7 @@ fn parse_float_data_proc_1src(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3151,7 +3153,7 @@ fn parse_adv_simd_scalar_pairwise(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3254,7 +3256,7 @@ fn parse_adv_simd_ld_st_single_structure(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3358,7 +3360,7 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3408,7 +3410,7 @@ fn parse_adv_simd_across_lanes(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3463,7 +3465,7 @@ fn parse_compare_and_swap(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3673,7 +3675,7 @@ fn parse_atomic_memory_operations(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3715,7 +3717,7 @@ fn parse_add_sub_with_carry(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3759,7 +3761,7 @@ fn parse_floating_point_compare(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3803,7 +3805,7 @@ fn parse_advanced_simd_permute(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3858,7 +3860,7 @@ fn parse_float_data_proc_2src(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3898,7 +3900,7 @@ fn parse_floating_point_immediate(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -3993,7 +3995,7 @@ fn parse_conv_between_float_and_fixed_point(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -4032,7 +4034,7 @@ fn parse_floating_point_conditional_select(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -4097,7 +4099,7 @@ fn parse_adv_simd_vec_x_indexed_elem(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }
@@ -4151,7 +4153,7 @@ fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: u32) -> AArch64Instr {
     });
 
     if let Some(instr) = MATCHER.handle(raw_instr) {
-        return instr;
+        instr
     } else {
         todo!("Unknown instruction {:032b}", raw_instr);
     }

@@ -1,9 +1,9 @@
 use elf::endian::AnyEndian;
 use elf::ElfBytes;
 
-use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule};
-use machineinstr::utils::BitReader;
+use machineinstr::aarch64::AArch64InstrParserRule;
 use machineinstr::MachineInstParser;
+use utility::BitReader;
 
 fn main() {
     // Get first argument
@@ -32,7 +32,7 @@ fn main() {
 
     let mut n = 0;
     let start = std::time::Instant::now();
-    for inst in parser {
+    for _inst in parser {
         n += 1;
         // println!("{:08}: {:?}", n, inst);
     }

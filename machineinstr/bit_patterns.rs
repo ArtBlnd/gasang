@@ -1,4 +1,4 @@
-use crate::utils::extract_bits32;
+use utility::extract_bits32;
 
 use num_traits::FromPrimitive;
 

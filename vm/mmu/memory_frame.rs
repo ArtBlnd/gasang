@@ -10,10 +10,7 @@ pub struct MemoryFrame {
 
 impl MemoryFrame {
     pub fn new(mmu: Arc<MmuData>, addr: u64) -> Self {
-        MemoryFrame {
-            mmu: mmu.clone(),
-            addr,
-        }
+        MemoryFrame { mmu, addr }
     }
 
     pub unsafe fn read(&mut self, buf: &mut [u8]) -> Result<(), MMUError> {
@@ -23,7 +20,7 @@ impl MemoryFrame {
         while read < buf.len() {
             let page = self.mmu.query(addr)?;
             let page_offs_beg = (addr % PAGE_SIZE) as usize;
-            let page_offs_end = (usize::min(PAGE_SIZE as usize, buf.len() - read)) as usize;
+            let page_offs_end = usize::min(PAGE_SIZE as usize, buf.len() - read);
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),
@@ -55,7 +52,7 @@ impl MemoryFrame {
         while writ < buf.len() {
             let page = self.mmu.query(addr)?;
             let page_offs_beg = (addr % PAGE_SIZE) as usize;
-            let page_offs_end = (usize::min(PAGE_SIZE as usize, buf.len() - writ)) as usize;
+            let page_offs_end = usize::min(PAGE_SIZE as usize, buf.len() - writ);
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),

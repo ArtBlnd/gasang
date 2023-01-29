@@ -3,5 +3,10 @@
 members = [
     "machineinstr",
     "driver",
-    "vm"
+    "vm",
+    "utility",
+]
+
+exclude = [
+    "examples"
 ]

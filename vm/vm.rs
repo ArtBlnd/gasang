@@ -2,7 +2,7 @@ use crate::instruction::{execute_instr, VmIr};
 use crate::jump_table::JumpTable;
 use crate::mmu::{MemoryFrame, Mmu};
 use crate::register::*;
-use crate::{Interrupt, MMUError};
+use crate::Interrupt;
 
 use slab::Slab;
 use std::collections::HashMap;
@@ -55,8 +55,7 @@ pub struct Vm {
 
 impl Vm {
     pub fn run(&mut self) -> Result<u64, Interrupt> {
-        let r = self.run_inner(&self.ctx.clone());
-        return r;
+        self.run_inner(&self.ctx.clone())
     }
 
     fn run_inner(&mut self, ctx: &VmContext) -> Result<u64, Interrupt> {
