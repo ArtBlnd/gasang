@@ -1,168 +1,125 @@
 use crate::instruction::*;
+use smallvec::SmallVec;
 
-use std::fmt::{Display, Formatter, Result as FmtResult};
+pub struct InstrPrinter(SmallVec<[String; 4]>);
 
-pub fn print_irop(op: u8, offset: &mut usize, instr: &VmIr<'_>) -> String {
-    match op {
-        IROP_UADD_REG3 => {
-            let op1 = instr.reg3(offset);
-            format!("uadd {}, {}, {}", op1.op1, op1.op2, op1.op3)
-        }
-        IROP_USUB_REG3 => {
-            let op1 = instr.reg3(offset);
-            format!("usub {}, {}, {}", op1.op1, op1.op2, op1.op3)
-        }
-        IROP_UMUL_REG3 => {
-            let op1 = instr.reg3(offset);
-            format!("umul {}, {}, {}", op1.op1, op1.op2, op1.op3)
-        }
-        IROP_UDIV_REG3 => {
-            let op1 = instr.reg3(offset);
-            format!("udiv {}, {}, {}", op1.op1, op1.op2, op1.op3)
-        }
+impl InstrPrinter {
+    pub fn new() -> Self {
+        Self(SmallVec::new())
+    }
 
-        IROP_UADD_CST8 => {
-            let op1 = instr.reg1u8(offset);
-            format!("uadd {}, {}", op1.op1, op1.imm8)
-        }
+    pub fn into_inner(self) -> SmallVec<[String; 4]> {
+        self.0
+    }
+}
 
-        IROP_USUB_CST8 => {
-            let op1 = instr.reg1u8(offset);
-            format!("usub {}, {}", op1.op1, op1.imm8)
-        }
+impl InstrVisitor for InstrPrinter {
+    fn visit_reg1(&mut self, op: u8, operand: Reg1) {
+        self.0.push(match op {
+            IROP_MOV_IPR2REG => format!("mov irp, {}", operand.op1),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_UMUL_CST8 => {
-            let op1 = instr.reg1u8(offset);
-            format!("umul {}, {}", op1.op1, op1.imm8)
-        }
+    fn visit_reg2(&mut self, op: u8, operand: Reg2) {
+        self.0.push(match op {
+            IROP_MOV_REG2MEM_REG => format!("mov {}, *({})", operand.op1, operand.op2),
+            IROP_MOV_REG2REG => format!("mov {}, {}", operand.op1, operand.op2),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_UDIV_CST8 => {
-            let op1 = instr.reg1u8(offset);
-            format!("udiv {}, {}", op1.op1, op1.imm8)
-        }
+    fn visit_reg3(&mut self, op: u8, operand: Reg3) {
+        self.0.push(match op {
+            IROP_UADD_REG3 => format!("uadd {}, {}, {}", operand.op1, operand.op2, operand.op3),
+            IROP_USUB_REG3 => format!("usub {}, {}, {}", operand.op1, operand.op2, operand.op3),
+            IROP_UMUL_REG3 => format!("umul {}, {}, {}", operand.op1, operand.op2, operand.op3),
+            IROP_UDIV_REG3 => format!("udiv {}, {}, {}", operand.op1, operand.op2, operand.op3),
+            IROP_OR_REG3 => format!("or {}, {}, {}", operand.op1, operand.op2, operand.op3),
+            IROP_AND_REG3 => format!("and {}, {}, {}", operand.op1, operand.op2, operand.op3),
+            IROP_XOR_REG3 => format!("xor {}, {}, {}", operand.op1, operand.op2, operand.op3),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_UADD_CST32 => {
-            let op1 = instr.reg1u32(offset);
-            format!("uadd {}, {}", op1.op1, op1.imm32)
-        }
+    fn visit_reg1u8(&mut self, op: u8, operand: Reg1U8) {
+        self.0.push(match op {
+            IROP_UADD_CST8 => format!("uadd {}, {}", operand.op1, operand.imm8),
+            IROP_USUB_CST8 => format!("usub {}, {}", operand.op1, operand.imm8),
+            IROP_UMUL_CST8 => format!("umul {}, {}", operand.op1, operand.imm8),
+            IROP_UDIV_CST8 => format!("udiv {}, {}", operand.op1, operand.imm8),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_IADD_CST32 => {
-            let op1 = instr.reg1i32(offset);
-            format!("iadd {}, {}", op1.op1, op1.imm32)
-        }
+    fn visit_reg2u8(&mut self, op: u8, operand: Reg2U8) {
+        self.0.push(match op {
+            IROP_LLEFT_SHIFT_IMM8 => {
+                format!("lshl {}, {} {}", operand.op1, operand.op2, operand.imm8)
+            }
+            IROP_LRIGHT_SHIFT_IMM8 => {
+                format!("lshr {}, {} {}", operand.op1, operand.op2, operand.imm8)
+            }
+            IROP_ROTATE_IMM8 => format!("rot {}, {} {}", operand.op1, operand.op2, operand.imm8),
+            IROP_ARIGHT_SHIFT_IMM8 => {
+                format!("ashr {}, {} {}", operand.op1, operand.op2, operand.imm8)
+            }
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_USUB_CST32 => {
-            let op1 = instr.reg1u32(offset);
-            format!("usub {}, {}", op1.op1, op1.imm32)
-        }
+    fn visit_reg1u32(&mut self, op: u8, operand: Reg1U32) {
+        self.0.push(match op {
+            IROP_UADD_CST32 => format!("uadd {}, {}", operand.op1, operand.imm32),
+            IROP_USUB_CST32 => format!("usub {}, {}", operand.op1, operand.imm32),
+            IROP_UMUL_CST32 => format!("umul {}, {}", operand.op1, operand.imm32),
+            IROP_UDIV_CST32 => format!("udiv {}, {}", operand.op1, operand.imm32),
+            IROP_MOV_REG2MEM_CST => format!("mov {}, *({})", operand.op1, operand.imm32),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_UMUL_CST32 => {
-            let op1 = instr.reg1u32(offset);
-            format!("umul {}, {}", op1.op1, op1.imm32)
-        }
+    fn visit_reg1i32(&mut self, op: u8, operand: Reg1I32) {
+        self.0.push(match op {
+            IROP_IADD_CST32 => format!("iadd {}, {}", operand.op1, operand.imm32),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_UDIV_CST32 => {
-            let op1 = instr.reg1u32(offset);
-            format!("udiv {}, {}", op1.op1, op1.imm32)
-        }
+    fn visit_reg1u64(&mut self, op: u8, operand: Reg1U64) {
+        self.0.push(match op {
+            IROP_UADD_CST64 => format!("uadd {}, {}", operand.op1, operand.imm64),
+            IROP_USUB_CST64 => format!("usub {}, {}", operand.op1, operand.imm64),
+            IROP_UMUL_CST64 => format!("umul {}, {}", operand.op1, operand.imm64),
+            IROP_UDIV_CST64 => format!("udiv {}, {}", operand.op1, operand.imm64),
+            IROP_MOV_64CST2REG => format!("mov {}, {}", operand.op1, operand.imm64),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_UADD_CST64 => {
-            let op1 = instr.reg1u64(offset);
-            format!("umul {}, {}", op1.op1, op1.imm64)
-        }
+    fn visit_reg1u16(&mut self, op: u8, operand: Reg1U16) {
+        self.0.push(match op {
+            IROP_MOV_16CST2REG => format!("mov {}, {}", operand.op1, operand.imm16),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_USUB_CST64 => {
-            let op1 = instr.reg1u64(offset);
-            format!("usub {}, {}", op1.op1, op1.imm64)
-        }
+    fn visit_u16(&mut self, op: u8, operand: U16) {
+        self.0.push(match op {
+            IROP_SVC => format!("svc {}", operand.imm16),
+            IROP_BRK => format!("brk {}", operand.imm16),
+            _ => unimplemented!(),
+        });
+    }
 
-        IROP_UMUL_CST64 => {
-            let op1 = instr.reg1u64(offset);
-            format!("umul {}, {}", op1.op1, op1.imm64)
-        }
+    fn visit_reg2i64(&mut self, op: u8, operand: Reg2I64) {}
 
-        IROP_UDIV_CST64 => {
-            let op1 = instr.reg1u64(offset);
-            format!("udiv {}, {}", op1.op1, op1.imm64)
-        }
+    fn visit_reg1i64(&mut self, op: u8, operand: Reg1I64) {}
 
-        IROP_OR_REG3 => {
-            let op1 = instr.reg3(offset);
-            format!("or {}, {}, {}", op1.op1, op1.op2, op1.op3)
-        }
-        IROP_AND_REG3 => {
-            let op1 = instr.reg3(offset);
-            format!("and {}, {}, {}", op1.op1, op1.op2, op1.op3)
-        }
-
-        IROP_XOR_REG3 => {
-            let op1 = instr.reg3(offset);
-            format!("xor {}, {}, {}", op1.op1, op1.op2, op1.op3)
-        }
-
-        IROP_LLEFT_SHIFT_IMM8 => {
-            let op1 = instr.reg2u8(offset);
-            format!("lshl {}, {} {}", op1.op1, op1.op2, op1.imm8)
-        }
-        IROP_LRIGHT_SHIFT_IMM8 => {
-            let op1 = instr.reg2u8(offset);
-            format!("lshr {}, {} {}", op1.op1, op1.op2, op1.imm8)
-        }
-
-        IROP_ROTATE_IMM8 => {
-            let op1 = instr.reg2u8(offset);
-            format!("rot {}, {} {}", op1.op1, op1.op2, op1.imm8)
-        }
-
-        IROP_ARIGHT_SHIFT_IMM8 => {
-            let op1 = instr.reg2u8(offset);
-            format!("ashr {}, {}", op1.op1, op1.imm8)
-        }
-
-        IROP_MOV_REG2MEM_REG => {
-            let op1 = instr.reg2(offset);
-            format!("mov {}, *({})", op1.op1, op1.op2)
-        }
-
-        IROP_MOV_REG2MEM_CST => {
-            let op1 = instr.reg1u32(offset);
-            format!("mov {}, *({})", op1.op1, op1.imm32)
-        }
-
-        IROP_MOV_64CST2REG => {
-            let op1 = instr.reg1u64(offset);
-            format!("mov {}, {}", op1.imm64, op1.op1)
-        }
-
-        IROP_MOV_16CST2REG => {
-            let op1 = instr.reg1u16(offset);
-            format!("mov {}, {}", op1.imm16, op1.op1)
-        }
-
-        IROP_MOV_IPR2REG => {
-            let op1 = instr.reg1(offset);
-            format!("mov irp, {}", op1.op1)
-        }
-
-        IROP_MOV_REG2REG => {
-            let op1 = instr.reg2(offset);
-            format!("mov {}, {}", op1.op1, op1.op2)
-        }
-
-        IROP_SVC => {
-            let op1 = instr.reg1u8(offset);
-            format!("svc {}", op1.imm8)
-        }
-
-        IROP_BRK => {
-            let op1 = instr.u16(offset);
-            format!("brk {}", op1.imm16)
-        }
-
-        IROP_NOP => "nop".to_string(),
-
-        _ => {
-            format!("unknown opcode: {:02x}", op)
-        }
+    fn visit_no_operand(&mut self, op: u8) {
+        self.0.push(match op {
+            IROP_NOP => format!("nop"),
+            _ => unimplemented!(),
+        });
     }
 }

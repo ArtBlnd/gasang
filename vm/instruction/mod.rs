@@ -34,14 +34,10 @@ impl<'r> Display for VmIr<'r> {
         let curr_size = self.curr_size();
 
         f.write_fmt(format_args!("{:02x}:{:02x}", real_size, curr_size))?;
-        let mut offset = 2;
 
-        let mut l = f.debug_list();
-        while let Some(opcode) = self.opcode(&mut offset) {
-            l.entry(&print_irop(opcode, &mut offset, self));
-        }
-
-        l.finish()?;
+        let mut p = InstrPrinter::new();
+        self.visit(&mut p);
+        f.debug_list().entries(p.into_inner()).finish()?;
 
         Ok(())
     }
@@ -62,6 +58,54 @@ impl<'r> VmIr<'r> {
 
     pub fn prev_size(&self) -> u8 {
         self.get(1).unwrap() & 0b0011_1111
+    }
+
+    pub fn visit<V>(&self, visitor: &mut V)
+    where
+        V: InstrVisitor,
+    {
+        let mut offset = 2;
+        while let Some(opcode) = self.opcode(&mut offset) {
+            match opcode {
+                IROP_MOV_IPR2REG => visitor.visit_reg1(opcode, self.reg1(&mut offset)),
+
+                IROP_MOV_REG2MEM_REG | IROP_MOV_REG2REG => {
+                    visitor.visit_reg2(opcode, self.reg2(&mut offset))
+                }
+
+                IROP_UADD_REG3 | IROP_USUB_REG3 | IROP_UMUL_REG3 | IROP_UDIV_REG3
+                | IROP_OR_REG3 | IROP_AND_REG3 | IROP_XOR_REG3 => {
+                    visitor.visit_reg3(opcode, self.reg3(&mut offset))
+                }
+
+                IROP_UADD_CST8 | IROP_USUB_CST8 | IROP_UMUL_CST8 | IROP_UDIV_CST8 => {
+                    visitor.visit_reg1u8(opcode, self.reg1u8(&mut offset))
+                }
+
+                IROP_LLEFT_SHIFT_IMM8
+                | IROP_LRIGHT_SHIFT_IMM8
+                | IROP_ROTATE_IMM8
+                | IROP_ARIGHT_SHIFT_IMM8 => visitor.visit_reg2u8(opcode, self.reg2u8(&mut offset)),
+
+                IROP_UADD_CST32 | IROP_USUB_CST32 | IROP_UMUL_CST32 | IROP_UDIV_CST32
+                | IROP_MOV_REG2MEM_CST => visitor.visit_reg1u32(opcode, self.reg1u32(&mut offset)),
+
+                IROP_IADD_CST32 | IROP_ISUB_CST32 | IROP_IMUL_CST32 | IROP_IDIV_CST32 => {
+                    visitor.visit_reg1i32(opcode, self.reg1i32(&mut offset))
+                }
+
+                IROP_UADD_CST64 | IROP_USUB_CST64 | IROP_UMUL_CST64 | IROP_UDIV_CST64 => {
+                    visitor.visit_reg1u64(opcode, self.reg1u64(&mut offset))
+                }
+
+                IROP_MOV_16CST2REG => visitor.visit_reg1u16(opcode, self.reg1u16(&mut offset)),
+
+                IROP_SVC | IROP_BRK => visitor.visit_u16(opcode, self.u16(&mut offset)),
+
+                IROP_NOP => visitor.visit_no_operand(opcode),
+                _ => unimplemented!("opcode: {:02x}", opcode),
+            }
+        }
     }
 
     pub fn opcode(&self, offset: &mut usize) -> Option<u8> {
@@ -240,6 +284,22 @@ impl<'r> VmIr<'r> {
         *offset += 9;
         v
     }
+}
+
+pub trait InstrVisitor {
+    fn visit_no_operand(&mut self, op: u8) {}
+    fn visit_reg1(&mut self, op: u8, operand: Reg1) {}
+    fn visit_reg2(&mut self, op: u8, operand: Reg2) {}
+    fn visit_reg3(&mut self, op: u8, operand: Reg3) {}
+    fn visit_reg1u8(&mut self, op: u8, operand: Reg1U8) {}
+    fn visit_reg2u8(&mut self, op: u8, operand: Reg2U8) {}
+    fn visit_reg1u32(&mut self, op: u8, operand: Reg1U32) {}
+    fn visit_reg1i32(&mut self, op: u8, operand: Reg1I32) {}
+    fn visit_reg1u64(&mut self, op: u8, operand: Reg1U64) {}
+    fn visit_reg1u16(&mut self, op: u8, operand: Reg1U16) {}
+    fn visit_u16(&mut self, op: u8, operand: U16) {}
+    fn visit_reg2i64(&mut self, op: u8, operand: Reg2I64) {}
+    fn visit_reg1i64(&mut self, op: u8, operand: Reg1I64) {}
 }
 
 pub fn build_instr_sig<A>(out: &mut SmallVec<A>, orgn_size: u8, curr_size: u8, prev_size: u8)

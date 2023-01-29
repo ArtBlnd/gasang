@@ -18,7 +18,7 @@ const PAGE_SIZE: u64 = 65536;
 // virtual address and VM host address and callbacks. also manages the page table.
 #[derive(Debug, Clone)]
 pub struct Mmu {
-    inner: Arc<MmuData>, 
+    inner: Arc<MmuData>,
 }
 
 impl DerefMut for Mmu {
@@ -78,10 +78,15 @@ impl MmuData {
         let mut pt = self.page_table.write().unwrap();
 
         let mut offset = 0u64;
-        
+
         while size > offset {
             let page = pt.get_or_mmap(addr + offset, || Page::Unmapped);
-            *page = Page::Memory { memory: HostMemory::new(PAGE_SIZE as usize), readable, writable, executable };
+            *page = Page::Memory {
+                memory: HostMemory::new(PAGE_SIZE as usize),
+                readable,
+                writable,
+                executable,
+            };
 
             offset += PAGE_SIZE;
         }

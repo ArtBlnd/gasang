@@ -3,8 +3,7 @@ use crate::aarch64::{compile_text_segment, AArch64Compiler};
 use crate::engine::Engine;
 use crate::image::Image;
 use crate::register::{FprRegister, GprRegister, RegId};
-use crate::{InterruptModel, Vm, VmContext, MMUError};
-
+use crate::{InterruptModel, MMUError, Vm, VmContext};
 
 use slab::Slab;
 
@@ -94,12 +93,10 @@ pub fn build_image(image: &Image, compiler: &AArch64Compiler, vm_ctx: &mut VmCon
 
         match sec_name {
             ".text" => compile_text_segment(addr, data, compiler, vm_ctx),
-            ".rodata" => {
-                unsafe {
-                    vm_ctx.mmu.mmap(addr, data.len() as u64, true, true, false);
-                    vm_ctx.mmu.frame(addr).write(data).unwrap();
-                }
-            }
+            ".rodata" => unsafe {
+                vm_ctx.mmu.mmap(addr, data.len() as u64, true, true, false);
+                vm_ctx.mmu.frame(addr).write(data).unwrap();
+            },
             _ => {}
         }
     }

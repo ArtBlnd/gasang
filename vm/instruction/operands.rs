@@ -92,7 +92,6 @@ impl Reg1U64 {
     }
 }
 
-
 pub struct Reg1U16 {
     pub op1: RegId,
     pub imm16: u16,

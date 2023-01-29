@@ -29,14 +29,15 @@ pub fn compile_text_segment(
     let parser =
         MachineInstParser::new(BitReader::new(data.iter().cloned()), AArch64InstrParserRule);
 
+    // construct jump table.
     let mut prev_size = 0u8;
     for native_instr in parser {
         let instr = compiler.compile_instr(native_instr.size, prev_size, native_instr.op);
         vm_ctx.insert_instr(&instr);
 
+        //Decoding -> Vmir {Add, Mul, Or, Shift, Jump}
+
         ipr += native_instr.size as u64;
         prev_size = instr.len() as u8;
     }
-
-    
 }

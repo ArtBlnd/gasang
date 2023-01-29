@@ -4,8 +4,8 @@ use elf::ElfBytes;
 use std::path::PathBuf;
 
 use vm::aarch64::AArch64VMEngine;
-use vm::image::*;
 use vm::engine::Engine;
+use vm::image::*;
 
 fn main() {
     // Get first argument
@@ -28,12 +28,10 @@ fn main() {
 
         if name == ".text" {
             image.set_entrypoint(sec.sh_addr as u64);
-        } 
+        }
 
         image.add_section(name, sec.sh_addr, beg as usize, end as usize);
     }
-
-    
 
     let mut engine = AArch64VMEngine::init(image);
     unsafe {

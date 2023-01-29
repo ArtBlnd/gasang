@@ -1,6 +1,7 @@
 use crate::instruction::*;
 
 //Dst = Val0 + Val1
+pub const IROP_AL_INSTRUCTION_MASK: u8 = 0b00_000000;
 pub const IROP_UADD_REG3: u8 = 0b0000_0000;
 pub const IROP_USUB_REG3: u8 = 0b0000_0001;
 pub const IROP_UMUL_REG3: u8 = 0b0000_0010;
@@ -38,16 +39,22 @@ pub const IROP_ROTATE_IMM8: u8 = 0b0001_0101;
 pub const IROP_ARIGHT_SHIFT_IMM8: u8 = 0b0001_0110; // Arithmetic Right Shift
 
 //Memory Instructions
-pub const IROP_MOV_REG2MEM_REG: u8 = 0b0001_0111;
-pub const IROP_MOV_REG2MEM_CST: u8 = 0b0001_1000;
+pub const IROP_MEM_INSTRUCTION_MASK: u8 = 0b01_000000;
+pub const IROP_MOV_REG2MEM_REG: u8 = 0b0101_0111;
+pub const IROP_MOV_REG2MEM_CST: u8 = 0b0101_1000;
 
-pub const IROP_MOV_64CST2REG: u8 = 0b0001_1001;
-pub const IROP_MOV_16CST2REG: u8 = 0b0001_1010;
+pub const IROP_MOV_64CST2REG: u8 = 0b0101_1001;
+pub const IROP_MOV_16CST2REG: u8 = 0b0101_1010;
 
-pub const IROP_MOV_IPR2REG: u8 = 0b0001_1100;
-pub const IROP_MOV_REG2REG: u8 = 0b0001_1101;
+pub const IROP_MOV_IPR2REG: u8 = 0b0101_1100;
+pub const IROP_MOV_REG2REG: u8 = 0b0101_1101;
+
+// ControlFlow Instructions
+pub const IROP_CF_INSTRUCTION_MASK: u8 = 0b10_000000;
+pub const IROP_JMP: u8 = 0b1000_0000;
 
 //Special Instructions
-pub const IROP_SVC: u8 = 0b001_1110;
-pub const IROP_BRK: u8 = 0b001_1111;
-pub const IROP_NOP: u8 = 0b010_0000;
+pub const IROP_SP_INSTRUCTION_MASK: u8 = 0b11_000000;
+pub const IROP_NOP: u8 = 0b1100_1101;
+pub const IROP_SVC: u8 = 0b1100_1110;
+pub const IROP_BRK: u8 = 0b1100_1111;

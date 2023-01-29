@@ -48,7 +48,7 @@ pub unsafe fn execute_instr_inner(
             let op = ir.reg2u8(offset);
             let reg = vm.gpr(op.op1);
             let val = reg.get();
-            
+
             reg.set(val << op.imm8);
         }
 
@@ -64,7 +64,7 @@ pub unsafe fn execute_instr_inner(
             let op = ir.u16(offset);
             return Err(Interrupt::SystemCall(op.imm16 as usize));
         }
-        
+
         IROP_BRK => {
             let op = ir.u16(offset);
             return Err(Interrupt::DebugBreakpoint(op.imm16 as usize));

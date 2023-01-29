@@ -35,7 +35,9 @@ impl MemoryFrame {
                         return Err(MMUError::AccessViolation);
                     }
 
-                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end] };
+                    let mem = unsafe {
+                        &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end]
+                    };
                     buf.copy_from_slice(mem);
                     read += mem.len();
                     addr += mem.len() as u64;
@@ -65,7 +67,9 @@ impl MemoryFrame {
                         return Err(MMUError::AccessViolation);
                     }
 
-                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end] };
+                    let mem = unsafe {
+                        &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end]
+                    };
                     mem.copy_from_slice(buf);
                     writ += mem.len();
                     addr += mem.len() as u64;
