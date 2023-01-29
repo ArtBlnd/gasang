@@ -40,6 +40,8 @@ pub const IROP_ARIGHT_SHIFT_IMM8: u8 = 0b0001_0110; // Arithmetic Right Shift
 
 //Memory Instructions
 pub const IROP_MEM_INSTRUCTION_MASK: u8 = 0b01_000000;
+pub const IROP_PUSH_REG: u8 = 0b0101_1110;
+pub const IROP_POP_REG: u8 = 0b0101_1111;
 pub const IROP_MOV_REG2MEM_REG: u8 = 0b0101_0111;
 pub const IROP_MOV_REG2MEM_CST: u8 = 0b0101_1000;
 

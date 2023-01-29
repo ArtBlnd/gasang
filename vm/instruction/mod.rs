@@ -67,7 +67,9 @@ impl<'r> VmIr<'r> {
         let mut offset = 2;
         while let Some(opcode) = self.opcode(&mut offset) {
             match opcode {
-                IROP_MOV_IPR2REG => visitor.visit_reg1(opcode, self.reg1(&mut offset)),
+                IROP_MOV_IPR2REG | IROP_PUSH_REG | IROP_POP_REG => {
+                    visitor.visit_reg1(opcode, self.reg1(&mut offset))
+                }
 
                 IROP_MOV_REG2MEM_REG | IROP_MOV_REG2REG => {
                     visitor.visit_reg2(opcode, self.reg2(&mut offset))
