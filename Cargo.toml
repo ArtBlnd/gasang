@@ -5,6 +5,7 @@ members = [
     "driver",
     "vm",
     "utility",
+    "virtio"
 ]
 
 exclude = [
