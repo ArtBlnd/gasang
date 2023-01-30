@@ -66,8 +66,6 @@ impl Engine for AArch64VMEngine {
                 ipr2ipv_cache: HashMap::new(),
                 ipr: image.entrypoint(),
                 ip_modified: false,
-
-                flags: 0,
             },
             vm_ctx,
             interrupt: AArch64UnixInterruptModel,

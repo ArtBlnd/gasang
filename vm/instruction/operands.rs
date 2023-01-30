@@ -40,159 +40,158 @@ impl Reg3 {
     }
 }
 
-pub struct Reg1U8 {
+pub struct Reg1Imm8 {
     pub op1: RegId,
     pub imm8: u8,
 }
 
-impl Reg1U8 {
+impl Reg1Imm8 {
     pub fn build(self, opcode: u8) -> [u8; 3] {
         [opcode, self.op1.0, self.imm8]
     }
+
+    pub fn u8(&self) -> u8 {
+        self.imm8
+    }
+
+    pub fn i8(&self) -> i8 {
+        self.imm8 as i8
+    }
 }
 
-pub struct Reg2U8 {
+pub struct Reg1Imm16 {
     pub op1: RegId,
-    pub op2: RegId,
-    pub imm8: u8,
+    pub imm16: u16,
 }
 
-impl Reg2U8 {
+impl Reg1Imm16 {
     pub fn build(self, opcode: u8) -> [u8; 4] {
-        [opcode, self.op1.0, self.op2.0, self.imm8]
+        let imm = self.imm16.to_le_bytes();
+        [opcode, self.op1.0, imm[0], imm[1]]
+    }
+
+    pub fn u16(&self) -> u16 {
+        self.imm16
+    }
+
+    pub fn i16(&self) -> i16 {
+        self.imm16 as i16
     }
 }
 
-pub struct Reg2U32 {
-    pub op1: RegId,
-    pub op2: RegId,
-    pub imm32: u32,
-}
-
-impl Reg2U32 {
-    pub fn build(self, opcode: u8) -> [u8; 7] {
-        let imm = self.imm32.to_le_bytes();
-        [
-            opcode, self.op1.0, self.op2.0, imm[0], imm[1], imm[2], imm[3],
-        ]
-    }
-}
-
-pub struct Reg1U32 {
+pub struct Reg1Imm32 {
     pub op1: RegId,
     pub imm32: u32,
 }
 
-impl Reg1U32 {
+impl Reg1Imm32 {
     pub fn build(self, opcode: u8) -> [u8; 6] {
         let imm = self.imm32.to_le_bytes();
         [opcode, self.op1.0, imm[0], imm[1], imm[2], imm[3]]
     }
+
+    pub fn u32(&self) -> u32 {
+        self.imm32
+    }
+
+    pub fn i32(&self) -> i32 {
+        self.imm32 as i32
+    }
 }
 
-pub struct Reg1U64 {
+pub struct Reg1Imm64 {
     pub op1: RegId,
     pub imm64: u64,
 }
 
-impl Reg1U64 {
+impl Reg1Imm64 {
     pub fn build(self, opcode: u8) -> [u8; 10] {
         let imm = self.imm64.to_le_bytes();
         [
             opcode, self.op1.0, imm[0], imm[1], imm[2], imm[3], imm[4], imm[5], imm[6], imm[7],
         ]
     }
+
+    pub fn u64(&self) -> u64 {
+        self.imm64
+    }
+
+    pub fn i64(&self) -> i64 {
+        self.imm64 as i64
+    }
 }
 
-pub struct Reg1U16 {
+pub struct Reg2Imm8 {
     pub op1: RegId,
+    pub op2: RegId,
+    pub imm8: u8,
+}
+
+impl Reg2Imm8 {
+    pub fn build(self, opcode: u8) -> [u8; 4] {
+        [opcode, self.op1.0, self.op2.0, self.imm8]
+    }
+
+    pub fn u8(&self) -> u8 {
+        self.imm8
+    }
+
+    pub fn i8(&self) -> i8 {
+        self.imm8 as i8
+    }
+}
+
+pub struct Reg2Imm16 {
+    pub op1: RegId,
+    pub op2: RegId,
     pub imm16: u16,
 }
 
-impl Reg1U16 {
-    pub fn build(self, opcode: u8) -> [u8; 4] {
-        let imm = self.imm16.to_le_bytes();
-        [opcode, self.op1.0, imm[0], imm[1]]
-    }
-}
-
-pub struct Reg1I32 {
-    pub op1: RegId,
-    pub imm32: i32,
-}
-
-impl Reg1I32 {
-    pub fn build(self, opcode: u8) -> [u8; 6] {
-        let imm = self.imm32.to_le_bytes();
-        [opcode, self.op1.0, imm[0], imm[1], imm[2], imm[3]]
-    }
-}
-
-pub struct Reg2I16 {
-    pub op1: RegId,
-    pub op2: RegId,
-    pub imm16: i16,
-}
-
-impl Reg2I16 {
+impl Reg2Imm16 {
     pub fn build(self, opcode: u8) -> [u8; 5] {
         let imm = self.imm16.to_le_bytes();
         [opcode, self.op1.0, self.op2.0, imm[0], imm[1]]
     }
+
+    pub fn u16(&self) -> u16 {
+        self.imm16
+    }
+
+    pub fn i16(&self) -> i16 {
+        self.imm16 as i16
+    }
 }
 
-pub struct Reg1I16 {
+pub struct Reg2Imm32 {
     pub op1: RegId,
-    pub imm16: i16,
-}
-
-impl Reg1I16 {
-    pub fn build(self, opcode: u8) -> [u8; 4] {
-        let imm = self.imm16.to_le_bytes();
-        [opcode, self.op1.0, imm[0], imm[1]]
-    }
-}
-
-pub struct U16 {
-    pub imm16: u16,
-}
-
-impl U16 {
-    pub fn build(self, opcode: u8) -> [u8; 3] {
-        let imm = self.imm16.to_le_bytes();
-        [opcode, imm[0], imm[1]]
-    }
-}
-
-pub struct I32 {
-    pub imm32: i32,
-}
-
-impl I32 {
-    pub fn build(self, opcode: u8) -> [u8; 5] {
-        let imm = self.imm32.to_le_bytes();
-        [opcode, imm[0], imm[1], imm[2], imm[3]]
-    }
-}
-
-pub struct U32 {
+    pub op2: RegId,
     pub imm32: u32,
 }
 
-impl U32 {
-    pub fn build(self, opcode: u8) -> [u8; 5] {
+impl Reg2Imm32 {
+    pub fn build(self, opcode: u8) -> [u8; 7] {
         let imm = self.imm32.to_le_bytes();
-        [opcode, imm[0], imm[1], imm[2], imm[3]]
+        [
+            opcode, self.op1.0, self.op2.0, imm[0], imm[1], imm[2], imm[3],
+        ]
+    }
+
+    pub fn u32(&self) -> u32 {
+        self.imm32
+    }
+
+    pub fn i32(&self) -> i32 {
+        self.imm32 as i32
     }
 }
 
-pub struct Reg2I64 {
+pub struct Reg2Imm64 {
     pub op1: RegId,
     pub op2: RegId,
-    pub imm64: i64,
+    pub imm64: u64,
 }
 
-impl Reg2I64 {
+impl Reg2Imm64 {
     pub fn build(self, opcode: u8) -> [u8; 11] {
         let imm = self.imm64.to_le_bytes();
         [
@@ -200,18 +199,50 @@ impl Reg2I64 {
             imm[7],
         ]
     }
+
+    pub fn u64(&self) -> u64 {
+        self.imm64
+    }
+
+    pub fn i64(&self) -> i64 {
+        self.imm64 as i64
+    }
 }
 
-pub struct Reg1I64 {
-    pub op1: RegId,
-    pub imm64: i64,
+pub struct Imm16 {
+    pub imm16: u16,
 }
 
-impl Reg1I64 {
-    pub fn build(self, opcode: u8) -> [u8; 10] {
-        let imm = self.imm64.to_le_bytes();
-        [
-            opcode, self.op1.0, imm[0], imm[1], imm[2], imm[3], imm[4], imm[5], imm[6], imm[7],
-        ]
+impl Imm16 {
+    pub fn build(self, opcode: u8) -> [u8; 3] {
+        let imm = self.imm16.to_le_bytes();
+        [opcode, imm[0], imm[1]]
+    }
+
+    pub fn u16(&self) -> u16 {
+        self.imm16
+    }
+
+    pub fn i16(&self) -> i16 {
+        self.imm16 as i16
+    }
+}
+
+pub struct Imm32 {
+    pub imm32: u32,
+}
+
+impl Imm32 {
+    pub fn build(self, opcode: u8) -> [u8; 5] {
+        let imm = self.imm32.to_le_bytes();
+        [opcode, imm[0], imm[1], imm[2], imm[3]]
+    }
+
+    pub fn u32(&self) -> u32 {
+        self.imm32
+    }
+
+    pub fn i32(&self) -> i32 {
+        self.imm32 as i32
     }
 }

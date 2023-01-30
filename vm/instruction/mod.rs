@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 mod operands;
 pub use operands::*;
 mod instructions;
@@ -33,7 +35,7 @@ impl<'r> Display for VmIr<'r> {
         let real_size = self.real_size();
         let curr_size = self.curr_size();
 
-        f.write_fmt(format_args!("{real_size:02x}:{curr_size:02x}"))?;
+        f.write_fmt(format_args!("{:02x}:{:02x}", real_size, curr_size))?;
 
         let mut p = InstrPrinter::new();
         self.visit(&mut p);
@@ -49,11 +51,11 @@ impl<'r> VmIr<'r> {
     }
 
     pub fn real_size(&self) -> u8 {
-        (self.first().unwrap() & 0b1111_0000) >> 4
+        (self.get(0).unwrap() & 0b1111_0000) >> 4
     }
 
     pub fn curr_size(&self) -> u8 {
-        ((self.first().unwrap() & 0b0000_1111) << 2) | ((self.get(1).unwrap() & 0b1100_0000) >> 6)
+        ((self.get(0).unwrap() & 0b0000_1111) << 2) | ((self.get(1).unwrap() & 0b1100_0000) >> 6)
     }
 
     pub fn prev_size(&self) -> u8 {
@@ -67,47 +69,40 @@ impl<'r> VmIr<'r> {
         let mut offset = 2;
         while let Some(opcode) = self.opcode(&mut offset) {
             match opcode {
-                IROP_MOV_IPR2REG | IROP_PUSH_REG | IROP_POP_REG => {
+                // 1 REGISTER OPERANDS
+                MOV_IPR_REG | PSH_REG | POP_REG => {
                     visitor.visit_reg1(opcode, self.reg1(&mut offset))
                 }
-
-                IROP_MOV_REG2REG => visitor.visit_reg2(opcode, self.reg2(&mut offset)),
-
-                IROP_BR_IPR_REL32 => visitor.visit_i32(opcode, self.i32(&mut offset)),
-
-                IROP_BR_IPV => visitor.visit_u32(opcode, self.u32(&mut offset)),
-
-                IROP_UADD_REG3 | IROP_USUB_REG3 | IROP_UMUL_REG3 | IROP_UDIV_REG3
-                | IROP_OR_REG3 | IROP_AND_REG3 | IROP_XOR_REG3 => {
+                MOV_REG2 => visitor.visit_reg2(opcode, self.reg2(&mut offset)),
+                UADD_REG3 | USUB_REG3 | UMUL_REG3 | UDIV_REG3 | OR_REG3 | AND_REG3 | XOR_REG3 => {
                     visitor.visit_reg3(opcode, self.reg3(&mut offset))
                 }
 
-                IROP_UADD_CST8 | IROP_USUB_CST8 | IROP_UMUL_CST8 | IROP_UDIV_CST8 => {
-                    visitor.visit_reg1u8(opcode, self.reg1u8(&mut offset))
+                // 1 REGISTE AND 1 IMMEDIATE OPERANDS
+                MOV_REG1IMM16 => visitor.visit_reg1imm16(opcode, self.reg1u16(&mut offset)),
+                MOV_REG1IMM64 | ULOAD_REG1IMM64 | USTORE_REG1IMM64 => {
+                    visitor.visit_reg1imm64(opcode, self.reg1u64(&mut offset))
                 }
 
-                IROP_LLEFT_SHIFT_IMM8
-                | IROP_LRIGHT_SHIFT_IMM8
-                | IROP_ROTATE_IMM8
-                | IROP_ARIGHT_SHIFT_IMM8 => visitor.visit_reg2u8(opcode, self.reg2u8(&mut offset)),
-
-                IROP_UADD_CST32 | IROP_USUB_CST32 | IROP_UMUL_CST32 | IROP_UDIV_CST32 => {
-                    visitor.visit_reg1u32(opcode, self.reg1u32(&mut offset))
+                // 2 REGISTER AND 1 IMMEDIATE OPERANDS
+                LSHL_REG2IMM8 | LSHR_REG2IMM8 | RROT_REG2IMM8 | ASHR_REG2IMM8 | UADD_REG2IMM8
+                | USUB_REG2IMM8 | UMUL_REG2IMM8 | UDIV_REG2IMM8 => {
+                    visitor.visit_reg2imm8(opcode, self.reg2u8(&mut offset))
+                }
+                UADD_REG2IMM32 | USUB_REG2IMM32 | UMUL_REG2IMM32 | UDIV_REG2IMM32
+                | IADD_REG2IMM32 | ISUB_REG2IMM32 | IMUL_REG2IMM32 | IDIV_REG2IMM32 => {
+                    visitor.visit_reg2imm32(opcode, self.reg2u32(&mut offset))
+                }
+                UADD_REG2IMM64 | USUB_REG2IMM64 | UMUL_REG2IMM64 | UDIV_REG2IMM64 => {
+                    visitor.visit_reg2imm64(opcode, self.reg2u64(&mut offset))
                 }
 
-                IROP_IADD_CST32 | IROP_ISUB_CST32 | IROP_IMUL_CST32 | IROP_IDIV_CST32 => {
-                    visitor.visit_reg1i32(opcode, self.reg1i32(&mut offset))
-                }
+                // 1 IMMEDIATE OPERANDS
+                SVC_IMM16 | BRK_IMM16 => visitor.visit_u16(opcode, self.u16(&mut offset)),
+                BR_IPV_IMM32 | BR_IRP_IMM32_REL => visitor.visit_u32(opcode, self.u32(&mut offset)),
 
-                IROP_UADD_CST64 | IROP_USUB_CST64 | IROP_UMUL_CST64 | IROP_UDIV_CST64 => {
-                    visitor.visit_reg1u64(opcode, self.reg1u64(&mut offset))
-                }
-
-                IROP_MOV_16CST2REG => visitor.visit_reg1u16(opcode, self.reg1u16(&mut offset)),
-
-                IROP_SVC | IROP_BRK => visitor.visit_u16(opcode, self.u16(&mut offset)),
-
-                IROP_NOP => visitor.visit_no_operand(opcode),
+                // NO OPERANDS
+                NOP => visitor.visit_no_operand(opcode),
                 _ => unimplemented!("opcode: {:02x}", opcode),
             }
         }
@@ -154,8 +149,8 @@ impl<'r> VmIr<'r> {
         v
     }
 
-    pub fn reg1u8(&self, offset: &mut usize) -> Reg1U8 {
-        let v = Reg1U8 {
+    pub fn reg1u8(&self, offset: &mut usize) -> Reg1Imm8 {
+        let v = Reg1Imm8 {
             op1: RegId(*self.get(*offset).unwrap()),
             imm8: *self.get(1 + *offset).unwrap(),
         };
@@ -164,8 +159,8 @@ impl<'r> VmIr<'r> {
         v
     }
 
-    pub fn reg2u8(&self, offset: &mut usize) -> Reg2U8 {
-        let v = Reg2U8 {
+    pub fn reg2u8(&self, offset: &mut usize) -> Reg2Imm8 {
+        let v = Reg2Imm8 {
             op1: RegId(*self.get(*offset).unwrap()),
             op2: RegId(*self.get(1 + *offset).unwrap()),
             imm8: *self.get(2 + *offset).unwrap(),
@@ -175,8 +170,8 @@ impl<'r> VmIr<'r> {
         v
     }
 
-    pub fn reg1u32(&self, offset: &mut usize) -> Reg1U32 {
-        let v = Reg1U32 {
+    pub fn reg1u32(&self, offset: &mut usize) -> Reg1Imm32 {
+        let v = Reg1Imm32 {
             op1: RegId(*self.get(*offset).unwrap()),
             imm32: u32::from_le_bytes([
                 *self.get(1 + *offset).unwrap(),
@@ -191,24 +186,8 @@ impl<'r> VmIr<'r> {
         v
     }
 
-    pub fn reg1i32(&self, offset: &mut usize) -> Reg1I32 {
-        let v = Reg1I32 {
-            op1: RegId(*self.get(*offset).unwrap()),
-            imm32: i32::from_le_bytes([
-                *self.get(1 + *offset).unwrap(),
-                *self.get(2 + *offset).unwrap(),
-                *self.get(3 + *offset).unwrap(),
-                *self.get(4 + *offset).unwrap(),
-            ]),
-        };
-
-        *offset += 5;
-
-        v
-    }
-
-    pub fn reg1u64(&self, offset: &mut usize) -> Reg1U64 {
-        let v = Reg1U64 {
+    pub fn reg1u64(&self, offset: &mut usize) -> Reg1Imm64 {
+        let v = Reg1Imm64 {
             op1: RegId(*self.get(*offset).unwrap()),
             imm64: u64::from_le_bytes([
                 *self.get(1 + *offset).unwrap(),
@@ -226,8 +205,8 @@ impl<'r> VmIr<'r> {
         v
     }
 
-    pub fn reg1u16(&self, offset: &mut usize) -> Reg1U16 {
-        let v = Reg1U16 {
+    pub fn reg1u16(&self, offset: &mut usize) -> Reg1Imm16 {
+        let v = Reg1Imm16 {
             op1: RegId(*self.get(*offset).unwrap()),
             imm16: u16::from_le_bytes([
                 *self.get(1 + *offset).unwrap(),
@@ -239,51 +218,27 @@ impl<'r> VmIr<'r> {
         v
     }
 
-    pub fn u16(&self, offset: &mut usize) -> U16 {
-        let v = U16 {
-            imm16: u16::from_le_bytes([
-                *self.get(*offset).unwrap(),
-                *self.get(1 + *offset).unwrap(),
-            ]),
-        };
-
-        *offset += 2;
-        v
-    }
-
-    pub fn i32(&self, offset: &mut usize) -> I32 {
-        let v = I32 {
-            imm32: i32::from_le_bytes([
-                *self.get(*offset).unwrap(),
-                *self.get(1 + *offset).unwrap(),
-                *self.get(2 + *offset).unwrap(),
-                *self.get(3 + *offset).unwrap(),
-            ]),
-        };
-
-        *offset += 4;
-        v
-    }
-
-    pub fn u32(&self, offset: &mut usize) -> U32 {
-        let v = U32 {
-            imm32: u32::from_le_bytes([
-                *self.get(*offset).unwrap(),
-                *self.get(1 + *offset).unwrap(),
-                *self.get(2 + *offset).unwrap(),
-                *self.get(3 + *offset).unwrap(),
-            ]),
-        };
-
-        *offset += 4;
-        v
-    }
-
-    pub fn reg2i64(&self, offset: &mut usize) -> Reg2I64 {
-        let v = Reg2I64 {
+    pub fn reg2u32(&self, offset: &mut usize) -> Reg2Imm32 {
+        let v = Reg2Imm32 {
             op1: RegId(*self.get(*offset).unwrap()),
             op2: RegId(*self.get(1 + *offset).unwrap()),
-            imm64: i64::from_le_bytes([
+            imm32: u32::from_le_bytes([
+                *self.get(2 + *offset).unwrap(),
+                *self.get(3 + *offset).unwrap(),
+                *self.get(4 + *offset).unwrap(),
+                *self.get(5 + *offset).unwrap(),
+            ]),
+        };
+
+        *offset += 6;
+        v
+    }
+
+    pub fn reg2u64(&self, offset: &mut usize) -> Reg2Imm64 {
+        let v = Reg2Imm64 {
+            op1: RegId(*self.get(*offset).unwrap()),
+            op2: RegId(*self.get(1 + *offset).unwrap()),
+            imm64: u64::from_le_bytes([
                 *self.get(2 + *offset).unwrap(),
                 *self.get(3 + *offset).unwrap(),
                 *self.get(4 + *offset).unwrap(),
@@ -299,42 +254,48 @@ impl<'r> VmIr<'r> {
         v
     }
 
-    pub fn reg1i64(&self, offset: &mut usize) -> Reg1I64 {
-        let v = Reg1I64 {
-            op1: RegId(*self.get(*offset).unwrap()),
-            imm64: i64::from_le_bytes([
+    pub fn u16(&self, offset: &mut usize) -> Imm16 {
+        let v = Imm16 {
+            imm16: u16::from_le_bytes([
+                *self.get(*offset).unwrap(),
                 *self.get(1 + *offset).unwrap(),
-                *self.get(2 + *offset).unwrap(),
-                *self.get(3 + *offset).unwrap(),
-                *self.get(4 + *offset).unwrap(),
-                *self.get(5 + *offset).unwrap(),
-                *self.get(6 + *offset).unwrap(),
-                *self.get(7 + *offset).unwrap(),
-                *self.get(8 + *offset).unwrap(),
             ]),
         };
 
-        *offset += 9;
+        *offset += 2;
+        v
+    }
+
+    pub fn u32(&self, offset: &mut usize) -> Imm32 {
+        let v = Imm32 {
+            imm32: u32::from_le_bytes([
+                *self.get(*offset).unwrap(),
+                *self.get(1 + *offset).unwrap(),
+                *self.get(2 + *offset).unwrap(),
+                *self.get(3 + *offset).unwrap(),
+            ]),
+        };
+
+        *offset += 4;
         v
     }
 }
 
 pub trait InstrVisitor {
-    fn visit_no_operand(&mut self, _op: u8) {}
-    fn visit_reg1(&mut self, _op: u8, _operand: Reg1) {}
-    fn visit_reg2(&mut self, _op: u8, _operand: Reg2) {}
-    fn visit_reg3(&mut self, _op: u8, _operand: Reg3) {}
-    fn visit_reg1u8(&mut self, _op: u8, _operand: Reg1U8) {}
-    fn visit_reg2u8(&mut self, _op: u8, _operand: Reg2U8) {}
-    fn visit_reg1u32(&mut self, _op: u8, _operand: Reg1U32) {}
-    fn visit_reg1i32(&mut self, _op: u8, _operand: Reg1I32) {}
-    fn visit_reg1u64(&mut self, _op: u8, _operand: Reg1U64) {}
-    fn visit_reg1u16(&mut self, _op: u8, _operand: Reg1U16) {}
-    fn visit_u16(&mut self, _op: u8, _operand: U16) {}
-    fn visit_i32(&mut self, _op: u8, _operand: I32) {}
-    fn visit_u32(&mut self, _op: u8, _operand: U32) {}
-    fn visit_reg2i64(&mut self, _op: u8, _operand: Reg2I64) {}
-    fn visit_reg1i64(&mut self, _op: u8, _operand: Reg1I64) {}
+    fn visit_no_operand(&mut self, op: u8) {}
+    fn visit_reg1(&mut self, op: u8, operand: Reg1) {}
+    fn visit_reg2(&mut self, op: u8, operand: Reg2) {}
+    fn visit_reg3(&mut self, op: u8, operand: Reg3) {}
+    fn visit_reg1imm8(&mut self, op: u8, operand: Reg1Imm8) {}
+    fn visit_reg1imm16(&mut self, op: u8, operand: Reg1Imm16) {}
+    fn visit_reg1imm32(&mut self, op: u8, operand: Reg1Imm32) {}
+    fn visit_reg1imm64(&mut self, op: u8, operand: Reg1Imm64) {}
+    fn visit_reg2imm8(&mut self, op: u8, operand: Reg2Imm8) {}
+    fn visit_reg2imm16(&mut self, op: u8, operand: Reg2Imm16) {}
+    fn visit_reg2imm32(&mut self, op: u8, operand: Reg2Imm32) {}
+    fn visit_reg2imm64(&mut self, op: u8, operand: Reg2Imm64) {}
+    fn visit_u16(&mut self, op: u8, operand: Imm16) {}
+    fn visit_u32(&mut self, op: u8, operand: Imm32) {}
 }
 
 pub fn build_instr_sig<A>(out: &mut SmallVec<A>, orgn_size: u8, curr_size: u8, prev_size: u8)

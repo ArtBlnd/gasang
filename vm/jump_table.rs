@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 #[derive(Debug, Clone, Copy)]
-pub struct JumpId(u32);
+pub struct JumpId(pub u32);
 
 impl Display for JumpId {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {

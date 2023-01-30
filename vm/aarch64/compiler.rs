@@ -1,9 +1,9 @@
 use crate::instruction::*;
-use crate::jump_table::{Checkpoint, JumpId, JumpTable};
+use crate::jump_table::JumpId;
 use crate::register::RegId;
 use crate::VmContext;
 
-use machineinstr::aarch64::*;
+use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule};
 use machineinstr::MachineInstParser;
 use utility::extract_bits16;
 use utility::BitReader;
@@ -12,11 +12,12 @@ use smallvec::SmallVec;
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use std::ops::Deref;
 
 pub fn compile_code(addr: u64, data: &[u8], compiler: &AArch64Compiler, vm_ctx: &mut VmContext) {
     // Compile instructions into VMIR and insert it to context.
     let mut ipr = addr;
+    let ipv = vm_ctx.vm_instr.len();
+
     let parser =
         MachineInstParser::new(BitReader::new(data.iter().cloned()), AArch64InstrParserRule);
 
@@ -31,15 +32,15 @@ pub fn compile_code(addr: u64, data: &[u8], compiler: &AArch64Compiler, vm_ctx: 
             let instr = VmIr::from_ref(&vm_ctx.vm_instr[jump_instr_ipv..]);
 
             let mut rewriter = JumpRewriter::new(
-                vm_ctx.vm_instr.len(),
+                vm_ctx.jump_table.new_jump(ipv),
                 instr.real_size(),
                 instr.curr_size(),
                 instr.prev_size(),
             );
 
             instr.visit(&mut rewriter);
-            let beg = vm_ctx.vm_instr.len();
-            let end = vm_ctx.vm_instr.len() + instr.curr_size() as usize;
+            let beg = ipv;
+            let end = ipv + instr.curr_size() as usize;
             vm_ctx.vm_instr.as_mut_slice()[beg..end].copy_from_slice(&rewriter.finish());
         }
 
@@ -49,7 +50,7 @@ pub fn compile_code(addr: u64, data: &[u8], compiler: &AArch64Compiler, vm_ctx: 
         let mut is_jump = IsJump(false);
         VmIr::from_ref(&instr).visit(&mut is_jump);
         if is_jump.0 == true {
-            ip_lookup_table.push(ipr, vm_ctx.vm_instr.len())
+            ip_lookup_table.push(ipr, ipv)
         }
 
         ipr += native_instr.size as u64;
@@ -59,32 +60,32 @@ pub fn compile_code(addr: u64, data: &[u8], compiler: &AArch64Compiler, vm_ctx: 
 
 struct IsJump(bool);
 impl InstrVisitor for IsJump {
-    fn visit_i32(&mut self, op: u8, _operand: I32) {
-        self.0 = op == IROP_BR_IPR_REL32
+    fn visit_u32(&mut self, op: u8, _operand: Imm32) {
+        self.0 = op == BR_IRP_IMM32_REL
     }
 }
 
 struct JumpRewriter {
     out: SmallVec<[u8; 16]>,
     curr_size: u8,
-    target_ipv: usize,
+
+    target: JumpId,
 }
 
 impl JumpRewriter {
-    pub fn new(target_ipv: usize, orgn_size: u8, curr_size: u8, prev_size: u8) -> Self {
+    pub fn new(target: JumpId, orgn_size: u8, curr_size: u8, prev_size: u8) -> Self {
         let mut out = SmallVec::new();
         build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
-
         Self {
             out,
             curr_size,
-            target_ipv,
+            target,
         }
     }
 
     pub fn finish(self) -> SmallVec<[u8; 16]> {
         let mut out = self.out;
-        out.resize(self.curr_size as usize, IROP_NOP); // Fill with nop.
+        out.resize(self.curr_size as usize, NOP); // Fill with nop.
         out
     }
 }
@@ -102,42 +103,34 @@ impl InstrVisitor for JumpRewriter {
     fn visit_reg3(&mut self, op: u8, operand: Reg3) {
         self.out.extend_from_slice(&operand.build(op))
     }
-    fn visit_reg1u8(&mut self, op: u8, operand: Reg1U8) {
+    fn visit_reg1imm8(&mut self, op: u8, operand: Reg1Imm8) {
         self.out.extend_from_slice(&operand.build(op))
     }
-    fn visit_reg2u8(&mut self, op: u8, operand: Reg2U8) {
+    fn visit_reg2imm8(&mut self, op: u8, operand: Reg2Imm8) {
         self.out.extend_from_slice(&operand.build(op))
     }
-    fn visit_reg1u32(&mut self, op: u8, operand: Reg1U32) {
+    fn visit_reg1imm32(&mut self, op: u8, operand: Reg1Imm32) {
         self.out.extend_from_slice(&operand.build(op))
     }
-    fn visit_reg1i32(&mut self, op: u8, operand: Reg1I32) {
+    fn visit_reg1imm64(&mut self, op: u8, operand: Reg1Imm64) {
         self.out.extend_from_slice(&operand.build(op))
     }
-    fn visit_reg1u64(&mut self, op: u8, operand: Reg1U64) {
+    fn visit_reg1imm16(&mut self, op: u8, operand: Reg1Imm16) {
         self.out.extend_from_slice(&operand.build(op))
     }
-    fn visit_reg1u16(&mut self, op: u8, operand: Reg1U16) {
-        self.out.extend_from_slice(&operand.build(op))
-    }
-    fn visit_u16(&mut self, op: u8, operand: U16) {
-        self.out.extend_from_slice(&operand.build(op))
-    }
-    fn visit_i32(&mut self, op: u8, operand: I32) {
+    fn visit_u16(&mut self, op: u8, operand: Imm16) {
         match op {
-            IROP_BR_IPR_REL32 => {
-                todo!()
+            BR_IRP_IMM32_REL => {
+                let op = Imm32 {
+                    imm32: self.target.0,
+                };
+
+                self.out.extend_from_slice(&op.build(BR_IPV_IMM32));
             }
             _ => self.out.extend_from_slice(&operand.build(op)),
         }
     }
-    fn visit_u32(&mut self, op: u8, operand: U32) {
-        self.out.extend_from_slice(&operand.build(op))
-    }
-    fn visit_reg2i64(&mut self, op: u8, operand: Reg2I64) {
-        self.out.extend_from_slice(&operand.build(op))
-    }
-    fn visit_reg1i64(&mut self, op: u8, operand: Reg1I64) {
+    fn visit_u32(&mut self, op: u8, operand: Imm32) {
         self.out.extend_from_slice(&operand.build(op))
     }
 }
@@ -224,11 +217,11 @@ impl AArch64Compiler {
 
         match instr {
             AArch64Instr::MovzVar32(operand) | AArch64Instr::MovzVar64(operand) => {
-                let op = Reg1U16 {
+                let op = Reg1Imm16 {
                     op1: self.gpr(operand.rd),
                     imm16: operand.imm16,
                 }
-                .build(IROP_MOV_16CST2REG);
+                .build(MOV_REG1IMM16);
 
                 let curr_size = 2 + op.len() as u8;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -246,13 +239,14 @@ impl AArch64Compiler {
                 let op1 = Reg1 {
                     op1: self.gpr(operand.rd),
                 }
-                .build(IROP_MOV_IPR2REG);
+                .build(MOV_IPR_REG);
 
-                let op2 = Reg1I32 {
+                let op2 = Reg2Imm32 {
                     op1: self.gpr(operand.rd),
-                    imm32: imm as i32,
+                    op2: self.gpr(operand.rd),
+                    imm32: imm as u32,
                 }
-                .build(IROP_IADD_CST32);
+                .build(IADD_REG2IMM32);
 
                 let curr_size = 2 + op1.len() as u8 + op2.len() as u8;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -266,20 +260,20 @@ impl AArch64Compiler {
                 let rd = self.gpr(operand.rd);
 
                 if operand.imm6 == 0 && operand.shift == 0 && operand.rn == 0b11111 {
-                    let op = Reg2 { op1: rm, op2: rd }.build(IROP_MOV_REG2REG);
+                    let op = Reg2 { op1: rm, op2: rd }.build(MOV_REG2);
 
                     let curr_size = 2 + op.len() as u8;
                     build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
                     out.extend_from_slice(&op);
                 } else {
                     let i1 = match decode_shift(operand.shift) {
-                        ShiftType::LSL => IROP_LLEFT_SHIFT_IMM8,
-                        ShiftType::LSR => IROP_LRIGHT_SHIFT_IMM8,
-                        ShiftType::ASR => IROP_ARIGHT_SHIFT_IMM8,
-                        ShiftType::ROR => IROP_ROTATE_IMM8,
+                        ShiftType::LSL => LSHL_REG2IMM8,
+                        ShiftType::LSR => LSHR_REG2IMM8,
+                        ShiftType::ASR => ASHR_REG2IMM8,
+                        ShiftType::ROR => RROT_REG2IMM8,
                     };
 
-                    let op1 = Reg2U8 {
+                    let op1 = Reg2Imm8 {
                         op1: rm,
                         op2: rd,
                         imm8: operand.imm6,
@@ -291,7 +285,7 @@ impl AArch64Compiler {
                         op2: rd,
                         op3: rn,
                     }
-                    .build(IROP_OR_REG3);
+                    .build(OR_REG3);
 
                     let curr_size = 2 + op1.len() as u8 + op2.len() as u8;
                     build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -301,10 +295,10 @@ impl AArch64Compiler {
             }
 
             AArch64Instr::Svc(operand) => {
-                let op = U16 {
+                let op = Imm16 {
                     imm16: operand.imm16,
                 }
-                .build(IROP_SVC);
+                .build(SVC_IMM16);
 
                 let curr_size = 2 + op.len() as u8;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -312,10 +306,10 @@ impl AArch64Compiler {
             }
 
             AArch64Instr::Brk(operand) => {
-                let op = U16 {
+                let op = Imm16 {
                     imm16: operand.imm16,
                 }
-                .build(IROP_BRK);
+                .build(BRK_IMM16);
 
                 let curr_size = 2 + op.len() as u8;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -353,20 +347,20 @@ impl AArch64Compiler {
 
                 let mut ops = SmallVec::<[u8; 16]>::new();
 
-                let v = Reg2I16 {
+                let v = Reg2Imm16 {
                     op1: src,
                     op2: dst,
-                    imm16: offset,
+                    imm16: offset as u16,
                 }
-                .build(IROP_SLOAD_REG2REG);
+                .build(SLOAD_REL_REG2IMM32);
                 ops.extend_from_slice(&v);
 
                 if wback {
-                    let w = Reg1I32 {
+                    let w = Reg1Imm32 {
                         op1: src,
-                        imm32: offset as i32,
+                        imm32: offset as u32,
                     }
-                    .build(IROP_IADD_CST32);
+                    .build(IADD_REG2IMM32);
                     ops.extend_from_slice(&w);
                 }
 
@@ -390,12 +384,12 @@ impl AArch64Compiler {
                     self.gpr(operand.rn)
                 };
 
-                let op = Reg2U32 {
+                let op = Reg2Imm32 {
                     op1: src,
                     op2: dst,
                     imm32: imm,
                 }
-                .build(IROP_UADD_CST32);
+                .build(UADD_REG2IMM32);
 
                 let curr_size = op.len() as u8 + 2;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
@@ -434,17 +428,4 @@ const fn sign_extend(value: i64, size: u8) -> i64 {
     } else {
         value
     }
-}
-
-const fn add_with_carry(x: u64, y: u64, carry_in: u64) -> (u64, u64) {
-    let unsigned_sum = x + y + carry_in;
-    let signed_sum = x as i64 + y as i64 + carry_in as i64;
-    let result = unsigned_sum;
-
-    let n = result & 0x8000000000000000 >> 63;
-    let z = if result == 0 { 1 } else { 0 };
-    let c = if result == unsigned_sum { 0 } else { 1 };
-    let v = if (result as i64) == signed_sum { 0 } else { 1 };
-
-    (result, n << 3 | z << 2 | c << 1 | v)
 }

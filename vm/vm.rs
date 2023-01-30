@@ -49,8 +49,6 @@ pub struct Vm {
     pub(crate) ipr: u64,
     pub(crate) ipr2ipv_cache: HashMap<u64, usize>,
     pub(crate) ip_modified: bool,
-
-    pub(crate) flags: u64,
 }
 
 impl Vm {
