@@ -121,6 +121,37 @@ impl Reg1Imm64 {
     }
 }
 
+pub struct Reg1Imm8Imm32 {
+    pub op1: RegId,
+    pub imm8: u8,
+    pub imm32: u32,
+}
+
+impl Reg1Imm8Imm32 {
+    pub fn build(self, opcode: u8) -> [u8; 7] {
+        let imm = self.imm32.to_le_bytes();
+        [
+            opcode, self.op1.0, self.imm8, imm[0], imm[1], imm[2], imm[3],
+        ]
+    }
+
+    pub fn u8(&self) -> u8 {
+        self.imm8
+    }
+
+    pub fn i8(&self) -> i8 {
+        self.imm8 as i8
+    }
+
+    pub fn u32(&self) -> u32 {
+        self.imm32
+    }
+
+    pub fn i32(&self) -> i32 {
+        self.imm32 as i32
+    }
+}
+
 pub struct Reg2Imm8 {
     pub op1: RegId,
     pub op2: RegId,

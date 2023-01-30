@@ -84,6 +84,10 @@ impl<'r> VmIr<'r> {
                     visitor.visit_reg1imm64(opcode, self.reg1u64(&mut offset))
                 }
 
+                BR_IPR_IMM32_REL_IF_OP1_EQ_IMM64 | BR_IPR_IMM32_REL_IF_OP1_NE_IMM64 => {
+                    visitor.visit_reg1imm8imm32(opcode, self.reg1u8u32(&mut offset))
+                }
+
                 // 2 REGISTER AND 1 IMMEDIATE OPERANDS
                 LSHL_REG2IMM8 | LSHR_REG2IMM8 | RROT_REG2IMM8 | ASHR_REG2IMM8 | UADD_REG2IMM8
                 | USUB_REG2IMM8 | UMUL_REG2IMM8 | UDIV_REG2IMM8 => {
@@ -101,7 +105,7 @@ impl<'r> VmIr<'r> {
 
                 // 1 IMMEDIATE OPERANDS
                 SVC_IMM16 | BRK_IMM16 => visitor.visit_u16(opcode, self.u16(&mut offset)),
-                BR_IPV_IMM32 | BR_IRP_IMM32_REL => visitor.visit_u32(opcode, self.u32(&mut offset)),
+                BR_IPV_IMM32 | BR_IPR_IMM32_REL => visitor.visit_u32(opcode, self.u32(&mut offset)),
 
                 // NO OPERANDS
                 NOP => visitor.visit_no_operand(opcode),
@@ -220,6 +224,22 @@ impl<'r> VmIr<'r> {
         v
     }
 
+    pub fn reg1u8u32(&self, offset: &mut usize) -> Reg1Imm8Imm32 {
+        let v = Reg1Imm8Imm32 {
+            op1: RegId(*self.get(*offset).unwrap()),
+            imm8: *self.get(1 + *offset).unwrap(),
+            imm32: u32::from_le_bytes([
+                *self.get(2 + *offset).unwrap(),
+                *self.get(3 + *offset).unwrap(),
+                *self.get(4 + *offset).unwrap(),
+                *self.get(5 + *offset).unwrap(),
+            ]),
+        };
+
+        *offset += 6;
+        v
+    }
+
     pub fn reg2u32(&self, offset: &mut usize) -> Reg2Imm32 {
         let v = Reg2Imm32 {
             op1: RegId(*self.get(*offset).unwrap()),
@@ -292,6 +312,7 @@ pub trait InstrVisitor {
     fn visit_reg1imm16(&mut self, op: u8, operand: Reg1Imm16) {}
     fn visit_reg1imm32(&mut self, op: u8, operand: Reg1Imm32) {}
     fn visit_reg1imm64(&mut self, op: u8, operand: Reg1Imm64) {}
+    fn visit_reg1imm8imm32(&mut self, op: u8, operand: Reg1Imm8Imm32) {}
     fn visit_reg2imm8(&mut self, op: u8, operand: Reg2Imm8) {}
     fn visit_reg2imm16(&mut self, op: u8, operand: Reg2Imm16) {}
     fn visit_reg2imm32(&mut self, op: u8, operand: Reg2Imm32) {}

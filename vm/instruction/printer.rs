@@ -152,7 +152,7 @@ impl InstrVisitor for InstrPrinter {
     fn visit_u32(&mut self, op: u8, operand: Imm32) {
         self.0.push(match op {
             BR_IPV_IMM32 => format!("jmp_ipv {}", operand.imm32),
-            BR_IRP_IMM32_REL => format!("jmp_ipr {}", operand.imm32),
+            BR_IPR_IMM32_REL => format!("jmp_ipr {}", operand.imm32),
             _ => unimplemented!(),
         })
     }
