@@ -127,6 +127,15 @@ impl InstrVisitor for InstrPrinter {
             USUB_REG2IMM64 => format!("usub {}, {} {}", operand.op1, operand.op2, operand.u64()),
             UMUL_REG2IMM64 => format!("umul {}, {} {}", operand.op1, operand.op2, operand.u64()),
             UDIV_REG2IMM64 => format!("udiv {}, {} {}", operand.op1, operand.op2, operand.u64()),
+
+            IADD_REG2IMM64 => format!("iadd {}, {} {}", operand.op1, operand.op2, operand.u64()),
+            ISUB_REG2IMM64 => format!("isub {}, {} {}", operand.op1, operand.op2, operand.u64()),
+            IMUL_REG2IMM64 => format!("imul {}, {} {}", operand.op1, operand.op2, operand.u64()),
+            IDIV_REG2IMM64 => format!("idiv {}, {} {}", operand.op1, operand.op2, operand.u64()),
+
+            OR_REG2IMM64 => format!("or {}, {} {}", operand.op1, operand.op2, operand.u64()),
+            AND_REG2IMM64 => format!("and {}, {} {}", operand.op1, operand.op2, operand.u64()),
+            XOR_REG2IMM64 => format!("xor {}, {} {}", operand.op1, operand.op2, operand.u64()),
             _ => unimplemented!(),
         });
     }

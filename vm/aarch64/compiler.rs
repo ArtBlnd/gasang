@@ -317,7 +317,7 @@ impl AArch64Compiler {
             }
 
             AArch64Instr::LdrImm64(operand) => {
-                let (mut wback, _post_index, _scale, offset) =
+                let (mut wback, post_index, _scale, offset) =
                     if extract_bits16(11..12, operand.imm12) == 0b0 {
                         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
                         let post = extract_bits16(0..2, operand.imm12) == 0b01;
@@ -345,19 +345,22 @@ impl AArch64Compiler {
                 };
                 let dst = self.gpr(operand.rt);
 
+                let offset_temp = if !post_index { offset } else { 0 };
+
                 let mut ops = SmallVec::<[u8; 16]>::new();
 
                 let v = Reg2Imm16 {
                     op1: src,
                     op2: dst,
-                    imm16: offset as u16,
+                    imm16: offset_temp as u16,
                 }
                 .build(SLOAD_REL_REG2IMM32);
                 ops.extend_from_slice(&v);
 
                 if wback {
-                    let w = Reg1Imm32 {
+                    let w = Reg2Imm32 {
                         op1: src,
+                        op2: src,
                         imm32: offset as u32,
                     }
                     .build(IADD_REG2IMM32);
@@ -394,6 +397,43 @@ impl AArch64Compiler {
                 let curr_size = op.len() as u8 + 2;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
                 out.extend_from_slice(&op);
+            }
+
+            AArch64Instr::BlImm(operand) => {
+                let op = Imm32 {
+                    imm32: sign_extend((operand.imm26 << 2) as i64, 28) as u32,
+                }.build(BR_IRP_IMM32_REL);
+
+                let curr_size = op.len() as u8 + 2;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op);
+            }
+
+            AArch64Instr::Adrp(operand) => {
+                let imm = sign_extend((operand.immhi << 14 | (operand.immlo as u32) << 12) as i64, 33);
+                let rd = self.gpr(operand.rd);
+
+                let op1 = Reg1 {
+                    op1: rd,
+                }.build(MOV_IPR_REG);
+
+                let op2 = Reg2Imm64 {
+                    op1: rd,
+                    op2: rd,
+                    imm64: 0xFFFF_FFFF_FFFF_F000,
+                }.build(AND_REG2IMM64);
+
+                let op3 = Reg2Imm64 {
+                    op1: rd,
+                    op2: rd,
+                    imm64: imm as u64,
+                }.build(IADD_REG2IMM64);
+
+                let curr_size = (op1.len() + op2.len() + op3.len() + 2) as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op1);
+                out.extend_from_slice(&op2);
+                out.extend_from_slice(&op3);
             }
 
             _ => unimplemented!("unknown instruction: {:?}", instr),

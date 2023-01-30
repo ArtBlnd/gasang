@@ -1,56 +1,55 @@
-//UADD_REG1_REG2_REG3
-//UADD_REG1_REG2_IMM1
 
-//REG3_UADD_REG_TO_REG_WITH_REG
-//UADD_REG2REG_WITH_REG
-//UADD_R2R_WR
-
-//IR_MOV_MEMREG_TO_MEM_REG
-//MOV_MR2MR
-//MOV_MR2MR_WI32
-
-//MOV_REGIPR_TO_REG
-//MOV_IPR2REG
-//SVC_WU16
-//SVC_U16
-
-//MOV_U16_TO_MEMREG
-
-//Dst = Val0 + Val1
+/// Add | Op2 = Op1 + Op3
 pub const UADD_REG3: u8 = 0b0000_0000;
-pub const USUB_REG3: u8 = 0b0000_0001;
+/// Sub | Op2 = Op1 + Op3
+pub const USUB_REG3: u8 = 0b0000_0001; 
+/// Mul | Op2 = Op1 + Op3
 pub const UMUL_REG3: u8 = 0b0000_0010;
+/// Div | Op2 = Op1 + Op3
 pub const UDIV_REG3: u8 = 0b0000_0011;
-//Dst += Const(1byte)
+///Add | Op2 = Op1 + Imm8
 pub const UADD_REG2IMM8: u8 = 0b0000_0100;
+///Sub | Op2 = Op1 + Imm8
 pub const USUB_REG2IMM8: u8 = 0b0000_0101;
+///Mul | Op2 = Op1 + Imm8
 pub const UMUL_REG2IMM8: u8 = 0b0000_0110;
+///Div | Op2 = Op1 + Imm8
 pub const UDIV_REG2IMM8: u8 = 0b0000_0111;
-//Dst += Const(4byte)
-pub const UADD_REG2IMM32: u8 = 0b0000_1000;
-pub const USUB_REG2IMM32: u8 = 0b0000_1001;
-pub const UMUL_REG2IMM32: u8 = 0b0000_1010;
-pub const UDIV_REG2IMM32: u8 = 0b0000_1011;
 
-pub const IADD_REG2IMM32: u8 = 0b0001_0000;
-pub const ISUB_REG2IMM32: u8 = 0b0001_0001;
-pub const IMUL_REG2IMM32: u8 = 0b0001_0010;
-pub const IDIV_REG2IMM32: u8 = 0b0001_0011;
+//Dst += Const(4byte)
+pub const UADD_REG2IMM32: u8 = 0b0001_0000;
+pub const USUB_REG2IMM32: u8 = 0b0001_0001;
+pub const UMUL_REG2IMM32: u8 = 0b0001_0010;
+pub const UDIV_REG2IMM32: u8 = 0b0001_0011;
+
+pub const IADD_REG2IMM32: u8 = 0b0001_0100;
+pub const ISUB_REG2IMM32: u8 = 0b0001_0101;
+pub const IMUL_REG2IMM32: u8 = 0b0001_0110;
+pub const IDIV_REG2IMM32: u8 = 0b0001_0111;
 //Dst += Const(8byte)
-pub const UADD_REG2IMM64: u8 = 0b0001_0100;
-pub const USUB_REG2IMM64: u8 = 0b0001_0101;
-pub const UMUL_REG2IMM64: u8 = 0b0001_0110;
-pub const UDIV_REG2IMM64: u8 = 0b0001_0111;
+pub const UADD_REG2IMM64: u8 = 0b0001_1000;
+pub const USUB_REG2IMM64: u8 = 0b0001_1001;
+pub const UMUL_REG2IMM64: u8 = 0b0001_1010;
+pub const UDIV_REG2IMM64: u8 = 0b0001_1011;
+
+pub const IADD_REG2IMM64: u8 = 0b0001_1100;
+pub const ISUB_REG2IMM64: u8 = 0b0001_1101;
+pub const IMUL_REG2IMM64: u8 = 0b0001_1110;
+pub const IDIV_REG2IMM64: u8 = 0b0001_1111;
 //Dst = Val0 (|, &, ^) Val1
-pub const OR_REG3: u8 = 0b0001_1000;
-pub const AND_REG3: u8 = 0b0001_1001;
-pub const XOR_REG3: u8 = 0b0001_1010;
+pub const OR_REG3: u8 = 0b0010_0000;
+pub const AND_REG3: u8 = 0b0010_0001;
+pub const XOR_REG3: u8 = 0b0010_0010;
+
+pub const OR_REG2IMM64: u8 = 0b0010_0100;
+pub const AND_REG2IMM64: u8 = 0b0010_0101;
+pub const XOR_REG2IMM64: u8 = 0b0010_0110;
 
 //Shifts
-pub const LSHL_REG2IMM8: u8 = 0b0001_1100;
-pub const LSHR_REG2IMM8: u8 = 0b0001_1101; //Logical Right Shift
-pub const RROT_REG2IMM8: u8 = 0b0001_1110;
-pub const ASHR_REG2IMM8: u8 = 0b0001_1111; // Arithmetic Right Shift
+pub const LSHL_REG2IMM8: u8 = 0b0010_1000;
+pub const LSHR_REG2IMM8: u8 = 0b0010_1001; //Logical Right Shift
+pub const RROT_REG2IMM8: u8 = 0b0010_1010;
+pub const ASHR_REG2IMM8: u8 = 0b0010_1011; // Arithmetic Right Shift
 
 //Memory Instructions
 pub const PSH_REG: u8 = 0b0100_0000;

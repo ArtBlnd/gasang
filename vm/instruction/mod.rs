@@ -93,7 +93,9 @@ impl<'r> VmIr<'r> {
                 | IADD_REG2IMM32 | ISUB_REG2IMM32 | IMUL_REG2IMM32 | IDIV_REG2IMM32 => {
                     visitor.visit_reg2imm32(opcode, self.reg2u32(&mut offset))
                 }
-                UADD_REG2IMM64 | USUB_REG2IMM64 | UMUL_REG2IMM64 | UDIV_REG2IMM64 => {
+                UADD_REG2IMM64 | USUB_REG2IMM64 | UMUL_REG2IMM64 | UDIV_REG2IMM64
+                | IADD_REG2IMM64 | ISUB_REG2IMM64 | IMUL_REG2IMM64 | IDIV_REG2IMM64
+                | OR_REG2IMM64 | AND_REG2IMM64 | XOR_REG2IMM64 => {
                     visitor.visit_reg2imm64(opcode, self.reg2u64(&mut offset))
                 }
 
