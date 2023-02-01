@@ -127,18 +127,8 @@ pub enum AArch64Instr {
     LdrReg64(LoadStoreRegRegOffset),
     PrfmReg(LoadStoreRegRegOffset),
 
-    Stp32(LoadStoreRegPair),
-    Ldp32(LoadStoreRegPair),
-    StpSimdFP32(LoadStoreRegPair),
-    LdpSimdFP32(LoadStoreRegPair),
     Stgp(LoadStoreRegPair),
     Ldpsw(LoadStoreRegPair),
-    StpSimdFP64(LoadStoreRegPair),
-    LdpSimdFP64(LoadStoreRegPair),
-    Stp64(LoadStoreRegPair),
-    Ldp64(LoadStoreRegPair),
-    StpSimdFP128(LoadStoreRegPair),
-    LdpSimdFP128(LoadStoreRegPair),
 
     Sturb(SizeImm12RnRt),
     Ldurb(SizeImm12RnRt),
@@ -216,6 +206,20 @@ pub enum AArch64Instr {
     Cbz64(CmpAndBranchImm),
     Cbnz64(CmpAndBranchImm),
 
+    Wfet(Rt),
+    Wfit(Rt),
+
+    MsrImm(Pstate),
+    Cfinv(Pstate),
+    Xaflag(Pstate),
+    Axflag(Pstate),
+
+    Tstart(Rt),
+    Ttest(Rt),
+
+    Sys(SystemInstructions),
+    Sysl(SystemInstructions),
+
     MsrReg(SysRegMov),
     Mrs(SysRegMov),
 
@@ -277,6 +281,11 @@ pub enum AArch64Instr {
     AsrvVar64(DataProc2Src),
     RorvVar64(DataProc2Src),
     Pacga(DataProc2Src),
+
+    Rmif(RotateRightIntoFlags),
+
+    SetfVar8(Rn),
+    SetfVar16(Rn),
 
     CcmnRegVar32(CondCmpReg),
     CcmpRegVar32(CondCmpReg),

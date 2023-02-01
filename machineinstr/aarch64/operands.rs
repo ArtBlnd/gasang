@@ -124,6 +124,7 @@ pub struct AddSubtractExtReg {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Bitfield {
+    pub n: u8,
     pub immr: u8,
     pub imms: u8,
     pub rn: u8,
@@ -141,6 +142,7 @@ pub struct LogicalImm {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LoadStoreRegPair {
     pub imm7: u8,
+    pub o: u8,
     pub rt2: u8,
     pub rn: u8,
     pub rt: u8,
@@ -377,3 +379,37 @@ pub struct AdvSimdScalarXIndexedElem {
     pub rn: u8,
     pub rd: u8,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rt {
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rn {
+    pub rn: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pstate {
+    pub op1: u8,
+    pub crm: u8,
+    pub op2: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SystemInstructions {
+    pub op1: u8,
+    pub crn: u8,
+    pub crm: u8,
+    pub op2: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RotateRightIntoFlags {
+    pub imm6: u8,
+    pub rn: u8,
+    pub mask: u8,
+}
+
