@@ -1,9 +1,9 @@
 use crate::instruction::*;
 use crate::jump_table::JumpId;
 use crate::register::RegId;
-use crate::VmContext;
+use crate::*;
 
-use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule};
+use machineinstr::aarch64::{AArch64Instr, AArch64InstrParserRule, SizeImm12RnRt};
 use machineinstr::MachineInstParser;
 use utility::extract_bits16;
 use utility::BitReader;
@@ -25,12 +25,24 @@ pub fn compile_code(addr: u64, data: &[u8], compiler: &AArch64Compiler, vm_ctx: 
 
     // construct jump table.
     let mut prev_size = 0u8;
+    let mut prev_check_point = ipr;
+    let min_distance = vm_ctx.jump_table.checkpoint_min_distance();
+
     for native_instr in parser {
+        // Constructing checkpoint table for "Jump to Register" and "Jump to relative" instructions,
+        // which couldn't know destination during compile time
+        if prev_check_point / min_distance < ipr / min_distance {
+            let ipv = vm_ctx.vm_instr.len();
+            vm_ctx.jump_table.new_checkpoint(ipr, ipv);
+            prev_check_point = ipr;
+        }
+
         if ip_lookup_table.check_ipr(ipr) {
             //IPV of jump instruction
             let jump_instr_ipv = ip_lookup_table.pop().unwrap();
             let instr = VmIr::from_ref(&vm_ctx.vm_instr[jump_instr_ipv..]);
 
+            //Rewrite operand with found ipv
             let mut rewriter = JumpRewriter::new(
                 vm_ctx.jump_table.new_jump(ipv),
                 instr.real_size(),
@@ -48,7 +60,10 @@ pub fn compile_code(addr: u64, data: &[u8], compiler: &AArch64Compiler, vm_ctx: 
         vm_ctx.insert_instr(&instr);
 
         let mut is_jump = IsJump(false);
-        VmIr::from_ref(&instr).visit(&mut is_jump);
+        let vmir = VmIr::from_ref(&instr);
+        println!("{vmir}");
+        vmir.visit(&mut is_jump);
+        //If current ir including jump instruction push ipr-ipv pair to table
         if is_jump.0 == true {
             ip_lookup_table.push(ipr, ipv)
         }
@@ -61,7 +76,7 @@ pub fn compile_code(addr: u64, data: &[u8], compiler: &AArch64Compiler, vm_ctx: 
 struct IsJump(bool);
 impl InstrVisitor for IsJump {
     fn visit_u32(&mut self, op: u8, _operand: Imm32) {
-        self.0 = op == BR_IRP_IMM32_REL
+        //self.0 = op == BR_IPR_IMM32_REL
     }
 }
 
@@ -120,7 +135,7 @@ impl InstrVisitor for JumpRewriter {
     }
     fn visit_u16(&mut self, op: u8, operand: Imm16) {
         match op {
-            BR_IRP_IMM32_REL => {
+            BR_IPR_IMM32_REL => {
                 let op = Imm32 {
                     imm32: self.target.0,
                 };
@@ -182,6 +197,7 @@ pub struct AArch64Compiler {
 
     stack_reg: RegId,
     pstate_reg: RegId,
+    btype_next: RegId,
 }
 
 impl AArch64Compiler {
@@ -190,12 +206,14 @@ impl AArch64Compiler {
         fpr_registers: [RegId; 32],
         stack_reg: RegId,
         pstate_reg: RegId,
+        btype_next: RegId,
     ) -> Self {
         Self {
             gpr_registers,
             fpr_registers,
             stack_reg,
             pstate_reg,
+            btype_next,
         }
     }
 
@@ -254,7 +272,74 @@ impl AArch64Compiler {
                 out.extend_from_slice(&op2);
             }
 
-            AArch64Instr::OrrShiftedReg64(operand) => {
+            AArch64Instr::StpVar64(operand) => {
+                // If rn is 31 we use stack register instead.
+                let rn = if operand.rn == 31 {
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+
+                let rt1 = self.gpr(operand.rt);
+                let rt2 = self.gpr(operand.rt2);
+
+                let signed_offs = operand.o == 010;
+                let (wback, post_index) = match operand.o {
+                    0b001 => (true, true),
+                    0b011 => (true, false),
+                    0b010 => (false, false),
+                    _ => unreachable!("Invalid stp64 options {:03b}", operand.o),
+                };
+
+                if rt1 == rn || rt2 == rn {
+                    unreachable!("Bad stp64 instruction");
+                }
+
+                let offs = if !post_index { operand.imm7 as i32 } else { 0 };
+
+                let (store_instr, offs1, offs2) = if signed_offs {
+                    let offs2 = (offs + 8) as u32;
+                    (SSTORE_REL_REG2IMM32, offs as u32, offs2)
+                } else {
+                    (USTORE_REL_REG2IMM32, offs as u32, offs as u32 + 8)
+                };
+
+                let op1 = Reg2Imm32 {
+                    op1: rt1,
+                    op2: rn,
+                    imm32: offs1,
+                }
+                .build(store_instr);
+
+                let op2 = Reg2Imm32 {
+                    op1: rt2,
+                    op2: rn,
+                    imm32: offs2,
+                }
+                .build(store_instr);
+
+                if post_index && wback {
+                    let op3 = Reg2Imm8 {
+                        op1: rn,
+                        op2: rn,
+                        imm8: operand.imm7 as u8,
+                    }
+                    .build(UADD_REG2IMM8);
+
+                    let curr_size = 2 + op1.len() as u8 + op2.len() as u8 + op3.len() as u8;
+                    build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                    out.extend_from_slice(&op1);
+                    out.extend_from_slice(&op2);
+                    out.extend_from_slice(&op3);
+                } else {
+                    let curr_size = 2 + op1.len() as u8 + op2.len() as u8;
+                    build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                    out.extend_from_slice(&op1);
+                    out.extend_from_slice(&op2);
+                }
+            }
+
+            AArch64Instr::OrrShiftedReg64(operand) | AArch64Instr::OrrShiftedReg32(operand) => {
                 let rm = self.gpr(operand.rm);
                 let rn = self.gpr(operand.rn);
                 let rd = self.gpr(operand.rd);
@@ -317,21 +402,7 @@ impl AArch64Compiler {
             }
 
             AArch64Instr::LdrImm64(operand) => {
-                let (mut wback, post_index, _scale, offset) =
-                    if extract_bits16(11..12, operand.imm12) == 0b0 {
-                        let imm9 = extract_bits16(2..11, operand.imm12) as i64;
-                        let post = extract_bits16(0..2, operand.imm12) == 0b01;
-
-                        (true, post, operand.size, sign_extend(imm9, 9) as i16)
-                    } else {
-                        //Unsigned offset
-                        (
-                            false,
-                            false,
-                            operand.size,
-                            (operand.imm12 << operand.size) as i16,
-                        )
-                    };
+                let (mut wback, post_index, _scale, offset) = decode_operand_for_ld_st(operand);
 
                 if wback && operand.rn == operand.rt && operand.rn != 31 {
                     wback = false;
@@ -349,25 +420,100 @@ impl AArch64Compiler {
 
                 let mut ops = SmallVec::<[u8; 16]>::new();
 
-                let v = Reg2Imm16 {
+                let v = Reg2Imm32 {
                     op1: src,
                     op2: dst,
-                    imm16: offset_temp as u16,
+                    imm32: offset_temp as u32,
                 }
                 .build(SLOAD_REL_REG2IMM32);
                 ops.extend_from_slice(&v);
 
+                let curr_size = ops.len() as u8 + 2;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&ops);
+            }
+
+            AArch64Instr::StrImm64(operand) => {
+                let (wback, post_index, _scale, offset) = decode_operand_for_ld_st(operand);
+
+                let src = self.gpr(operand.rt);
+
+                let dst = if operand.rn == 31 {
+                    // If rn is 31, we use stack register instead of gpr registers.
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+
+                let offset_temp = if !post_index { offset } else { 0 };
+
+                let mut ops = SmallVec::<[u8; 16]>::new();
+
+                let op = Reg2Imm32 {
+                    op1: src,
+                    op2: dst,
+                    imm32: offset_temp as u32,
+                }
+                .build(SSTORE_REL_REG2IMM32);
+                ops.extend_from_slice(&op);
+
                 if wback {
-                    let w = Reg2Imm32 {
+                    let op = Reg2Imm32 {
+                        op1: dst,
+                        op2: dst,
+                        imm32: offset as u32,
+                    }
+                    .build(IADD_REG2IMM32);
+                    ops.extend_from_slice(&op);
+                }
+
+                let curr_size = ops.len() as u8 + 2;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&ops);
+            }
+
+            AArch64Instr::LdrbImm(operand) => {
+                let (wback, post_index, _, offset) = decode_operand_for_ld_st(operand);
+
+                let src = if operand.rn == 31 {
+                    // If rn is 31, we use stack register instead of gpr registers.
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+                let dst = self.gpr(operand.rt);
+
+                let mut ops = SmallVec::<[u8; 16]>::new();
+
+                let offset_temp = if !post_index { offset } else { 0 };
+
+                let op1 = Reg2Imm32 {
+                    op1: src,
+                    op2: dst,
+                    imm32: offset_temp as u32,
+                }
+                .build(SLOAD_REL_REG2IMM32);
+                ops.extend_from_slice(&op1);
+
+                let op2 = Reg2Imm64 {
+                    op1: dst,
+                    op2: dst,
+                    imm64: 0x0000_0000_0000_00FF,
+                }
+                .build(AND_REG2IMM64);
+                ops.extend_from_slice(&op2);
+
+                if wback {
+                    let op = Reg2Imm32 {
                         op1: src,
                         op2: src,
                         imm32: offset as u32,
                     }
                     .build(IADD_REG2IMM32);
-                    ops.extend_from_slice(&w);
+                    ops.extend_from_slice(&op);
                 }
 
-                let curr_size = out.len() as u8 + 2;
+                let curr_size = ops.len() as u8 + 2;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
                 out.extend_from_slice(&ops);
             }
@@ -399,41 +545,218 @@ impl AArch64Compiler {
                 out.extend_from_slice(&op);
             }
 
-            AArch64Instr::BlImm(operand) => {
-                let op = Imm32 {
-                    imm32: sign_extend((operand.imm26 << 2) as i64, 28) as u32,
-                }.build(BR_IRP_IMM32_REL);
+            AArch64Instr::SubImm64(operand) => {
+                let imm = !((operand.imm12 as u32) << (operand.sh * 12)) + 1;
+
+                let src = if operand.rn == 31 {
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+
+                let dst = if operand.rd == 31 {
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+
+                let op = Reg2Imm32 {
+                    op1: src,
+                    op2: dst,
+                    imm32: imm,
+                }
+                .build(IADD_REG2IMM32);
 
                 let curr_size = op.len() as u8 + 2;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
                 out.extend_from_slice(&op);
             }
 
-            AArch64Instr::Adrp(operand) => {
-                let imm = sign_extend((operand.immhi << 14 | (operand.immlo as u32) << 12) as i64, 33);
-                let rd = self.gpr(operand.rd);
-
-                let op1 = Reg1 {
-                    op1: rd,
-                }.build(MOV_IPR_REG);
+            AArch64Instr::BlImm(operand) => {
+                let x30 = self.gpr(30);
+                let op1 = Reg1 { op1: x30 }.build(MOV_IPR_REG);
 
                 let op2 = Reg2Imm64 {
-                    op1: rd,
-                    op2: rd,
-                    imm64: 0xFFFF_FFFF_FFFF_F000,
-                }.build(AND_REG2IMM64);
+                    op1: x30,
+                    op2: x30,
+                    imm64: 4,
+                }
+                .build(UADD_REG2IMM64);
 
-                let op3 = Reg2Imm64 {
-                    op1: rd,
-                    op2: rd,
-                    imm64: imm as u64,
-                }.build(IADD_REG2IMM64);
+                let op3 = Imm32 {
+                    imm32: sign_extend((operand.imm26 << 2) as i64, 28) as u32,
+                }
+                .build(BR_IPR_IMM32_REL);
 
                 let curr_size = (op1.len() + op2.len() + op3.len() + 2) as u8;
                 build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
                 out.extend_from_slice(&op1);
                 out.extend_from_slice(&op2);
                 out.extend_from_slice(&op3);
+            }
+
+            AArch64Instr::BImm(operand) => {
+                let op = Imm32 {
+                    imm32: sign_extend((operand.imm26 << 2) as i64, 28) as u32,
+                }
+                .build(BR_IPR_IMM32_REL);
+
+                let curr_size = (op.len() + 2) as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op);
+            }
+
+            AArch64Instr::Adrp(operand) => {
+                let imm = sign_extend(
+                    (operand.immhi << 14 | (operand.immlo as u32) << 12) as i64,
+                    33,
+                );
+                let rd = self.gpr(operand.rd);
+
+                let op1 = Reg1 { op1: rd }.build(MOV_IPR_REG);
+
+                let op2 = Reg2Imm64 {
+                    op1: rd,
+                    op2: rd,
+                    imm64: 0xFFFF_FFFF_FFFF_F000,
+                }
+                .build(AND_REG2IMM64);
+
+                let op3 = Reg2Imm64 {
+                    op1: rd,
+                    op2: rd,
+                    imm64: imm as u64,
+                }
+                .build(IADD_REG2IMM64);
+
+                let curr_size = (op1.len() + op2.len() + op3.len() + 2) as u8;
+                build_instr_sig(&mut out, orgn_size, curr_size, prev_size);
+                out.extend_from_slice(&op1);
+                out.extend_from_slice(&op2);
+                out.extend_from_slice(&op3);
+            }
+
+            AArch64Instr::Cbz64(operand) => {
+                let offset = operand.imm19 << 2;
+
+                let op1 = Reg1Slot1 {
+                    op1: self.gpr(operand.rt),
+                    slot_id: SLOT0,
+                }
+                .build(STORE_SLOT_REG);
+
+                let op2 = SlotImm32 {
+                    slot_id: SLOT0,
+                    imm32: offset,
+                }
+                .build(BR_IPR_IMM32_REL_IF_SLOT_ZERO);
+
+                let curr_size = op1.len() + op2.len() + 2;
+                build_instr_sig(&mut out, orgn_size, curr_size as u8, prev_size);
+                out.extend_from_slice(&op1);
+                out.extend_from_slice(&op2);
+            }
+
+            AArch64Instr::Ret(operand) => {
+                let op1 = Reg1Imm16 {
+                    op1: self.btype_next,
+                    imm16: 0b00,
+                }
+                .build(MOV_REG1IMM16);
+
+                let op2 = Reg1 {
+                    op1: self.gpr(operand.rn),
+                }
+                .build(BR_IPR_REG1);
+
+                let curr_size = op1.len() + op2.len() + 2;
+                build_instr_sig(&mut out, orgn_size, curr_size as u8, prev_size);
+                out.extend_from_slice(&op1);
+                out.extend_from_slice(&op2);
+            }
+
+            AArch64Instr::Sbfm64(operand) => {
+                let immr = operand.immr;
+                let imms = operand.imms;
+
+                let (wmask, tmask) = decode_bit_masks(operand.n, imms, immr, false, 64);
+
+                let src = self.gpr(operand.rn);
+                let dst = self.gpr(operand.rd);
+
+                let op1 = Reg2Imm8 {
+                    op1: src,
+                    op2: dst,
+                    imm8: immr,
+                }
+                .build(RROT_REG2IMM8);
+
+                let op2 = Reg2Imm64 {
+                    op1: dst,
+                    op2: dst,
+                    imm64: wmask,
+                }
+                .build(AND_REG2IMM64);
+
+                let op3 = Reg2Imm64 {
+                    op1: dst,
+                    op2: dst,
+                    imm64: tmask,
+                }
+                .build(AND_REG2IMM64);
+
+                let op4 = Reg1Slot1 {
+                    op1: dst,
+                    slot_id: SLOT0,
+                }
+                .build(STORE_SLOT_REG); // SLOT0 == bot & tmask
+
+                let op5 = Reg2Imm8 {
+                    op1: src,
+                    op2: dst,
+                    imm8: imms,
+                }
+                .build(MOV_BIT_REG2IMM8);
+
+                let op6 = Reg2Imm16 {
+                    op1: dst,
+                    op2: dst,
+                    imm16: 64 << 8 | 1,
+                }
+                .build(REPL_REG2IMM16); // top
+
+                let op7 = Reg2Imm64 {
+                    op1: dst,
+                    op2: dst,
+                    imm64: !tmask,
+                }
+                .build(AND_REG2IMM64);
+
+                let op8 = Reg1Slot1 {
+                    op1: dst,
+                    slot_id: SLOT0,
+                }
+                .build(OR_REG1SLOT1);
+
+                let curr_size = op1.len()
+                    + op2.len()
+                    + op3.len()
+                    + op4.len()
+                    + op5.len()
+                    + op6.len()
+                    + op7.len()
+                    + op8.len()
+                    + 2;
+
+                build_instr_sig(&mut out, orgn_size, curr_size as u8, prev_size);
+                out.extend_from_slice(&op1);
+                out.extend_from_slice(&op2);
+                out.extend_from_slice(&op3);
+                out.extend_from_slice(&op4);
+                out.extend_from_slice(&op5);
+                out.extend_from_slice(&op6);
+                out.extend_from_slice(&op7);
+                out.extend_from_slice(&op8);
             }
 
             _ => unimplemented!("unknown instruction: {:?}", instr),
@@ -460,6 +783,60 @@ const fn decode_shift(shift: u8) -> ShiftType {
     }
 }
 
+const fn highest_set_bit(x: u64) -> u64 {
+    63 - x.leading_zeros() as u64
+}
+
+const fn ones(n: u64) -> u64 {
+    replicate(1, n, 1)
+}
+
+const fn ror(x: u64, shift: u64, size: u64) -> u64 {
+    let m = shift % size;
+    x >> m | ((x << (size - m)) & ones(shift))
+}
+
+const fn replicate(x: u64, n: u64, size: u64) -> u64 {
+    let mut result = 0b0;
+    let mut i = n;
+
+    while i > 0 {
+        result |= x;
+        result <<= size;
+        i -= 1;
+    }
+
+    result
+}
+
+const fn decode_bit_masks(immn: u8, imms: u8, immr: u8, immediate: bool, m: u8) -> (u64, u64) {
+    let len = highest_set_bit(((immn << 6) as u16 | extract_bits16(0..6, !imms as u16)) as u64);
+    assert!(len >= 1, "UNDEFINED");
+    assert!(m >= (1 << len), "UNDEFINED");
+
+    let levels = ones(len);
+
+    assert!(
+        !(immediate && (imms as u64 & levels) == levels),
+        "UNDEFINED"
+    );
+
+    let s = imms & levels as u8;
+    let r = immr & levels as u8;
+    let diff = s - r;
+
+    let esize = 1 << len;
+    let d = extract_bits16(0..len as usize, diff as u16);
+
+    let welem = ones(s as u64 + 1);
+    let telem = ones(d as u64 + 1);
+
+    let wmask = replicate(ror(welem, r as u64, esize), m as u64, esize);
+    let tmask = replicate(telem, m as u64, esize);
+
+    (wmask, tmask)
+}
+
 const fn sign_extend(value: i64, size: u8) -> i64 {
     let mask = 1 << (size - 1);
     let sign = value & mask;
@@ -467,5 +844,22 @@ const fn sign_extend(value: i64, size: u8) -> i64 {
         value | !((1 << size) - 1)
     } else {
         value
+    }
+}
+
+const fn decode_operand_for_ld_st(operand: SizeImm12RnRt) -> (bool, bool, u8, i16) {
+    if extract_bits16(11..12, operand.imm12) == 0b0 {
+        let imm9 = extract_bits16(2..11, operand.imm12) as i64;
+        let post = extract_bits16(0..2, operand.imm12) == 0b01;
+
+        (true, post, operand.size, sign_extend(imm9, 9) as i16)
+    } else {
+        //Unsigned offset
+        (
+            false,
+            false,
+            operand.size,
+            (operand.imm12 << operand.size) as i16,
+        )
     }
 }

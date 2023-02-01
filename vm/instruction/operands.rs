@@ -1,4 +1,4 @@
-use crate::register::RegId;
+use crate::{register::RegId, SlotId};
 
 pub const VMIR_REG1: u8 = 0b0000;
 pub const VMIR_REG2: u8 = 0b0001;
@@ -118,37 +118,6 @@ impl Reg1Imm64 {
 
     pub fn i64(&self) -> i64 {
         self.imm64 as i64
-    }
-}
-
-pub struct Reg1Imm8Imm32 {
-    pub op1: RegId,
-    pub imm8: u8,
-    pub imm32: u32,
-}
-
-impl Reg1Imm8Imm32 {
-    pub fn build(self, opcode: u8) -> [u8; 7] {
-        let imm = self.imm32.to_le_bytes();
-        [
-            opcode, self.op1.0, self.imm8, imm[0], imm[1], imm[2], imm[3],
-        ]
-    }
-
-    pub fn u8(&self) -> u8 {
-        self.imm8
-    }
-
-    pub fn i8(&self) -> i8 {
-        self.imm8 as i8
-    }
-
-    pub fn u32(&self) -> u32 {
-        self.imm32
-    }
-
-    pub fn i32(&self) -> i32 {
-        self.imm32 as i32
     }
 }
 
@@ -275,5 +244,48 @@ impl Imm32 {
 
     pub fn i32(&self) -> i32 {
         self.imm32 as i32
+    }
+}
+
+pub struct Reg1Slot1 {
+    pub op1: RegId,
+    pub slot_id: SlotId,
+}
+
+impl Reg1Slot1 {
+    pub fn build(self, opcode: u8) -> [u8; 3] {
+        [opcode, self.op1.0, self.slot_id.0]
+    }
+}
+
+pub struct SlotImm32 {
+    pub slot_id: SlotId,
+    pub imm32: u32,
+}
+
+impl SlotImm32 {
+    pub fn build(self, opcode: u8) -> [u8; 6] {
+        let imm = self.imm32.to_le_bytes();
+        [opcode, self.slot_id.0, imm[0], imm[1], imm[2], imm[3]]
+    }
+
+    pub fn u32(&self) -> u32 {
+        self.imm32
+    }
+
+    pub fn i32(&self) -> i32 {
+        self.imm32 as i32
+    }
+}
+
+pub struct Slot3 {
+    pub slot1: SlotId,
+    pub slot2: SlotId,
+    pub slot3: SlotId,
+}
+
+impl Slot3 {
+    pub fn build(self, opcode: u8) -> [u8; 4] {
+        [opcode, self.slot1.0, self.slot2.0, self.slot3.0]
     }
 }

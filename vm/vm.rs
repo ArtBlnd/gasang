@@ -11,6 +11,12 @@ use std::sync::Arc;
 pub const CARRY_FLAG: u64 = 1 << 0;
 pub const OVERFLOW_FLAG: u64 = 1 << 1;
 
+pub struct SlotId(pub u8);
+pub const SLOT0: SlotId = SlotId(0);
+pub const SLOT1: SlotId = SlotId(1);
+pub const SLOT2: SlotId = SlotId(2);
+pub const SLOT3: SlotId = SlotId(3);
+
 #[derive(Debug)]
 pub struct VmContext {
     pub vm_instr: Vec<u8>,
@@ -49,6 +55,8 @@ pub struct Vm {
     pub(crate) ipr: u64,
     pub(crate) ipr2ipv_cache: HashMap<u64, usize>,
     pub(crate) ip_modified: bool,
+
+    pub(crate) slot: [u64; 4],
 }
 
 impl Vm {
@@ -151,6 +159,10 @@ impl Vm {
         self.fpr_registers
             .get_mut(id.0 as usize)
             .expect("Bad fpr register id")
+    }
+
+    pub fn slot(&mut self, slot: SlotId) -> &mut u64 {
+        &mut self.slot[slot.0 as usize]
     }
 
     pub fn reg_by_name(&self, name: impl AsRef<str>) -> Option<RegId> {

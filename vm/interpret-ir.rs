@@ -35,6 +35,8 @@ fn main() {
     // initialize AArch64 registers.
     let pstate_reg = RegId(gpr_storage.insert(GprRegister::new("pstate", 8)) as u8);
     let stack_reg = RegId(gpr_storage.insert(GprRegister::new("sp", 8)) as u8);
+    let btype_next = RegId(gpr_storage.insert(GprRegister::new("btype_next", 8)) as u8);
+
     let gpr_registers: [RegId; 32] = (0..32)
         .map(|i| RegId(gpr_storage.insert(GprRegister::new(format!("x{i}"), 8)) as u8))
         .collect::<Vec<_>>()
@@ -46,7 +48,13 @@ fn main() {
         .try_into()
         .unwrap();
 
-    let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg, stack_reg);
+    let compiler = AArch64Compiler::new(
+        gpr_registers,
+        fpr_registers,
+        pstate_reg,
+        stack_reg,
+        btype_next,
+    );
     let mut vm_ctx = VmContext::new();
     compile_code(text_section.sh_addr, buf, &compiler, &mut vm_ctx);
 

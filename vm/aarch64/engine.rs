@@ -3,7 +3,7 @@ use crate::aarch64::{compile_code, AArch64Compiler};
 use crate::engine::Engine;
 use crate::image::Image;
 use crate::register::{FprRegister, GprRegister, RegId};
-use crate::{InterruptModel, Vm, VmContext};
+use crate::{InterruptModel, SlotId, Vm, VmContext};
 
 use slab::Slab;
 
@@ -48,8 +48,15 @@ impl Engine for AArch64VMEngine {
             .unwrap();
         let pstate_reg = RegId(gpr_storage.insert(GprRegister::new("pstate", 8)) as u8);
         let stack_reg = RegId(gpr_storage.insert(GprRegister::new("sp", 8)) as u8);
+        let btype_next = RegId(gpr_storage.insert(GprRegister::new("btype_next", 8)) as u8);
 
-        let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, pstate_reg, stack_reg);
+        let compiler = AArch64Compiler::new(
+            gpr_registers,
+            fpr_registers,
+            pstate_reg,
+            stack_reg,
+            btype_next,
+        );
         let mut vm_ctx = VmContext::new();
         build_image(&image, &compiler, &mut vm_ctx);
 
@@ -66,6 +73,8 @@ impl Engine for AArch64VMEngine {
                 ipr2ipv_cache: HashMap::new(),
                 ipr: image.entrypoint(),
                 ip_modified: false,
+
+                slot: [0u64; 4],
             },
             vm_ctx,
             interrupt: AArch64UnixInterruptModel,
