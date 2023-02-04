@@ -14,3 +14,9 @@ pub enum MMUError {
     #[error("Page fault")]
     PageFault,
 }
+
+
+#[derive(Debug, Error, Clone)]
+pub enum CompileError {
+
+}

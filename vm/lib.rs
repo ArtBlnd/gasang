@@ -1,8 +1,9 @@
-pub mod image;
-pub mod register;
-pub mod interrupt;
-pub mod mmu;
-pub mod error;
-pub mod ir;
-pub mod vm;
 pub mod codegen;
+pub mod compiler;
+pub mod error;
+pub mod image;
+pub mod interrupt;
+pub mod ir;
+pub mod mmu;
+pub mod register;
+pub mod vm;

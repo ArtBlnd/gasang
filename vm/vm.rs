@@ -1,5 +1,1 @@
-
-
-pub struct Vm {
-    
-}
+pub struct Vm {}

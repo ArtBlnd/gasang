@@ -48,10 +48,19 @@ where
             todo!("SVE encodings")
         })
         .bind("x_xx_100x_xxxxxxxxxxxxxxxxxxxxxxxxx", parse_aarch64_d_p_i)
-        .bind("x_xx_101x_xxxxxxxxxxxxxxxxxxxxxxxxx", parse_aarch64_branches_exception_gen_and_sys_instr)
-        .bind("x_xx_x1x0_xxxxxxxxxxxxxxxxxxxxxxxxx", parse_aarch64_load_and_stores)
+        .bind(
+            "x_xx_101x_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            parse_aarch64_branches_exception_gen_and_sys_instr,
+        )
+        .bind(
+            "x_xx_x1x0_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            parse_aarch64_load_and_stores,
+        )
         .bind("x_xx_x101_xxxxxxxxxxxxxxxxxxxxxxxxx", parse_aarch64_d_p_r)
-        .bind("x_xx_x111_xxxxxxxxxxxxxxxxxxxxxxxxx", parse_aarch64_dp_sfp_adv_simd);
+        .bind(
+            "x_xx_x111_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            parse_aarch64_dp_sfp_adv_simd,
+        );
 
         m
     });
@@ -71,9 +80,18 @@ where
 fn parse_aarch64_d_p_i(raw_instr: u32) -> AArch64Instr {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
-        m.bind("xxx_100_00x_xxxxxxxxxxxxxxxxxxxxxxx", parse_pc_rel_addressing)
-        .bind("xxx_100_010_xxxxxxxxxxxxxxxxxxxxxxx", parse_add_sub_immediate)
-        .bind("xxx_100_011_xxxxxxxxxxxxxxxxxxxxxxx", parse_add_sub_imm_with_tags)
+        m.bind(
+            "xxx_100_00x_xxxxxxxxxxxxxxxxxxxxxxx",
+            parse_pc_rel_addressing,
+        )
+        .bind(
+            "xxx_100_010_xxxxxxxxxxxxxxxxxxxxxxx",
+            parse_add_sub_immediate,
+        )
+        .bind(
+            "xxx_100_011_xxxxxxxxxxxxxxxxxxxxxxx",
+            parse_add_sub_imm_with_tags,
+        )
         .bind("xxx_100_100_xxxxxxxxxxxxxxxxxxxxxxx", parse_logical_imm)
         .bind("xxx_100_101_xxxxxxxxxxxxxxxxxxxxxxx", parse_move_wide_imm)
         .bind("xxx_100_110_xxxxxxxxxxxxxxxxxxxxxxx", parse_bitfield)
@@ -589,19 +607,40 @@ fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: u32) -> AArch64
         let mut m = BitPatternMatcher::new();
         //--------------------------------------------
         //      |op1|101|      op2     |       | op3 |
-        m.bind("010_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx", parse_cond_branch_imm)
+        m.bind(
+            "010_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            parse_cond_branch_imm,
+        )
         .bind("110_101_00xxxxxxxxxxxx_xxxxxxx_xxxxx", parse_exception_gen)
-        .bind("110_101_01000000110001_xxxxxxx_xxxxx", parse_sys_instr_with_reg_arg)
+        .bind(
+            "110_101_01000000110001_xxxxxxx_xxxxx",
+            parse_sys_instr_with_reg_arg,
+        )
         .bind("110_101_01000000110010_xxxxxxx_11111", parse_hints)
         .bind("110_101_01000000110011_xxxxxxx_xxxxx", parse_barriers)
         .bind("110_101_0100000xxx0100_xxxxxxx_xxxxx", parse_pstate)
-        .bind("110_101_0100100xxxxxxx_xxxxxxx_xxxxx", parse_sys_with_result)
+        .bind(
+            "110_101_0100100xxxxxxx_xxxxxxx_xxxxx",
+            parse_sys_with_result,
+        )
         .bind("110_101_0100x01xxxxxxx_xxxxxxx_xxxxx", parse_sys_instr)
         .bind("110_101_0100x1xxxxxxxx_xxxxxxx_xxxxx", parse_sys_reg_mov)
-        .bind("110_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx", parse_uncond_branch_reg)
-        .bind("x00_101_xxxxxxxxxxxxxx_xxxxxxx_xxxxx", parse_uncond_branch_imm)
-        .bind("x01_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx", parse_cmp_and_branch_imm)
-        .bind("x01_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx", parse_test_and_branch_imm);
+        .bind(
+            "110_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            parse_uncond_branch_reg,
+        )
+        .bind(
+            "x00_101_xxxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            parse_uncond_branch_imm,
+        )
+        .bind(
+            "x01_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            parse_cmp_and_branch_imm,
+        )
+        .bind(
+            "x01_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            parse_test_and_branch_imm,
+        );
 
         m
     });
@@ -4298,9 +4337,7 @@ fn parse_eval_into_flags(raw_instr: u32) -> AArch64Instr {
              rn: Extract<BitRange<5, 10>, u8>,
              o3: Extract<BitRange<4, 5>, u8>,
              mask: Extract<BitRange<0, 4>, u8>| {
-                let data = Rn {
-                    rn: rn.value
-                };
+                let data = Rn { rn: rn.value };
 
                 match (sf_op_s.value, opcode2.value, sz.value, o3.value, mask.value) {
                     (0b001, 0b000000, 0b0, 0b0, 0b1101) => AArch64Instr::SetfVar8(data),

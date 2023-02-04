@@ -30,5 +30,4 @@ fn main() {
 
         image.add_section(name, sec.sh_addr, beg as usize, end as usize);
     }
-
 }

@@ -412,4 +412,3 @@ pub struct RotateRightIntoFlags {
     pub rn: u8,
     pub mask: u8,
 }
-

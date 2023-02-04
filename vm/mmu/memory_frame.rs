@@ -1,5 +1,5 @@
-use crate::mmu::{MmuData, Page, PAGE_SIZE};
 use crate::error::MMUError;
+use crate::mmu::{MmuData, Page, PAGE_SIZE};
 
 use std::sync::Arc;
 
