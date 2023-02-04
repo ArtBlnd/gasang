@@ -1,7 +1,6 @@
 use thiserror::Error;
 
-use crate::MMUError;
-use crate::{Vm, VmContext};
+use crate::error::MMUError;
 
 #[derive(Clone, Debug, Error)]
 pub enum Interrupt {
@@ -25,8 +24,4 @@ pub enum Interrupt {
 
     #[error("Need recompile")]
     NeedRecompile,
-}
-
-pub trait InterruptModel {
-    unsafe fn interrupt(&self, int: Interrupt, vm: &mut Vm, vm_ctx: &VmContext);
 }

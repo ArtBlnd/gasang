@@ -3,8 +3,6 @@ use elf::ElfBytes;
 
 use std::path::PathBuf;
 
-use vm::aarch64::AArch64VMEngine;
-use vm::engine::Engine;
 use vm::image::*;
 
 fn main() {
@@ -33,8 +31,4 @@ fn main() {
         image.add_section(name, sec.sh_addr, beg as usize, end as usize);
     }
 
-    let mut engine = AArch64VMEngine::init(image);
-    unsafe {
-        engine.run();
-    }
 }
