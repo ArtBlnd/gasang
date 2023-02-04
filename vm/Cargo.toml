@@ -6,10 +6,6 @@ edition = "2021"
 [lib]
 path = "lib.rs"
 
-[[bin]]
-name = "interpret-ir"
-path = "interpret-ir.rs"
-
 [dependencies]
 elf = "0.7.1"
 machineinstr = { version = "0.1.0", path = "../machineinstr" }
