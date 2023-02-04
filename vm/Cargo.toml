@@ -7,6 +7,7 @@ edition = "2021"
 path = "lib.rs"
 
 [dependencies]
+cranelift = "0.92.0"
 elf = "0.7.1"
 machineinstr = { version = "0.1.0", path = "../machineinstr" }
 num-traits = "0.2.15"

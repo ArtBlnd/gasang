@@ -5,3 +5,4 @@ pub mod mmu;
 pub mod error;
 pub mod ir;
 pub mod vm;
+pub mod codegen;
