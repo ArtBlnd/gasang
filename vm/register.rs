@@ -42,56 +42,6 @@ impl GprRegister {
     pub fn get(&self) -> u64 {
         self.value
     }
-
-    pub fn add(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value += value;
-        Ok(())
-    }
-
-    pub fn sub(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value -= value;
-        Ok(())
-    }
-
-    pub fn mul(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value *= value;
-        Ok(())
-    }
-
-    pub fn div(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value /= value;
-        Ok(())
-    }
-
-    pub fn shr(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value >>= value;
-        Ok(())
-    }
-
-    pub fn shl(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value <<= value;
-        Ok(())
-    }
-
-    pub fn or(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value |= value;
-        Ok(())
-    }
-
-    pub fn and(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value &= value;
-        Ok(())
-    }
-
-    pub fn xor(&mut self, value: u64) -> Result<(), Interrupt> {
-        self.value ^= value;
-        Ok(())
-    }
-
-    pub fn not(&mut self) -> Result<(), Interrupt> {
-        self.value = !self.value;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -109,4 +59,21 @@ impl FprRegister {
             value: 0.0,
         }
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn size(&self) -> u8 {
+        self.size
+    }
+
+    pub fn set(&mut self, value: f64) {
+        self.value = value;
+    }
+
+    pub fn get(&self) -> f64 {
+        self.value
+    }
 }
+

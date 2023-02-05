@@ -8,12 +8,13 @@ use utility::{extract_bits32, BitReader};
 use once_cell::sync::Lazy;
 
 /// AArch64 instruction parser
+#[derive(Clone, Debug)]
 pub struct AArch64InstrParserRule;
 
 impl MachineInstrParserRule for AArch64InstrParserRule {
-    type MachineInstr = NativeInstr<AArch64Instr>;
+    type MachineInstr = AArch64Instr;
 
-    fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<Self::MachineInstr>
+    fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<NativeInstr<Self::MachineInstr>>
     where
         I: Iterator<Item = u8>,
     {

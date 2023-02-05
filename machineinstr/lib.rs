@@ -7,10 +7,12 @@ mod bit_patterns;
 use std::iter::Iterator;
 use utility::*;
 
-pub trait MachineInstrParserRule {
+use crate::instr::NativeInstr;
+
+pub trait MachineInstrParserRule: Clone {
     type MachineInstr;
 
-    fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<Self::MachineInstr>
+    fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<NativeInstr<Self::MachineInstr>>
     where
         I: Iterator<Item = u8>;
 }
@@ -31,7 +33,7 @@ where
     I: Iterator<Item = u8>,
     R: MachineInstrParserRule,
 {
-    type Item = R::MachineInstr;
+    type Item = NativeInstr<R::MachineInstr>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.rule.parse(&mut self.buf)

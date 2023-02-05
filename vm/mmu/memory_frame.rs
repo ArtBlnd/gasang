@@ -3,6 +3,7 @@ use crate::mmu::{MmuData, Page, PAGE_SIZE};
 
 use std::sync::Arc;
 
+#[derive(Clone, Debug)]
 pub struct MemoryFrame {
     mmu: Arc<MmuData>,
     addr: u64,
@@ -11,6 +12,10 @@ pub struct MemoryFrame {
 impl MemoryFrame {
     pub fn new(mmu: Arc<MmuData>, addr: u64) -> Self {
         MemoryFrame { mmu, addr }
+    }
+
+    pub fn consume(&mut self, offset: u64) {
+        self.addr += offset;
     }
 
     pub unsafe fn read(&mut self, buf: &mut [u8]) -> Result<(), MMUError> {

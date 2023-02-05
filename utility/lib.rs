@@ -55,6 +55,6 @@ mod tests {
     fn test_extract_bits32() {
         let bits: u32 = 0b1111_0000_1010_0101_1100_0011_1001_0110;
 
-        assert_eq!(0b1100, extract_bits32(8..12, bits))
+        assert_eq!(0b0011, extract_bits32(8..12, bits))
     }
 }

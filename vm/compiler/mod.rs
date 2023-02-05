@@ -1,7 +1,7 @@
 pub mod aarch64;
 
-use crate::ir::Block;
 use crate::error::CompileError;
+use crate::ir::Block;
 
 pub trait Compiler {
     type Item;

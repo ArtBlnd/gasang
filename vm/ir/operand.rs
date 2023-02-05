@@ -1,4 +1,4 @@
-use crate::ir::{Type, Ir};
+use crate::ir::{Ir, Type};
 use crate::register::RegId;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 path = "lib.rs"
 
+[[bin]]
+name = "compile-cli"
+path = "compile-cli.rs"
+
 [dependencies]
 cranelift = "0.92.0"
 elf = "0.7.1"
