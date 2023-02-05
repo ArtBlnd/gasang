@@ -48,6 +48,16 @@ fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Codegen
             let imm = *imm;
             Ok(Box::new(move |ctx| ctx.eip() + imm))
         }
+        Ir::Value(Operand::Immediate(imm, t)) => {
+            let imm = *imm;
+            let t = *t;
+            Ok(Box::new(move |_ctx| imm & type_mask(t)))
+        }
+        Ir::Value(Operand::Register(reg_id, t)) => {
+            let reg = *reg_id;
+            let t = *t;
+            Ok(Box::new(move |ctx| ctx.gpr(reg).get() & type_mask(t)))
+        }
 
         Ir::Add(t, op1, op2) => {
             let lhs = compile_op(op1, set_flag)?;
