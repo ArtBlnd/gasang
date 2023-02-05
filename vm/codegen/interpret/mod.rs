@@ -40,6 +40,15 @@ pub fn compile_block(block: Block) -> Result<InterpretExeuctableBlock, CodegenEr
 
 fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, CodegenError> {
     match ir {
+        Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm, Type::I64)) => {
+            let imm = *imm;
+            Ok(Box::new(move |ctx| (ctx.eip() as i64 + imm as i64) as u64))
+        }
+        Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm, Type::U64)) => {
+            let imm = *imm;
+            Ok(Box::new(move |ctx| ctx.eip() + imm))
+        }
+
         Ir::Add(t, op1, op2) => {
             let lhs = compile_op(op1, set_flag)?;
             let rhs = compile_op(op2, set_flag)?;
@@ -542,6 +551,9 @@ fn compile_op(op: &Operand, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Co
             let imm = *imm;
             let t = t.clone();
             Box::new(move |_| imm & type_mask(t))
+        }
+        Operand::Eip => {
+            Box::new(move |ctx| ctx.eip())
         }
     })
 }
