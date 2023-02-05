@@ -1,41 +1,42 @@
 use crate::codegen::interpret::InterpretExeuctableBlock;
 use crate::codegen::Codegen;
 use crate::error::CodegenError;
-use crate::ir::{Block, Ir, Operand, Type};
+use crate::ir::{Ir, IrBlock, Operand, Type};
 use crate::VmState;
 
 mod code;
 pub use code::*;
 mod function;
 pub use function::*;
+use smallvec::SmallVec;
 
 pub struct InterpretCodegen;
 
 impl Codegen for InterpretCodegen {
     type Executable = CodeBlock;
 
-    fn compile(&self, blocks: Vec<Block>) -> Result<Self::Executable, CodegenError> {
+    fn compile(&self, blocks: Vec<IrBlock>) -> Result<Self::Executable, CodegenError> {
         let mut codes = Vec::new();
         let mut sizes = Vec::new();
 
         for block in blocks {
             let size = block.original_size();
-            let exe_block = compile_block(block)?;
+            let mut exec = SmallVec::new();
 
-            codes.push(exe_block);
+            for block_item in block.items() {
+                exec.push(InterpretExeuctableBlock {
+                    code: compile_ir(block_item.root(), true)?,
+                    code_type: block_item.root().get_type(),
+                    code_dest: block_item.dest().clone(),
+                });
+            }
+
+            codes.push(exec);
             sizes.push(size);
         }
 
         Ok(CodeBlock { codes, sizes })
     }
-}
-
-pub fn compile_block(block: Block) -> Result<InterpretExeuctableBlock, CodegenError> {
-    Ok(InterpretExeuctableBlock {
-        code: compile_ir(block.ir_root(), false)?,
-        code_dest: block.ir_dest(),
-        code_type: block.ir_root().get_type(),
-    })
 }
 
 fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, CodegenError> {

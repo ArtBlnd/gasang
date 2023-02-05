@@ -25,7 +25,7 @@ impl MemoryFrame {
         while read < buf.len() {
             let page = self.mmu.query(addr)?;
             let page_offs_beg = (addr % PAGE_SIZE) as usize;
-            let page_offs_end = usize::min(PAGE_SIZE as usize, buf.len() - read);
+            let page_offs_end = usize::min(PAGE_SIZE as usize, page_offs_beg + buf.len() - read);
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),
@@ -37,10 +37,8 @@ impl MemoryFrame {
                         return Err(MMUError::AccessViolation);
                     }
 
-                    let mem = unsafe {
-                        &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end]
-                    };
-                    buf.copy_from_slice(mem);
+                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    buf[read..read + mem.len()].copy_from_slice(&mem);
                     read += mem.len();
                     addr += mem.len() as u64;
                 }
@@ -57,22 +55,20 @@ impl MemoryFrame {
         while writ < buf.len() {
             let page = self.mmu.query(addr)?;
             let page_offs_beg = (addr % PAGE_SIZE) as usize;
-            let page_offs_end = usize::min(PAGE_SIZE as usize, buf.len() - writ);
+            let page_offs_end = usize::min(PAGE_SIZE as usize, page_offs_beg + buf.len() - writ);
 
             match page {
                 Page::Unmapped => return Err(MMUError::PageNotMapped),
                 Page::Memory {
                     memory, writable, ..
                 } => {
-                    // Check if the page is writable
+                    // Check if the page is readable
                     if !writable {
                         return Err(MMUError::AccessViolation);
                     }
 
-                    let mem = unsafe {
-                        &mut memory.get_slice()[page_offs_beg..page_offs_beg + page_offs_end]
-                    };
-                    mem.copy_from_slice(buf);
+                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    mem.copy_from_slice(&buf[writ..writ + mem.len()]);
                     writ += mem.len();
                     addr += mem.len() as u64;
                 }

@@ -36,6 +36,11 @@ fn main() {
             image.set_entrypoint(sec.sh_addr);
         }
 
+        match name {
+            ".text" | ".data" | ".bss" | ".rodata" => {}
+            _ => continue,
+        }
+
         let (writable, executable) = get_access_info(sec.sh_flags);
 
         image.add_section(
@@ -56,8 +61,10 @@ fn main() {
         vm_state.add_fpr_register(FprRegister::new(format!("d{idx}"), 8))
     });
 
+    let stack_reg = vm_state.add_gpr_register(GprRegister::new("sp".to_string(), 8));
+
     let mut vm_state = vm_state.build(image.entrypoint(), AArch64UnixInterruptModel);
-    let compiler = AArch64Compiler::new(gpr_registers, fpr_registers);
+    let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, stack_reg);
     let parse_rule = AArch64InstrParserRule;
     let codegen = InterpretCodegen;
 

@@ -13,5 +13,5 @@ use crate::error::CodegenError;
 pub trait Codegen {
     type Executable: Executable;
 
-    fn compile(&self, blocks: Vec<crate::ir::Block>) -> Result<Self::Executable, CodegenError>;
+    fn compile(&self, blocks: Vec<crate::ir::IrBlock>) -> Result<Self::Executable, CodegenError>;
 }

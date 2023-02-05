@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 use crate::ir::{Ir, Type};
 
 use crate::register::RegId;
@@ -15,62 +17,48 @@ pub enum BlockDestination {
 }
 
 #[derive(Clone, Debug)]
-pub struct Block {
-    ir_root: Ir,
-    ir_dest: BlockDestination,
+pub struct IrBlock {
+    items: SmallVec<[IrBlockItem; 2]>,
 
     original_size: usize,
 }
 
-impl Block {
-    pub fn new(ir_root: Ir, ir_dest: BlockDestination, original_size: usize) -> Self {
+impl IrBlock {
+    pub fn new(original_size: usize) -> Self {
         Self {
-            ir_root,
-            ir_dest,
+            items: SmallVec::new(),
             original_size,
         }
     }
 
-    pub fn ir_root(&self) -> &Ir {
-        &self.ir_root
+    pub fn append(&mut self, ir: Ir, dest: BlockDestination) {
+        self.items.push(IrBlockItem {
+            ir_root: ir,
+            ir_dest: dest,
+        });
     }
 
-    pub fn ir_dest(&self) -> BlockDestination {
-        self.ir_dest.clone()
+    pub fn items(&self) -> &[IrBlockItem] {
+        &self.items
     }
 
     pub fn original_size(&self) -> usize {
         self.original_size
     }
+}
 
-    pub fn validate(&self) -> bool {
-        match self.ir_dest {
-            BlockDestination::Flags => {
-                self.ir_root().get_type() == Type::U64 && self.ir_root().validate()
-            }
-            BlockDestination::Eip => {
-                self.ir_root().get_type() == Type::U64 && self.ir_root().validate()
-            }
-            BlockDestination::GprRegister(_) => match self.ir_root().get_type() {
-                Type::U8
-                | Type::U16
-                | Type::U32
-                | Type::U64
-                | Type::I8
-                | Type::I16
-                | Type::I32
-                | Type::I64 => true && self.ir_root().validate(),
-                _ => false,
-            },
-            BlockDestination::FprRegister(_) => match self.ir_root().get_type() {
-                Type::F32 | Type::F64 => true && self.ir_root().validate(),
-                _ => false,
-            },
-            BlockDestination::Memory(_) => match self.ir_root().get_type() {
-                Type::U8 | Type::U16 | Type::U32 | Type::U64 => true && self.ir_root().validate(),
-                _ => false,
-            },
-            _ => self.ir_root().validate(),
-        }
+#[derive(Clone, Debug)]
+pub struct IrBlockItem {
+    ir_root: Ir,
+    ir_dest: BlockDestination,
+}
+
+impl IrBlockItem {
+    pub fn root(&self) -> &Ir {
+        &self.ir_root
+    }
+
+    pub fn dest(&self) -> &BlockDestination {
+        &self.ir_dest
     }
 }

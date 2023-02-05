@@ -79,7 +79,7 @@ impl MmuData {
 
         let mut offset = 0u64;
 
-        while size > offset {
+        while size + PAGE_SIZE > offset {
             let page = pt.get_or_mmap(addr + offset, || Page::Memory {
                 memory: HostMemory::new(PAGE_SIZE as usize),
                 readable,

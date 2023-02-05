@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use crate::codegen::{Codegen, Executable};
 use crate::compiler::Compiler;
 use crate::error::{CompileError, Error};
-use crate::ir::{Block, BlockDestination};
+use crate::ir::{BlockDestination, IrBlock};
 use crate::mmu::MemoryFrame;
 use crate::vm_state::VmState;
 
@@ -56,7 +56,7 @@ where
     fn compile_until_branch_or_eof(
         &mut self,
         frame: MemoryFrame,
-    ) -> Result<Vec<Block>, CompileError> {
+    ) -> Result<Vec<IrBlock>, CompileError> {
         compile_until_branch_or_eof(frame, &self.parse_rule, &self.compiler)
     }
 }
@@ -65,7 +65,7 @@ fn compile_until_branch_or_eof<R, C>(
     frame: MemoryFrame,
     rule: &R,
     compiler: &C,
-) -> Result<Vec<Block>, CompileError>
+) -> Result<Vec<IrBlock>, CompileError>
 where
     C: Compiler,
     R: MachineInstrParserRule<MachineInstr = C::Item>,
@@ -87,14 +87,14 @@ where
     let parser = MachineInstParser::new(BitReader::new(frame), rule.clone());
     for instr in parser {
         let block = compiler.compile(instr.op)?;
-        let block_dest = block.ir_dest().clone();
+        let last_dest = block.items().last().unwrap().dest().clone();
         results.push(block);
 
-        if let BlockDestination::Eip = block_dest  {
+        if let BlockDestination::Eip = last_dest {
             break;
         }
 
-        if let BlockDestination::Exit = block_dest {
+        if let BlockDestination::Exit = last_dest {
             break;
         }
     }
