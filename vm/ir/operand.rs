@@ -6,6 +6,7 @@ pub enum Operand {
     Ir(Box<Ir>),
     Register(RegId, Type),
     Immediate(u64, Type),
+    Eip,
 }
 
 impl Operand {
@@ -14,6 +15,7 @@ impl Operand {
             Operand::Ir(ir) => ir.get_type(),
             Operand::Register(_, t) => *t,
             Operand::Immediate(_, t) => *t,
+            Operand::Eip => Type::U64,
         }
     }
 
@@ -22,6 +24,7 @@ impl Operand {
             Operand::Ir(ir) => ir.validate(),
             Operand::Register(_, _) => true,
             Operand::Immediate(_, _) => true,
+            Operand::Eip => true,
         }
     }
 }

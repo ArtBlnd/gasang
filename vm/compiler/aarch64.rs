@@ -43,7 +43,24 @@ impl Compiler for AArch64Compiler {
                 let ds = BlockDestination::None;
                 Ok(Block::new(ir, ds, 4))
             }
+            AArch64Instr::Adr(operand) => {
+                let imm = sign_extend((operand.immhi as i64) << 2 | (operand.immlo as i64), 20);
+
+                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm as u64, Type::I64));
+                let ds = BlockDestination::GprRegister(self.gpr(operand.rd as usize));
+                Ok(Block::new(ir, ds, 4))
+            }
             _ => unimplemented!("unimplemented instruction: {:?}", item),
         }
+    }
+}
+
+const fn sign_extend(value: i64, size: u8) -> i64 {
+    let mask = 1 << (size - 1);
+    let sign = value & mask;
+    if sign != 0 {
+        value | !((1 << size) - 1)
+    } else {
+        value
     }
 }
