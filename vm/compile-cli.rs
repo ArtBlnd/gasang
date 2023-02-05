@@ -21,8 +21,8 @@ fn main() {
 
     for sec in sec_headers {
         let name = strtbl.get(sec.sh_name as usize).unwrap();
-        let beg = sec.sh_offset;
-        let end = sec.sh_offset + sec.sh_size;
+        let _beg = sec.sh_offset;
+        let _end = sec.sh_offset + sec.sh_size;
 
         if name == ".text" {
             image.set_entrypoint(sec.sh_addr);

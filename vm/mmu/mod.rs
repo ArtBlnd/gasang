@@ -92,7 +92,7 @@ impl MmuData {
             let e = executable;
 
             if let Page::Memory {
-                memory,
+                memory: _,
                 readable,
                 writable,
                 executable,

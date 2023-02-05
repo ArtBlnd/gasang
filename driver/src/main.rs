@@ -48,10 +48,10 @@ fn main() {
 
     let mut vm_state = VmBuilder::new(&image);
     let gpr_registers: [RegId; 31] = std::array::from_fn(|idx| {
-        vm_state.add_gpr_register(GprRegister::new(format!("x{}", idx), 8))
+        vm_state.add_gpr_register(GprRegister::new(format!("x{idx}"), 8))
     });
     let fpr_registers: [RegId; 31] = std::array::from_fn(|idx| {
-        vm_state.add_fpr_register(FprRegister::new(format!("x{}", idx), 8))
+        vm_state.add_fpr_register(FprRegister::new(format!("x{idx}"), 8))
     });
 
     let mut vm_state = vm_state.build(image.entrypoint());

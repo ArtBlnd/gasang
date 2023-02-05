@@ -1,4 +1,4 @@
-use crate::image::Image;
+
 use crate::mmu::{MemoryFrame, Mmu};
 use crate::register::*;
 

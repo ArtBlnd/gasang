@@ -1,5 +1,5 @@
 use crate::ir::{Ir, Type};
-use crate::mmu::MemoryFrame;
+
 use crate::register::RegId;
 
 #[derive(Clone, Debug)]

@@ -333,7 +333,7 @@ fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Codegen
                         ((lhs.execute(ctx) as u32).rotate_right(rhs.execute(ctx) as u32)) as u64
                     }),
                     Type::U64 => Box::new(move |ctx| {
-                        ((lhs.execute(ctx) as u64).rotate_right(rhs.execute(ctx) as u32)) as u64
+                        (lhs.execute(ctx).rotate_right(rhs.execute(ctx) as u32))
                     }),
                     Type::I8 => Box::new(move |ctx| {
                         ((lhs.execute(ctx) as i8).rotate_right(rhs.execute(ctx) as u32)) as u64
@@ -371,7 +371,7 @@ fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Codegen
                     }),
                     Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
                         let var = op.execute(ctx);
-                        ctx.mem(var).read_u64().unwrap() as u64
+                        ctx.mem(var).read_u64().unwrap()
                     }),
                     Type::Void => return Err(CodegenError::InvalidType),
                 })
@@ -417,7 +417,7 @@ fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Codegen
                         v as u64 & to
                     }),
                     Type::I64 => Box::new(move |ctx| {
-                        let v: i64 = (op.execute(ctx) as i64).into();
+                        let v: i64 = op.execute(ctx) as i64;
                         v as u64 & to
                     }),
                     Type::F32 | Type::F64 => unimplemented!("invalid type for zext! {:?}", from),
@@ -541,15 +541,15 @@ fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Codegen
 
 fn compile_op(op: &Operand, set_flag: bool) -> Result<Box<dyn InterpretFunc>, CodegenError> {
     Ok(match op {
-        Operand::Ir(ir) => compile_ir(&ir, set_flag)?,
+        Operand::Ir(ir) => compile_ir(ir, set_flag)?,
         Operand::Register(id, t) => {
-            let id = id.clone();
-            let t = t.clone();
+            let id = *id;
+            let t = *t;
             Box::new(move |vm: &mut VmState| vm.gpr(id).get() & type_mask(t))
         }
         Operand::Immediate(imm, t) => {
             let imm = *imm;
-            let t = t.clone();
+            let t = *t;
             Box::new(move |_| imm & type_mask(t))
         }
         Operand::Eip => {
@@ -594,7 +594,7 @@ mod test {
             Operand::Immediate(9, Type::U8),
         );
         let result = unsafe { compile_ir(&ir, false).unwrap().execute(&mut vm) };
-        assert_eq!(result, 1 as u64);
+        assert_eq!(result, 1_u64);
 
         //Test subtract minus value ISUB
         let ir = Ir::Sub(
@@ -626,7 +626,7 @@ mod test {
         //Test IDIV
         let ir = Ir::Div(
             Type::I64,
-            Operand::Immediate((10) as u64, Type::I64),
+            Operand::Immediate(10_u64, Type::I64),
             Operand::Immediate((-5i64) as u64, Type::I64),
         );
         let result = unsafe { compile_ir(&ir, false).unwrap().execute(&mut vm) };

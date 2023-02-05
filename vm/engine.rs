@@ -84,8 +84,8 @@ where
         }
     }
 
-    let mut parser = MachineInstParser::new(BitReader::new(frame), rule.clone());
-    while let Some(instr) = parser.next() {
+    let parser = MachineInstParser::new(BitReader::new(frame), rule.clone());
+    for instr in parser {
         let block = compiler.compile(instr.op)?;
         let block_dest = block.ir_dest().clone();
         results.push(block);
