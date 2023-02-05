@@ -10,6 +10,8 @@ pub enum BlockDestination {
     FprRegister(RegId),
     Memory(u64),
     None,
+    SystemCall,
+    Exit,
 }
 
 #[derive(Clone, Debug)]
@@ -68,7 +70,7 @@ impl Block {
                 Type::U8 | Type::U16 | Type::U32 | Type::U64 => true && self.ir_root().validate(),
                 _ => false,
             },
-            BlockDestination::None => true,
+            _ => self.ir_root().validate(),
         }
     }
 }

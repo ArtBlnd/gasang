@@ -90,7 +90,11 @@ where
         let block_dest = block.ir_dest().clone();
         results.push(block);
 
-        if let BlockDestination::Eip = block_dest {
+        if let BlockDestination::Eip = block_dest  {
+            break;
+        }
+
+        if let BlockDestination::Exit = block_dest {
             break;
         }
     }

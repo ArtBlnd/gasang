@@ -332,9 +332,9 @@ fn compile_ir(ir: &Ir, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Codegen
                     Type::U32 => Box::new(move |ctx| {
                         ((lhs.execute(ctx) as u32).rotate_right(rhs.execute(ctx) as u32)) as u64
                     }),
-                    Type::U64 => Box::new(move |ctx| {
-                        (lhs.execute(ctx).rotate_right(rhs.execute(ctx) as u32))
-                    }),
+                    Type::U64 => {
+                        Box::new(move |ctx| lhs.execute(ctx).rotate_right(rhs.execute(ctx) as u32))
+                    }
                     Type::I8 => Box::new(move |ctx| {
                         ((lhs.execute(ctx) as i8).rotate_right(rhs.execute(ctx) as u32)) as u64
                     }),
@@ -552,22 +552,31 @@ fn compile_op(op: &Operand, set_flag: bool) -> Result<Box<dyn InterpretFunc>, Co
             let t = *t;
             Box::new(move |_| imm & type_mask(t))
         }
-        Operand::Eip => {
-            Box::new(move |ctx| ctx.eip())
-        }
+        Operand::Eip => Box::new(move |ctx| ctx.eip()),
     })
+}
+
+const fn type_mask(t: Type) -> u64 {
+    match t {
+        Type::U8 | Type::I8 => u8::max_value() as u64,
+        Type::U16 | Type::I16 => u16::max_value() as u64,
+        Type::U32 | Type::I32 | Type::F32 => u32::max_value() as u64,
+        Type::U64 | Type::I64 | Type::F64 => u64::max_value(),
+        Type::Void => panic!("Void type has no mask"),
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::image::Image;
+    use crate::interrupt::NoModel;
     use crate::vm_builder::VmBuilder;
 
     #[test]
     fn test_compile_simple_imm_ir() {
         let image = Image::from_image(vec![]);
-        let mut vm = VmBuilder::new(&image).build(0);
+        let mut vm = VmBuilder::new(&image).build(0, NoModel);
 
         //Test UADD
         let ir = Ir::Add(
@@ -682,15 +691,5 @@ mod test {
         let ir = Ir::SextCast(Type::I32, Operand::Immediate(0xFF, Type::I8));
         let result = unsafe { compile_ir(&ir, false).unwrap().execute(&mut vm) };
         assert_eq!(result as i64, u32::max_value() as i64);
-    }
-}
-
-const fn type_mask(t: Type) -> u64 {
-    match t {
-        Type::U8 | Type::I8 => u8::max_value() as u64,
-        Type::U16 | Type::I16 => u16::max_value() as u64,
-        Type::U32 | Type::I32 | Type::F32 => u32::max_value() as u64,
-        Type::U64 | Type::I64 | Type::F64 => u64::max_value(),
-        Type::Void => panic!("Void type has no mask"),
     }
 }

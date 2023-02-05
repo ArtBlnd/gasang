@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use crate::image::Image;
+use crate::interrupt::InterruptModel;
 use crate::mmu::Mmu;
 use crate::register::*;
 use crate::vm_state::VmState;
@@ -38,14 +41,35 @@ impl VmBuilder {
         }
     }
 
-    pub fn build(self, entry_point: u64) -> VmState {
+    pub fn build<M>(self, entry_point: u64, model: M) -> VmState
+    where
+        M: InterruptModel + 'static,
+    {
+        let mut reg_name_map = HashMap::new();
+        for gpr in &self.gpr_registers {
+            let k = gpr.1.name();
+            let v = gpr.0;
+
+            reg_name_map.insert(k.to_string(), RegId(v as u8));
+        }
+        for fpr in &self.fpr_registers {
+            let k = fpr.1.name();
+            let v = fpr.0;
+
+            reg_name_map.insert(k.to_string(), RegId(v as u8));
+        }
+
         VmState {
             gpr_registers: self.gpr_registers,
             fpr_registers: self.fpr_registers,
 
+            reg_name_map,
+
             mmu: self.mmu,
             eflags: 0,
             eip: entry_point,
+
+            interrupt_model: Box::new(model),
         }
     }
 

@@ -1,15 +1,17 @@
 use elf::endian::AnyEndian;
 use elf::ElfBytes;
+
 use machineinstr::aarch64::AArch64InstrParserRule;
+
 use vm::codegen::interpret::InterpretCodegen;
 use vm::compiler::aarch64::AArch64Compiler;
+use vm::engine::Engine;
+use vm::image::*;
+use vm::interrupt::AArch64UnixInterruptModel;
 use vm::register::{FprRegister, GprRegister, RegId};
 use vm::vm_builder::VmBuilder;
 
 use std::path::PathBuf;
-
-use vm::engine::Engine;
-use vm::image::*;
 
 fn main() {
     // Get first argument
@@ -51,10 +53,10 @@ fn main() {
         vm_state.add_gpr_register(GprRegister::new(format!("x{idx}"), 8))
     });
     let fpr_registers: [RegId; 31] = std::array::from_fn(|idx| {
-        vm_state.add_fpr_register(FprRegister::new(format!("x{idx}"), 8))
+        vm_state.add_fpr_register(FprRegister::new(format!("d{idx}"), 8))
     });
 
-    let mut vm_state = vm_state.build(image.entrypoint());
+    let mut vm_state = vm_state.build(image.entrypoint(), AArch64UnixInterruptModel);
     let compiler = AArch64Compiler::new(gpr_registers, fpr_registers);
     let parse_rule = AArch64InstrParserRule;
     let codegen = InterpretCodegen;

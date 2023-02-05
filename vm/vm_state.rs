@@ -1,20 +1,29 @@
-
+use crate::interrupt::InterruptModel;
 use crate::mmu::{MemoryFrame, Mmu};
 use crate::register::*;
+
+use std::collections::HashMap;
 
 use slab::Slab;
 
 pub struct VmState {
     pub(crate) gpr_registers: Slab<GprRegister>,
     pub(crate) fpr_registers: Slab<FprRegister>,
+    pub(crate) reg_name_map: HashMap<String, RegId>,
 
     pub(crate) eflags: u64,
     pub(crate) eip: u64,
 
     pub(crate) mmu: Mmu,
+
+    pub(crate) interrupt_model: Box<dyn InterruptModel>,
 }
 
 impl VmState {
+    pub fn reg_by_name(&self, name: impl AsRef<str>) -> Option<RegId> {
+        self.reg_name_map.get(name.as_ref()).copied()
+    }
+
     pub fn gpr(&self, id: RegId) -> &GprRegister {
         &self.gpr_registers[id.0 as usize]
     }
@@ -41,5 +50,9 @@ impl VmState {
 
     pub fn set_eip(&mut self, eip: u64) {
         self.eip = eip;
+    }
+
+    pub fn interrupt_model(&self) -> &dyn InterruptModel {
+        self.interrupt_model.as_ref()
     }
 }

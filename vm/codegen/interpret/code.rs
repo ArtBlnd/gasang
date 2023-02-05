@@ -26,9 +26,7 @@ impl Executable for CodeBlock {
                     vm_state.set_eip(result);
                     break;
                 }
-                BlockDestination::GprRegister(reg_id) => {
-                    vm_state.gpr_mut(*reg_id).set(result)
-                }
+                BlockDestination::GprRegister(reg_id) => vm_state.gpr_mut(*reg_id).set(result),
                 BlockDestination::FprRegister(reg_id) => {
                     vm_state.fpr_mut(*reg_id).set(f64::from_bits(result))
                 }
@@ -44,6 +42,12 @@ impl Executable for CodeBlock {
                     .expect("Failed to write memory");
                 }
                 BlockDestination::None => {}
+                BlockDestination::SystemCall => {
+                    vm_state.interrupt_model().syscall(result, vm_state)
+                }
+                BlockDestination::Exit => {
+                    std::process::exit(result as i32)
+                }
             }
 
             vm_state.eip += *size as u64;

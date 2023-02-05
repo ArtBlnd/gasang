@@ -17,12 +17,12 @@ impl AArch64Compiler {
             fpr_registers,
         }
     }
-    pub fn gpr(&self, index: usize) -> RegId {
-        self.gpr_registers[index]
+    pub fn gpr(&self, index: u8) -> RegId {
+        self.gpr_registers[index as usize]
     }
 
-    pub fn fpr(&self, index: usize) -> RegId {
-        self.fpr_registers[index]
+    pub fn fpr(&self, index: u8) -> RegId {
+        self.fpr_registers[index as usize]
     }
 }
 
@@ -35,7 +35,7 @@ impl Compiler for AArch64Compiler {
                 let pos = operand.hw << 4;
 
                 let ir = Ir::Value(Operand::Immediate((operand.imm16 as u64) << pos, Type::U64));
-                let ds = BlockDestination::GprRegister(self.gpr(operand.rd as usize));
+                let ds = BlockDestination::GprRegister(self.gpr(operand.rd));
                 Ok(Block::new(ir, ds, 4))
             }
             AArch64Instr::Nop => {
@@ -46,8 +46,41 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Adr(operand) => {
                 let imm = sign_extend((operand.immhi as i64) << 2 | (operand.immlo as i64), 20);
 
-                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm as u64, Type::I64));
-                let ds = BlockDestination::GprRegister(self.gpr(operand.rd as usize));
+                let ir = Ir::Add(
+                    Type::U64,
+                    Operand::Eip,
+                    Operand::Immediate(imm as u64, Type::I64),
+                );
+                let ds = BlockDestination::GprRegister(self.gpr(operand.rd));
+                Ok(Block::new(ir, ds, 4))
+            }
+            AArch64Instr::OrrShiftedReg32(operand) | AArch64Instr::OrrShiftedReg64(operand) => {
+                let rm = self.gpr(operand.rm);
+                let rd = self.gpr(operand.rd);
+
+                if operand.imm6 == 0 && operand.shift == 0 && operand.rn == 0b11111 {
+                    let ir = Ir::Value(Operand::Register(rm, Type::U64));
+                    let ds = BlockDestination::GprRegister(rd);
+
+                    Ok(Block::new(ir, ds, 4))
+                } else {
+                    let rn = self.gpr(operand.rn);
+
+                    todo!()
+                }
+            }
+
+            AArch64Instr::Svc(operand) => {
+                let ir = Ir::Value(Operand::Immediate(operand.imm16 as u64, Type::U16));
+                let ds = BlockDestination::SystemCall;
+
+                Ok(Block::new(ir, ds, 4))
+            }
+
+            AArch64Instr::Brk(operand) => {
+                let ir = Ir::Value(Operand::Immediate(operand.imm16 as u64, Type::U16));
+                let ds = BlockDestination::Exit;
+
                 Ok(Block::new(ir, ds, 4))
             }
             _ => unimplemented!("unimplemented instruction: {:?}", item),

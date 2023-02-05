@@ -1,5 +1,3 @@
-
-
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
