@@ -10,4 +10,5 @@ pub enum Type {
     I64,
     F32,
     F64,
+    Void,
 }

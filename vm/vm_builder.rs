@@ -14,11 +14,27 @@ pub struct VmBuilder {
 
 impl VmBuilder {
     pub fn new(image: &Image) -> Self {
+        let mmu = Mmu::new();
+
+        for section in image.sections() {
+            let addr = image.section_addr(section);
+            let data = image.section_data(section);
+            let size = data.len();
+
+            mmu.mmap(addr, size as u64, true, true, false);
+            unsafe {
+                mmu.frame(addr).write(data).expect("Failed VM Initialize");
+            }
+
+            let (writable, executable) = image.section_access_info(section);
+            mmu.mmap(addr, size as u64, true, writable, executable)
+        }
+
         Self {
             gpr_registers: Slab::new(),
             fpr_registers: Slab::new(),
 
-            mmu: Mmu::new(),
+            mmu,
         }
     }
 

@@ -55,6 +55,13 @@ pub struct RmCondRnRd {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HwImm16Rd {
+    pub hw: u8,
+    pub imm16: u16,
+    pub rd: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Imm16Rd {
     pub imm16: u16,
     pub rd: u8,

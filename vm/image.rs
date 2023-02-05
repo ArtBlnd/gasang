@@ -6,6 +6,9 @@ struct Section {
 
     beg: usize,
     end: usize,
+
+    writable: bool,
+    executable: bool,
 }
 
 pub struct Image {
@@ -39,12 +42,20 @@ impl Image {
         &mut self,
         sec_name: impl AsRef<str>,
         sec_addr: u64,
+        writable: bool,
+        executable: bool,
         beg: usize,
         end: usize,
     ) -> &mut Self {
         self.sections.insert(
             sec_name.as_ref().to_string(),
-            Section { sec_addr, beg, end },
+            Section {
+                sec_addr,
+                writable,
+                executable,
+                beg,
+                end,
+            },
         );
 
         self
@@ -61,5 +72,11 @@ impl Image {
     pub fn section_data(&self, name: impl AsRef<str>) -> &[u8] {
         let sec = self.sections.get(name.as_ref()).unwrap();
         &self.image[sec.beg..sec.end]
+    }
+
+    pub fn section_access_info(&self, name: impl AsRef<str>) -> (bool, bool) {
+        let sec = self.sections.get(name.as_ref()).unwrap();
+
+        (sec.writable, sec.executable)
     }
 }

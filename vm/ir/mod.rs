@@ -14,6 +14,10 @@ pub enum Ir {
 
     Load(Type, Operand),
 
+    And(Type, Operand, Operand),
+    Or(Type, Operand, Operand),
+    Xor(Type, Operand, Operand),
+
     LShl(Type, Operand, Operand),
     LShr(Type, Operand, Operand),
     AShr(Type, Operand, Operand),
@@ -22,6 +26,9 @@ pub enum Ir {
     ZextCast(Type, Operand),
     SextCast(Type, Operand),
     BitCast(Type, Operand),
+
+    Value(Operand),
+    Nop,
 }
 
 impl Ir {
@@ -42,6 +49,12 @@ impl Ir {
             Ir::ZextCast(t, _) => *t,
             Ir::SextCast(t, _) => *t,
             Ir::BitCast(t, _) => *t,
+
+            Ir::And(t, _, _) => *t,
+            Ir::Or(t, _, _) => *t,
+            Ir::Xor(t, _, _) => *t,
+            Ir::Value(op) => op.get_type(),
+            Ir::Nop => Type::Void,
         }
     }
 
@@ -50,7 +63,10 @@ impl Ir {
             Ir::Add(t, op1, op2)
             | Ir::Sub(t, op1, op2)
             | Ir::Mul(t, op1, op2)
-            | Ir::Div(t, op1, op2) => {
+            | Ir::Div(t, op1, op2)
+            | Ir::And(t, op1, op2)
+            | Ir::Or(t, op1, op2)
+            | Ir::Xor(t, op1, op2) => {
                 op1.validate()
                     && op2.validate()
                     && op1.get_type() == op2.get_type()
@@ -73,9 +89,11 @@ impl Ir {
                     && op1.get_type() == op2.get_type()
                     && op1.get_type() == *t
             }
-            Ir::ZextCast(_, _) => todo!(),
-            Ir::SextCast(_, _) => todo!(),
-            Ir::BitCast(_, _) => todo!(),
+            Ir::ZextCast(_, op) => op.validate(),
+            Ir::SextCast(_, op) => op.validate(),
+            Ir::BitCast(_, op) => op.validate(),
+            Ir::Value(op) => op.validate(),
+            Ir::Nop => true,
         }
     }
 }

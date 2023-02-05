@@ -5,8 +5,8 @@ pub use executable::*;
 mod prelude;
 pub use prelude::*;
 
-mod cranelift;
-mod interpret;
+pub mod cranelift;
+pub mod interpret;
 
 use crate::error::CodegenError;
 

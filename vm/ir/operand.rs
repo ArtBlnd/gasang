@@ -4,24 +4,24 @@ use crate::register::RegId;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operand {
     Ir(Box<Ir>),
-    Register(RegId),
-    Immediate(u64),
+    Register(RegId, Type),
+    Immediate(u64, Type),
 }
 
 impl Operand {
     pub fn get_type(&self) -> Type {
         match self {
             Operand::Ir(ir) => ir.get_type(),
-            Operand::Register(_) => Type::U64,
-            Operand::Immediate(_) => Type::U64,
+            Operand::Register(_, t) => *t,
+            Operand::Immediate(_, t) => *t,
         }
     }
 
     pub fn validate(&self) -> bool {
         match self {
             Operand::Ir(ir) => ir.validate(),
-            Operand::Register(_) => true,
-            Operand::Immediate(_) => true,
+            Operand::Register(_, _) => true,
+            Operand::Immediate(_, _) => true,
         }
     }
 }

@@ -8,7 +8,8 @@ pub enum BlockDestination {
     Eip,
     GprRegister(RegId),
     FprRegister(RegId),
-    Memory(MemoryFrame),
+    Memory(u64),
+    None,
 }
 
 #[derive(Clone, Debug)]
@@ -67,6 +68,7 @@ impl Block {
                 Type::U8 | Type::U16 | Type::U32 | Type::U64 => true && self.ir_root().validate(),
                 _ => false,
             },
+            BlockDestination::None => true,
         }
     }
 }

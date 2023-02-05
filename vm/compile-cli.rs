@@ -28,6 +28,6 @@ fn main() {
             image.set_entrypoint(sec.sh_addr);
         }
 
-        image.add_section(name, sec.sh_addr, beg as usize, end as usize);
+        // image.add_section(name, sec.sh_addr, beg as usize, end as usize);
     }
 }

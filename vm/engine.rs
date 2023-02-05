@@ -34,9 +34,9 @@ where
     R: MachineInstrParserRule<MachineInstr = C::Item>,
     G: Codegen,
 {
-    pub unsafe fn run(&mut self, ep: u64, vm_state: &mut VmState) -> Result<Infallible, Error> {
+    pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
         // get entrypoint memory frame and compile it.
-        let ep_frame = vm_state.mem(ep);
+        let ep_frame = vm_state.mem(vm_state.eip());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
 
         let mut code = self.codegen.compile(ep_block);

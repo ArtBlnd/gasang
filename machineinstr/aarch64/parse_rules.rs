@@ -857,7 +857,8 @@ fn parse_move_wide_imm(raw_instr: u32) -> AArch64Instr {
              hw: Extract<BitRange<21, 23>, u8>,
              imm16: Extract<BitRange<5, 21>, u16>,
              rd: Extract<BitRange<0, 5>, u8>| {
-                let data = Imm16Rd {
+                let data = HwImm16Rd {
+                    hw: hw.value,
                     imm16: imm16.value,
                     rd: rd.value,
                 };

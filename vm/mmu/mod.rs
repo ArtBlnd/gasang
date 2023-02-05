@@ -80,13 +80,28 @@ impl MmuData {
         let mut offset = 0u64;
 
         while size > offset {
-            let page = pt.get_or_mmap(addr + offset, || Page::Unmapped);
-            *page = Page::Memory {
+            let page = pt.get_or_mmap(addr + offset, || Page::Memory {
                 memory: HostMemory::new(PAGE_SIZE as usize),
                 readable,
                 writable,
                 executable,
-            };
+            });
+
+            let r = readable;
+            let w = writable;
+            let e = executable;
+
+            if let Page::Memory {
+                memory,
+                readable,
+                writable,
+                executable,
+            } = page
+            {
+                *readable = r;
+                *writable = w;
+                *executable = e;
+            }
 
             offset += PAGE_SIZE;
         }

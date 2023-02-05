@@ -19,7 +19,10 @@ pub enum MMUError {
 pub enum CompileError {}
 
 #[derive(Debug, Error, Clone)]
-pub enum CodegenError {}
+pub enum CodegenError {
+    #[error("Invalid type")]
+    InvalidType,
+}
 
 #[derive(Debug, Error, Clone)]
 pub enum Error {
