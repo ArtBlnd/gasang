@@ -6,8 +6,6 @@ use crate::register::RegId;
 use machineinstr::aarch64::AArch64Instr;
 use utility::extract_bits16;
 
-use smallvec::SmallVec;
-
 pub struct AArch64Compiler {
     gpr_registers: [RegId; 31],
     fpr_registers: [RegId; 31],
@@ -43,11 +41,6 @@ impl Compiler for AArch64Compiler {
 
                 let ir = Ir::Value(Operand::Immediate((operand.imm16 as u64) << pos, Type::U64));
                 let ds = BlockDestination::GprRegister(self.gpr(operand.rd));
-                block.append(ir, ds);
-            }
-            AArch64Instr::Nop => {
-                let ir = Ir::Nop;
-                let ds = BlockDestination::None;
                 block.append(ir, ds);
             }
             AArch64Instr::Adr(operand) => {
@@ -87,9 +80,9 @@ impl Compiler for AArch64Compiler {
                 let dst = self.gpr(operand.rt);
                 let src = if operand.rn == 31 {
                     // If rn is 31, we use stack register instead of gpr registers.
-                    Operand::Register(self.stack_reg, Type::U64)
+                    self.stack_reg
                 } else {
-                    Operand::Register(self.gpr(operand.rn), Type::U64)
+                    self.gpr(operand.rn)
                 };
 
                 let offset_temp =
@@ -98,13 +91,78 @@ impl Compiler for AArch64Compiler {
 
                 let ir = Ir::Load(
                     Type::U64,
-                    Operand::Ir(Box::new(Ir::Add(Type::U64, src, offset_temp))),
+                    Operand::Ir(Box::new(Ir::Add(
+                        Type::U64,
+                        Operand::Register(src, Type::U64),
+                        offset_temp.clone(),
+                    ))),
                 );
                 let ds = BlockDestination::GprRegister(dst);
 
                 block.append(ir, ds);
+
+                if wback {
+                    let offset = Operand::Ir(Box::new(Ir::SextCast(
+                        Type::I64,
+                        Operand::Immediate(offset as u64, Type::I16),
+                    )));
+
+                    let ir = Ir::Add(Type::U64, Operand::Register(src, Type::U64), offset);
+                    let ds = BlockDestination::GprRegister(src);
+
+                    block.append(ir, ds);
+                }
             }
 
+            // Arithmetic instructions
+            AArch64Instr::AddImm32(operand) | AArch64Instr::AddImm64(operand) => {
+                let rd = self.gpr(operand.rd);
+                let rn = if operand.rn == 31 {
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+
+                let imm = match operand.sh {
+                    0b00 => operand.imm12 as u64,
+                    0b01 => (operand.imm12 as u64) << 12,
+                    _ => unreachable!(),
+                };
+
+                let ir = Ir::Add(
+                    Type::U64,
+                    Operand::Register(rn, Type::U64),
+                    Operand::Immediate(imm, Type::U64),
+                );
+                let ds = BlockDestination::GprRegister(rd);
+
+                block.append(ir, ds);
+            }
+
+            // Branch instructions
+            AArch64Instr::BlImm(operand)  => {
+                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(4, Type::U64));
+                let ds = BlockDestination::GprRegister(self.gpr(30));
+
+                block.append(ir, ds);
+
+                let imm = sign_extend(operand.imm26 as i64, 28);
+
+                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm as u64, Type::I64));
+                let ds = BlockDestination::Eip;
+
+                block.append(ir, ds);
+            }
+            AArch64Instr::BImm(operand) => {
+                let imm = sign_extend(operand.imm26 as i64, 28);
+
+                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm as u64, Type::I64));
+                let ds = BlockDestination::Eip;
+
+                block.append(ir, ds);
+            }
+
+            // Interrupt Instructions
             AArch64Instr::Svc(operand) => {
                 let ir = Ir::Value(Operand::Immediate(operand.imm16 as u64, Type::U16));
                 let ds = BlockDestination::SystemCall;
@@ -116,6 +174,13 @@ impl Compiler for AArch64Compiler {
                 let ir = Ir::Value(Operand::Immediate(operand.imm16 as u64, Type::U16));
                 let ds = BlockDestination::Exit;
 
+                block.append(ir, ds);
+            }
+
+            // Speical instructions
+            AArch64Instr::Nop => {
+                let ir = Ir::Nop;
+                let ds = BlockDestination::None;
                 block.append(ir, ds);
             }
             _ => unimplemented!("unimplemented instruction: {:?}", item),

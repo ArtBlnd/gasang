@@ -46,6 +46,8 @@ where
                 code_block.execute(vm_state);
             }
 
+            vm_state.dump();
+
             let next_frame = vm_state.mem(vm_state.eip());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
 

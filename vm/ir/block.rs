@@ -1,7 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::ir::{Ir, Type};
-
+use crate::ir::Ir;
 use crate::register::RegId;
 
 #[derive(Clone, Debug)]
@@ -11,6 +10,7 @@ pub enum BlockDestination {
     GprRegister(RegId),
     FprRegister(RegId),
     Memory(u64),
+    MemoryRel(RegId, i64),
     None,
     SystemCall,
     Exit,

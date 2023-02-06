@@ -44,6 +44,9 @@ impl Executable for CodeBlock {
                         }
                         .expect("Failed to write memory");
                     }
+                    BlockDestination::MemoryRel(reg_id, offs) => {
+                        todo!()
+                    }
                     BlockDestination::None => {}
                     BlockDestination::SystemCall => {
                         vm_state.interrupt_model().syscall(result, vm_state)

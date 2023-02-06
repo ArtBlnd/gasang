@@ -24,18 +24,22 @@ impl VmState {
         self.reg_name_map.get(name.as_ref()).copied()
     }
 
+    #[inline]
     pub fn gpr(&self, id: RegId) -> &GprRegister {
         &self.gpr_registers[id.0 as usize]
     }
 
+    #[inline]
     pub fn gpr_mut(&mut self, id: RegId) -> &mut GprRegister {
         &mut self.gpr_registers[id.0 as usize]
     }
 
+    #[inline]
     pub fn fpr(&self, id: RegId) -> &FprRegister {
         &self.fpr_registers[id.0 as usize]
     }
 
+    #[inline]
     pub fn fpr_mut(&mut self, id: RegId) -> &mut FprRegister {
         &mut self.fpr_registers[id.0 as usize]
     }
@@ -54,5 +58,18 @@ impl VmState {
 
     pub fn interrupt_model(&self) -> &dyn InterruptModel {
         self.interrupt_model.as_ref()
+    }
+
+    pub fn dump(&self) {
+        println!("EIP: 0x{:x}", self.eip);
+        println!("EFLAGS: 0x{:x}", self.eflags);
+        
+        for reg in &self.gpr_registers {
+            println!("{}: 0x{:x}", reg.1.name(), reg.1.get());
+        }
+
+        for reg in &self.fpr_registers {
+            println!("{}: 0x{:x}", reg.1.name(), reg.1.get().to_bits());
+        }
     }
 }
