@@ -61,51 +61,49 @@ unsafe fn compile_ir(
     ir: &Ir,
     flag_policy: Arc<dyn FlagPolicy>,
 ) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    // Optimiations
     match ir {
-        // Optimization lowerings
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(imm, Type::I64)) => {
             let imm = *imm;
-            Ok(Box::new(move |ctx| (ctx.ip() as i64 + imm as i64) as u64))
+            return Ok(Box::new(move |ctx| (ctx.ip() as i64 + imm as i64) as u64));
         }
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(imm, Type::U64)) => {
             let imm = *imm;
-            Ok(Box::new(move |ctx| ctx.ip() + imm))
+            return Ok(Box::new(move |ctx| ctx.ip() + imm));
         }
-        Ir::Value(Operand::Ir(ir)) => compile_ir(ir, flag_policy),
+        Ir::Value(Operand::Ir(ir)) => return compile_ir(ir, flag_policy.clone()),
         Ir::Value(Operand::Immediate(imm, t)) => {
             let imm = *imm;
             let t = *t;
-            Ok(Box::new(move |_ctx| imm & type_mask(t)))
+
+            return Ok(Box::new(move |_ctx| imm & type_mask(t)));
         }
         Ir::Value(Operand::Register(reg_id, t)) => {
             let reg = *reg_id;
             let t = *t;
-            Ok(Box::new(move |ctx| ctx.gpr(reg).get() & type_mask(t)))
-        }
 
+            return Ok(Box::new(move |ctx| ctx.gpr(reg).get() & type_mask(t)));
+        }
         Ir::LShr(t, op1, Operand::Immediate(value, t1)) => {
             assert!(t == t1, "Type mismatch");
             let op1 = compile_op(op1, flag_policy.clone())?;
             let value = *value;
             let t = *t;
 
-            Ok(Box::new(move |ctx| (op1(ctx) >> value) & type_mask(t)))
+            return Ok(Box::new(move |ctx| (op1(ctx) >> value) & type_mask(t)));
         }
-
         Ir::And(Type::U64, Operand::Flag, Operand::Immediate(imm, Type::U64)) => {
             let imm = *imm;
-            Ok(Box::new(move |ctx| ctx.flag() & imm))
+            return Ok(Box::new(move |ctx| ctx.flag() & imm));
         }
-
         Ir::And(t, Operand::Immediate(imm1, t1), Operand::Immediate(imm2, t2)) => {
             assert!(t1 == t2 && t1 == t, "Type mismatch");
             let imm1 = *imm1;
             let imm2 = *imm2;
             let t = *t;
 
-            Ok(Box::new(move |_ctx| (imm1 & imm2) & type_mask(t)))
+            return Ok(Box::new(move |_ctx| (imm1 & imm2) & type_mask(t)));
         }
-
         Ir::If(t, Operand::Immediate(imm, t1), op1, op2) => {
             assert!(*t1 == Type::Bool, "Type mismatch");
             assert!(op1.get_type() == op2.get_type(), "Type mismatch");
@@ -114,11 +112,15 @@ unsafe fn compile_ir(
             let op1 = compile_op(op1, flag_policy.clone())?;
             let op2 = compile_op(op2, flag_policy.clone())?;
 
-            Ok(Box::new(move |ctx| {
+            return Ok(Box::new(move |ctx| {
                 type_mask(t) & if imm != 0 { op1(ctx) } else { op2(ctx) }
-            }))
+            }));
         }
 
+        _ => {}
+    };
+
+    match ir {
         Ir::Add(t, op1, op2) => gen_add(t, op1, op2, flag_policy),
         Ir::Sub(t, op1, op2) => gen_sub(t, op1, op2, flag_policy),
         Ir::Mul(t, op1, op2) => gen_mul(t, op1, op2, flag_policy),
