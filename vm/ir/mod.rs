@@ -31,9 +31,11 @@ pub enum Ir {
     SextCast(Type, Operand),
     BitCast(Type, Operand),
 
-    //If(Type, Operand, Operand, Operand), // If(ret_type, condition, if_true, if_false)
-    //Eq
-    //
+    If(Type, Operand, Operand, Operand), // If(ret_type, condition, if_true, if_false)
+    CmpEq(Operand, Operand),             // Equal
+    CmpNe(Operand, Operand),             // Not equal
+    CmpGt(Operand, Operand),             // Greater than
+    CmpLt(Operand, Operand),             // Less than
     Value(Operand),
     Nop,
 }
@@ -46,27 +48,30 @@ impl Ir {
             Ir::Mul(t, _, _) => *t,
             Ir::Div(t, _, _) => *t,
 
-            Ir::Load(t, _) => *t,
+            Ir::Addc(t, _, _) => *t,
+            Ir::Subc(t, _, _) => *t,
+
+            Ir::And(t, _, _) => *t,
+            Ir::Or(t, _, _) => *t,
+            Ir::Xor(t, _, _) => *t,
+            Ir::Not(t, _) => *t,
 
             Ir::LShl(t, _, _) => *t,
             Ir::LShr(t, _, _) => *t,
             Ir::AShr(t, _, _) => *t,
             Ir::Rotr(t, _, _) => *t,
 
+            Ir::Load(t, _) => *t,
+
             Ir::ZextCast(t, _) => *t,
             Ir::SextCast(t, _) => *t,
             Ir::BitCast(t, _) => *t,
 
-            Ir::And(t, _, _) => *t,
-            Ir::Or(t, _, _) => *t,
-            Ir::Xor(t, _, _) => *t,
             Ir::Value(op) => op.get_type(),
             Ir::Nop => Type::Void,
 
-            Ir::Addc(t, _, _) => *t,
-            Ir::Subc(t, _, _) => *t,
-
-            Ir::Not(t, _) => *t,
+            Ir::If(t, _, _, _) => *t,
+            Ir::CmpEq(_, _) | Ir::CmpNe(_, _) | Ir::CmpGt(_, _) | Ir::CmpLt(_, _) => Type::Bool,
         }
     }
 }

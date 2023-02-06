@@ -83,6 +83,42 @@ unsafe fn compile_ir(
             Ok(Box::new(move |ctx| ctx.gpr(reg).get() & type_mask(t)))
         }
 
+        Ir::LShr(t, op1, Operand::Immediate(value, t1)) => {
+            assert!(t == t1, "Type mismatch");
+            let op1 = compile_op(op1, flag_policy.clone())?;
+            let value = *value;
+            let t = *t;
+
+            Ok(Box::new(move |ctx| (op1(ctx) >> value) & type_mask(t)))
+        }
+
+        Ir::And(Type::U64, Operand::Flag, Operand::Immediate(imm, Type::U64)) => {
+            let imm = *imm;
+            Ok(Box::new(move |ctx| ctx.flag() & imm))
+        }
+
+        Ir::And(t, Operand::Immediate(imm1, t1), Operand::Immediate(imm2, t2)) => {
+            assert!(t1 == t2 && t1 == t, "Type mismatch");
+            let imm1 = *imm1;
+            let imm2 = *imm2;
+            let t = *t;
+
+            Ok(Box::new(move |_ctx| (imm1 & imm2) & type_mask(t)))
+        }
+
+        Ir::If(t, Operand::Immediate(imm, t1), op1, op2) => {
+            assert!(*t1 == Type::Bool, "Type mismatch");
+            assert!(op1.get_type() == op2.get_type(), "Type mismatch");
+            let imm = *imm;
+            let t = *t;
+            let op1 = compile_op(op1, flag_policy.clone())?;
+            let op2 = compile_op(op2, flag_policy.clone())?;
+
+            Ok(Box::new(move |ctx| {
+                type_mask(t) & if imm != 0 { op1(ctx) } else { op2(ctx) }
+            }))
+        }
+
         Ir::Add(t, op1, op2) => gen_add(t, op1, op2, flag_policy),
         Ir::Sub(t, op1, op2) => gen_sub(t, op1, op2, flag_policy),
         Ir::Mul(t, op1, op2) => gen_mul(t, op1, op2, flag_policy),
@@ -108,6 +144,12 @@ unsafe fn compile_ir(
 
         Ir::Value(op) => compile_op(op, flag_policy.clone()),
         Ir::Nop => Ok(Box::new(|_| 0)),
+
+        Ir::If(t, cond, if_true, if_false) => gen_if(t, cond, if_true, if_false, flag_policy),
+        Ir::CmpEq(op1, op2) => gen_cmp_eq(op1, op2, flag_policy),
+        Ir::CmpNe(op1, op2) => gen_cmp_ne(op1, op2, flag_policy),
+        Ir::CmpGt(op1, op2) => gen_cmp_gt(op1, op2, flag_policy),
+        Ir::CmpLt(op1, op2) => gen_cmp_lt(op1, op2, flag_policy),
     }
 }
 
@@ -127,6 +169,7 @@ unsafe fn compile_op(
             let t = *t;
             Box::new(move |_| imm & type_mask(t))
         }
+        Operand::VoidIr(ir) => compile_ir(ir, flag_policy.clone())?,
         Operand::Ip => Box::new(move |ctx| ctx.ip()),
         Operand::Flag => Box::new(move |ctx| ctx.flag()),
     })
@@ -139,7 +182,7 @@ const fn type_mask(t: Type) -> u64 {
         Type::U16 | Type::I16 => u16::max_value() as u64,
         Type::U32 | Type::I32 | Type::F32 => u32::max_value() as u64,
         Type::U64 | Type::I64 | Type::F64 => u64::max_value(),
-        Type::Void => panic!("Void type has no mask"),
+        Type::Void => 0b0,
     }
 }
 
@@ -690,11 +733,8 @@ unsafe fn gen_and(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => {
-            Box::new(move |ctx| (lhs.execute(ctx) & rhs.execute(ctx)) & type_mask(t))
-        }
-        Type::F32 | Type::F64 => unimplemented!("invalid type for and! {:?}", t),
-        Type::Void => return Err(CodegenError::InvalidType),
+        | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) & rhs.execute(ctx)) & type_mask(t)),
+        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
     })
 }
 
@@ -716,11 +756,8 @@ unsafe fn gen_or(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => {
-            Box::new(move |ctx| (lhs.execute(ctx) | rhs.execute(ctx)) & type_mask(t))
-        }
-        Type::F32 | Type::F64 => unimplemented!("invalid type for and! {:?}", t),
-        Type::Void => return Err(CodegenError::InvalidType),
+        | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) | rhs.execute(ctx)) & type_mask(t)),
+        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
     })
 }
 
@@ -744,11 +781,8 @@ unsafe fn gen_xor(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => {
-            Box::new(move |ctx| (lhs.execute(ctx) ^ rhs.execute(ctx)) & type_mask(t))
-        }
-        Type::F32 | Type::F64 => unimplemented!("invalid type for and! {:?}", t),
-        Type::Void => return Err(CodegenError::InvalidType),
+        | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) ^ rhs.execute(ctx)) & type_mask(t)),
+        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
     })
 }
 
@@ -771,7 +805,157 @@ unsafe fn gen_not(
         | Type::I16
         | Type::I32
         | Type::I64 => Box::new(move |ctx| (!op.execute(ctx) & type_mask(t)) as u64),
-        Type::F32 | Type::F64 => unimplemented!("invalid type for and! {:?}", t),
+        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
+    })
+}
+
+unsafe fn gen_if(
+    t: &Type,
+    cond: &Operand,
+    if_true: &Operand,
+    if_false: &Operand,
+    flag_policy: Arc<dyn FlagPolicy>,
+) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    assert_eq!(cond.get_type(), Type::Bool);
+
+    let cond = compile_op(cond, flag_policy.clone())?;
+    let if_true = compile_op(if_true, flag_policy.clone())?;
+    let if_false = compile_op(if_false, flag_policy.clone())?;
+
+    let t = *t;
+    Ok(match t {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64 => Box::new(move |ctx| {
+            type_mask(t)
+                & if cond.execute(ctx) != 0 {
+                    if_true.execute(ctx)
+                } else {
+                    if_false.execute(ctx)
+                }
+        }),
+        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
+    })
+}
+
+unsafe fn gen_cmp_eq(
+    op1: &Operand,
+    op2: &Operand,
+    flag_policy: Arc<dyn FlagPolicy>,
+) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let lhs = compile_op(op1, flag_policy.clone())?;
+    let rhs = compile_op(op2, flag_policy.clone())?;
+
+    let t = op1.get_type();
+    assert_eq!(op1.get_type(), op2.get_type());
+
+    Ok(match t {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::F32
+        | Type::F64 => Box::new(move |ctx| {
+            (lhs.execute(ctx) & type_mask(t) == rhs.execute(ctx) & type_mask(t)) as u64
+        }),
+        Type::Void => return Err(CodegenError::InvalidType),
+    })
+}
+
+unsafe fn gen_cmp_ne(
+    op1: &Operand,
+    op2: &Operand,
+    flag_policy: Arc<dyn FlagPolicy>,
+) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let lhs = compile_op(op1, flag_policy.clone())?;
+    let rhs = compile_op(op2, flag_policy.clone())?;
+
+    let t = op1.get_type();
+    assert_eq!(op1.get_type(), op2.get_type());
+
+    Ok(match t {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::F32
+        | Type::F64 => Box::new(move |ctx| {
+            (lhs.execute(ctx) & type_mask(t) != rhs.execute(ctx) & type_mask(t)) as u64
+        }),
+        Type::Void => return Err(CodegenError::InvalidType),
+    })
+}
+
+unsafe fn gen_cmp_gt(
+    op1: &Operand,
+    op2: &Operand,
+    flag_policy: Arc<dyn FlagPolicy>,
+) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let lhs = compile_op(op1, flag_policy.clone())?;
+    let rhs = compile_op(op2, flag_policy.clone())?;
+
+    let t = op1.get_type();
+    assert_eq!(op1.get_type(), op2.get_type());
+
+    Ok(match t {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::F32
+        | Type::F64 => Box::new(move |ctx| {
+            (lhs.execute(ctx) & type_mask(t) > rhs.execute(ctx) & type_mask(t)) as u64
+        }),
+        Type::Void => return Err(CodegenError::InvalidType),
+    })
+}
+
+unsafe fn gen_cmp_lt(
+    op1: &Operand,
+    op2: &Operand,
+    flag_policy: Arc<dyn FlagPolicy>,
+) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let lhs = compile_op(op1, flag_policy.clone())?;
+    let rhs = compile_op(op2, flag_policy.clone())?;
+
+    let t = op1.get_type();
+    assert_eq!(op1.get_type(), op2.get_type());
+
+    Ok(match t {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::F32
+        | Type::F64 => Box::new(move |ctx| {
+            (lhs.execute(ctx) & type_mask(t) < rhs.execute(ctx) & type_mask(t)) as u64
+        }),
         Type::Void => return Err(CodegenError::InvalidType),
     })
 }

@@ -60,7 +60,7 @@ impl Compiler for AArch64Compiler {
 
                     block.append(ir, ds);
                 } else {
-                    let rn = self.gpr(operand.rn);
+                    // let rn = self.gpr(operand.rn);
 
                     todo!()
                 }
@@ -211,8 +211,26 @@ impl Compiler for AArch64Compiler {
                 block.append(ir, ds);
             }
 
-            // Compare Instructions
-            AArch64Instr::CcmpImmVar32(operand) | AArch64Instr::CcmpImmVar64(operand) => {}
+            //Compare Instructions
+            AArch64Instr::CcmpImmVar32(operand) => {
+                let rn = self.gpr(operand.rn);
+                
+                let subc = Operand::VoidIr(Box::new(Ir::Subc(
+                    Type::U32,
+                    Operand::Register(rn, Type::U32),
+                    Operand::Immediate(operand.imm5 as u64, Type::U32)
+                )));
+
+                let ir = Ir::If(
+                    Type::Void,
+                    condition_holds(operand.cond),
+                    subc,
+                    Operand::Ir(Box::new(Ir::Nop)),
+                );
+                let ds = BlockDestination::None;
+
+                block.append(ir, ds);
+            }
 
             // Interrupt Instructions
             AArch64Instr::Svc(operand) => {
@@ -287,18 +305,97 @@ const fn gen_ip_relative(offset: i64) -> Ir {
     }
 }
 
-const fn condition_holds(cond: u8) -> Ir {
+fn condition_holds(cond: u8) -> Operand {
     let masked_cond = (cond & 0b1110) >> 1;
+    let cond0 = cond & 1;
 
-    match masked_cond {
-        0b000 => todo!(),
-        0b001 => todo!(),
-        0b010 => todo!(),
-        0b011 => todo!(),
-        0b100 => todo!(),
-        0b101 => todo!(),
-        0b110 => todo!(),
-        0b111 => todo!(),
+    let result = match masked_cond {
+        0b000 => cmp_flag_imm(zero_flag(), 1),
+        0b001 => cmp_flag_imm(carry_flag(), 1),
+        0b010 => cmp_flag_imm(negative_flag(), 1),
+        0b011 => cmp_flag_imm(overflow_flag(), 1),
+        0b100 => Operand::Ir(Box::new(Ir::And(
+            Type::Bool,
+            cmp_flag_imm(carry_flag(), 1),
+            cmp_flag_imm(zero_flag(), 0),
+        ))),
+        0b101 => Operand::Ir(Box::new(Ir::CmpEq(negative_flag(), overflow_flag()))),
+        0b110 => Operand::Ir(Box::new(Ir::And(
+            Type::Bool,
+            Operand::Ir(Box::new(Ir::CmpEq(negative_flag(), overflow_flag()))),
+            cmp_flag_imm(zero_flag(), 0),
+        ))),
+        0b111 => Operand::Immediate(0b1u64, Type::Bool),
         _ => unreachable!(),
     };
+
+    Operand::Ir(Box::new(Ir::If(
+        Type::Bool,
+        Operand::Immediate((cond0 == 1 && cond != 0b1111) as u64, Type::Bool),
+        result.clone(),
+        Operand::Ir(Box::new(Ir::Not(Type::Bool, result))),
+    )))
+}
+
+fn cmp_flag_imm(flag: Operand, immediate: u64) -> Operand {
+    Operand::Ir(Box::new(Ir::CmpEq(
+        flag,
+        Operand::Immediate(immediate, Type::U64),
+    )))
+}
+
+fn negative_flag() -> Operand {
+    let nf = Operand::Ir(Box::new(Ir::And(
+        Type::U64,
+        Operand::Flag,
+        Operand::Immediate(0x80000000_00000000, Type::U64),
+    )));
+
+    Operand::Ir(Box::new(Ir::LShr(
+        Type::U64,
+        nf,
+        Operand::Immediate(63, Type::U64),
+    )))
+}
+
+fn zero_flag() -> Operand {
+    let zf = Operand::Ir(Box::new(Ir::And(
+        Type::U64,
+        Operand::Flag,
+        Operand::Immediate(0x40000000_00000000, Type::U64),
+    )));
+
+    Operand::Ir(Box::new(Ir::LShr(
+        Type::U64,
+        zf,
+        Operand::Immediate(62, Type::U64),
+    )))
+}
+
+fn carry_flag() -> Operand {
+    let cf = Operand::Ir(Box::new(Ir::And(
+        Type::U64,
+        Operand::Flag,
+        Operand::Immediate(0x20000000_00000000, Type::U64),
+    )));
+
+    Operand::Ir(Box::new(Ir::LShr(
+        Type::U64,
+        cf,
+        Operand::Immediate(61, Type::U64),
+    )))
+}
+
+fn overflow_flag() -> Operand {
+    let of = Operand::Ir(Box::new(Ir::And(
+        Type::U64,
+        Operand::Flag,
+        Operand::Immediate(0x10000000_00000000, Type::U64),
+    )));
+
+    Operand::Ir(Box::new(Ir::LShr(
+        Type::U64,
+        of,
+        Operand::Immediate(60, Type::U64),
+    )))
 }
