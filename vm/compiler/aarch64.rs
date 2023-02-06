@@ -46,11 +46,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Adr(operand) => {
                 let imm = sign_extend((operand.immhi as i64) << 2 | (operand.immlo as i64), 20);
 
-                let ir = Ir::Add(
-                    Type::U64,
-                    Operand::Eip,
-                    Operand::Immediate(imm as u64, Type::I64),
-                );
+                let ir = gen_ip_relative(imm);
                 let ds = BlockDestination::GprRegister(self.gpr(operand.rd));
                 block.append(ir, ds);
             }
@@ -139,16 +135,69 @@ impl Compiler for AArch64Compiler {
                 block.append(ir, ds);
             }
 
+            AArch64Instr::SubImm32(operand) | AArch64Instr::SubImm64(operand) => {
+                let rd = self.gpr(operand.rd);
+                let rn = if operand.rn == 31 {
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+
+                let imm = match operand.sh {
+                    0b00 => operand.imm12 as u64,
+                    0b01 => (operand.imm12 as u64) << 12,
+                    _ => unreachable!(),
+                };
+
+                let ir = Ir::Sub(
+                    Type::U64,
+                    Operand::Register(rn, Type::U64),
+                    Operand::Immediate(imm, Type::U64),
+                );
+                let ds = BlockDestination::GprRegister(rd);
+
+                block.append(ir, ds);
+            }
+
+            AArch64Instr::SubsImm32(operand) | AArch64Instr::SubsImm64(operand) => {
+                let imm = match operand.sh {
+                    0b00 => operand.imm12 as u64,
+                    0b01 => (operand.imm12 as u64) << 12,
+                    _ => unreachable!(),
+                };
+
+                let rn = if operand.rn == 0b11111 {
+                    self.stack_reg
+                } else {
+                    self.gpr(operand.rn)
+                };
+
+                // If rd is 31, its alias is CMP(immediate).
+                let ds = if operand.rd == 0b11111 {
+                    BlockDestination::None
+                } else {
+                    BlockDestination::GprRegister(self.gpr(operand.rd))
+                };
+
+                let ir = Ir::Subc(
+                    Type::U64,
+                    Operand::Register(rn, Type::U64),
+                    Operand::Immediate(imm, Type::U64),
+                );
+
+                block.append(ir, ds);
+            }
+
             // Branch instructions
-            AArch64Instr::BlImm(operand)  => {
-                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(4, Type::U64));
+            AArch64Instr::BlImm(operand) => {
+                let ir = Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(4, Type::U64));
                 let ds = BlockDestination::GprRegister(self.gpr(30));
 
                 block.append(ir, ds);
 
                 let imm = sign_extend(operand.imm26 as i64, 28);
 
-                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm as u64, Type::I64));
+                let ir = gen_ip_relative(imm);
                 let ds = BlockDestination::Eip;
 
                 block.append(ir, ds);
@@ -156,11 +205,14 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::BImm(operand) => {
                 let imm = sign_extend(operand.imm26 as i64, 28);
 
-                let ir = Ir::Add(Type::U64, Operand::Eip, Operand::Immediate(imm as u64, Type::I64));
+                let ir = gen_ip_relative(imm);
                 let ds = BlockDestination::Eip;
 
                 block.append(ir, ds);
             }
+
+            // Compare Instructions
+            AArch64Instr::CcmpImmVar32(operand) | AArch64Instr::CcmpImmVar64(operand) => {}
 
             // Interrupt Instructions
             AArch64Instr::Svc(operand) => {
@@ -217,4 +269,36 @@ const fn decode_operand_for_ld_st_imm(
             (operand.imm12 << operand.size) as i16,
         )
     }
+}
+
+const fn gen_ip_relative(offset: i64) -> Ir {
+    if offset > 0 {
+        Ir::Add(
+            Type::U64,
+            Operand::Ip,
+            Operand::Immediate(offset as u64, Type::U64),
+        )
+    } else {
+        Ir::Sub(
+            Type::U64,
+            Operand::Ip,
+            Operand::Immediate((-offset) as u64, Type::U64),
+        )
+    }
+}
+
+const fn condition_holds(cond: u8) -> Ir {
+    let masked_cond = (cond & 0b1110) >> 1;
+
+    match masked_cond {
+        0b000 => todo!(),
+        0b001 => todo!(),
+        0b010 => todo!(),
+        0b011 => todo!(),
+        0b100 => todo!(),
+        0b101 => todo!(),
+        0b110 => todo!(),
+        0b111 => todo!(),
+        _ => unreachable!(),
+    };
 }

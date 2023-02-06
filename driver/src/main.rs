@@ -3,6 +3,7 @@ use elf::ElfBytes;
 
 use machineinstr::aarch64::AArch64InstrParserRule;
 
+use vm::codegen::flag_policy::AArch64FlagPolicy;
 use vm::codegen::interpret::InterpretCodegen;
 use vm::compiler::aarch64::AArch64Compiler;
 use vm::engine::Engine;
@@ -66,7 +67,7 @@ fn main() {
     let mut vm_state = vm_state.build(image.entrypoint(), AArch64UnixInterruptModel);
     let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, stack_reg);
     let parse_rule = AArch64InstrParserRule;
-    let codegen = InterpretCodegen;
+    let codegen = InterpretCodegen::new(AArch64FlagPolicy);
 
     let mut engine = Engine::new(compiler, parse_rule, codegen);
 

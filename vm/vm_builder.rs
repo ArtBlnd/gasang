@@ -66,8 +66,8 @@ impl VmBuilder {
             reg_name_map,
 
             mmu: self.mmu,
-            eflags: 0,
-            eip: entry_point,
+            flags: 0,
+            ip: entry_point,
 
             interrupt_model: Box::new(model),
         }

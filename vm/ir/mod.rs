@@ -12,21 +12,28 @@ pub enum Ir {
     Mul(Type, Operand, Operand),
     Div(Type, Operand, Operand),
 
-    Load(Type, Operand),
+    Addc(Type, Operand, Operand),
+    Subc(Type, Operand, Operand),
 
     And(Type, Operand, Operand),
     Or(Type, Operand, Operand),
     Xor(Type, Operand, Operand),
+    Not(Type, Operand),
 
     LShl(Type, Operand, Operand),
     LShr(Type, Operand, Operand),
     AShr(Type, Operand, Operand),
     Rotr(Type, Operand, Operand),
 
+    Load(Type, Operand),
+
     ZextCast(Type, Operand),
     SextCast(Type, Operand),
     BitCast(Type, Operand),
 
+    //If(Type, Operand, Operand, Operand), // If(ret_type, condition, if_true, if_false)
+    //Eq
+    //
     Value(Operand),
     Nop,
 }
@@ -55,45 +62,11 @@ impl Ir {
             Ir::Xor(t, _, _) => *t,
             Ir::Value(op) => op.get_type(),
             Ir::Nop => Type::Void,
-        }
-    }
 
-    pub fn validate(&self) -> bool {
-        match self {
-            Ir::Add(t, op1, op2)
-            | Ir::Sub(t, op1, op2)
-            | Ir::Mul(t, op1, op2)
-            | Ir::Div(t, op1, op2)
-            | Ir::And(t, op1, op2)
-            | Ir::Or(t, op1, op2)
-            | Ir::Xor(t, op1, op2) => {
-                op1.validate()
-                    && op2.validate()
-                    && op1.get_type() == op2.get_type()
-                    && op1.get_type() == *t
-            }
-            Ir::Load(t, op) => {
-                op.validate()
-                    && match op.get_type() {
-                        Type::U8 | Type::U16 | Type::U32 | Type::U64 => true,
-                        _ => false,
-                    }
-                    && *t == Type::U64
-            }
-            Ir::LShl(t, op1, op2)
-            | Ir::LShr(t, op1, op2)
-            | Ir::AShr(t, op1, op2)
-            | Ir::Rotr(t, op1, op2) => {
-                op1.validate()
-                    && op2.validate()
-                    && op1.get_type() == op2.get_type()
-                    && op1.get_type() == *t
-            }
-            Ir::ZextCast(_, op) => op.validate(),
-            Ir::SextCast(_, op) => op.validate(),
-            Ir::BitCast(_, op) => op.validate(),
-            Ir::Value(op) => op.validate(),
-            Ir::Nop => true,
+            Ir::Addc(t, _, _) => *t,
+            Ir::Subc(t, _, _) => *t,
+
+            Ir::Not(t, _) => *t,
         }
     }
 }

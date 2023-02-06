@@ -36,7 +36,7 @@ where
 {
     pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
         // get entrypoint memory frame and compile it.
-        let ep_frame = vm_state.mem(vm_state.eip());
+        let ep_frame = vm_state.mem(vm_state.ip());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
 
         let mut code = self.codegen.compile(ep_block);
@@ -48,7 +48,7 @@ where
 
             vm_state.dump();
 
-            let next_frame = vm_state.mem(vm_state.eip());
+            let next_frame = vm_state.mem(vm_state.ip());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
 
             code = self.codegen.compile(next_block);

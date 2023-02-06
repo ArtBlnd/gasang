@@ -11,8 +11,8 @@ pub struct VmState {
     pub(crate) fpr_registers: Slab<FprRegister>,
     pub(crate) reg_name_map: HashMap<String, RegId>,
 
-    pub(crate) eflags: u64,
-    pub(crate) eip: u64,
+    pub(crate) flags: u64,
+    pub(crate) ip: u64,
 
     pub(crate) mmu: Mmu,
 
@@ -48,12 +48,24 @@ impl VmState {
         self.mmu.frame(addr)
     }
 
-    pub fn eip(&self) -> u64 {
-        self.eip
+    pub fn ip(&self) -> u64 {
+        self.ip
     }
 
-    pub fn set_eip(&mut self, eip: u64) {
-        self.eip = eip;
+    pub fn set_ip(&mut self, eip: u64) {
+        self.ip = eip;
+    }
+
+    pub fn flag(&self) -> u64 {
+        self.flags
+    }
+
+    pub fn set_flag(&mut self, flag: u64) {
+        self.flags |= flag;
+    }
+
+    pub fn del_flag(&mut self, flag: u64) {
+        self.flags &= !flag;
     }
 
     pub fn interrupt_model(&self) -> &dyn InterruptModel {
@@ -61,9 +73,9 @@ impl VmState {
     }
 
     pub fn dump(&self) {
-        println!("EIP: 0x{:x}", self.eip);
-        println!("EFLAGS: 0x{:x}", self.eflags);
-        
+        println!("EIP: 0x{:x}", self.ip);
+        println!("EFLAGS: 0x{:x}", self.flags);
+
         for reg in &self.gpr_registers {
             println!("{}: 0x{:x}", reg.1.name(), reg.1.get());
         }

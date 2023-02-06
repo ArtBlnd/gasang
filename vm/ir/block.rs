@@ -21,6 +21,7 @@ pub struct IrBlock {
     items: SmallVec<[IrBlockItem; 2]>,
 
     original_size: usize,
+    restore_flag: bool,
 }
 
 impl IrBlock {
@@ -28,6 +29,7 @@ impl IrBlock {
         Self {
             items: SmallVec::new(),
             original_size,
+            restore_flag: false,
         }
     }
 
@@ -40,6 +42,14 @@ impl IrBlock {
 
     pub fn items(&self) -> &[IrBlockItem] {
         &self.items
+    }
+
+    pub fn restore_flag(&self) -> bool {
+        self.restore_flag
+    }
+
+    pub fn set_restore_flag(&mut self) {
+        self.restore_flag = true;
     }
 
     pub fn original_size(&self) -> usize {

@@ -6,6 +6,7 @@ mod prelude;
 pub use prelude::*;
 
 pub mod cranelift;
+pub mod flag_policy;
 pub mod interpret;
 
 use crate::error::CodegenError;
