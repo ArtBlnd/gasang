@@ -38,7 +38,7 @@ impl MemoryFrame {
                     }
 
                     let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
-                    buf[read..read + mem.len()].copy_from_slice(&mem);
+                    buf[read..read + mem.len()].copy_from_slice(mem);
                     read += mem.len();
                     addr += mem.len() as u64;
                 }
@@ -62,7 +62,7 @@ impl MemoryFrame {
                 Page::Memory {
                     memory, writable, ..
                 } => {
-                    // Check if the page is readable
+                    // Check if the page is writable
                     if !writable {
                         return Err(MMUError::AccessViolation);
                     }

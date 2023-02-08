@@ -63,40 +63,40 @@ unsafe fn compile_ir(
 ) -> Result<Box<dyn InterpretFunc>, CodegenError> {
     // Optimiations
     match ir {
-        Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(imm, Type::I64)) => {
+        Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::I64, imm)) => {
             let imm = *imm;
             return Ok(Box::new(move |ctx| (ctx.ip() as i64 + imm as i64) as u64));
         }
-        Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(imm, Type::U64)) => {
+        Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::U64, imm)) => {
             let imm = *imm;
             return Ok(Box::new(move |ctx| ctx.ip() + imm));
         }
         Ir::Value(Operand::Ir(ir)) => return compile_ir(ir, flag_policy.clone()),
-        Ir::Value(Operand::Immediate(imm, t)) => {
+        Ir::Value(Operand::Immediate(t, imm)) => {
             let imm = *imm;
             let t = *t;
 
             return Ok(Box::new(move |_ctx| imm & type_mask(t)));
         }
-        Ir::Value(Operand::Register(reg_id, t)) => {
-            let reg = *reg_id;
+        Ir::Value(Operand::Register(t, reg)) => {
+            let reg = *reg;
             let t = *t;
 
             return Ok(Box::new(move |ctx| ctx.gpr(reg).get() & type_mask(t)));
         }
-        Ir::LShr(t, op1, Operand::Immediate(value, t1)) => {
+        Ir::LShr(t, op1, Operand::Immediate(t1, val)) => {
             assert!(t == t1, "Type mismatch");
             let op1 = compile_op(op1, flag_policy.clone())?;
-            let value = *value;
+            let val = *val;
             let t = *t;
 
-            return Ok(Box::new(move |ctx| (op1(ctx) >> value) & type_mask(t)));
+            return Ok(Box::new(move |ctx| (op1(ctx) >> val) & type_mask(t)));
         }
-        Ir::And(Type::U64, Operand::Flag, Operand::Immediate(imm, Type::U64)) => {
+        Ir::And(Type::U64, Operand::Flag, Operand::Immediate(Type::U64, imm)) => {
             let imm = *imm;
             return Ok(Box::new(move |ctx| ctx.flag() & imm));
         }
-        Ir::And(t, Operand::Immediate(imm1, t1), Operand::Immediate(imm2, t2)) => {
+        Ir::And(t, Operand::Immediate(t1, imm1), Operand::Immediate(t2, imm2)) => {
             assert!(t1 == t2 && t1 == t, "Type mismatch");
             let imm1 = *imm1;
             let imm2 = *imm2;
@@ -104,7 +104,7 @@ unsafe fn compile_ir(
 
             return Ok(Box::new(move |_ctx| (imm1 & imm2) & type_mask(t)));
         }
-        Ir::If(t, Operand::Immediate(imm, t1), op1, op2) => {
+        Ir::If(t, Operand::Immediate(t1, imm), op1, op2) => {
             assert!(*t1 == Type::Bool, "Type mismatch");
             assert!(op1.get_type() == op2.get_type(), "Type mismatch");
             let imm = *imm;
@@ -142,7 +142,7 @@ unsafe fn compile_ir(
 
         Ir::ZextCast(t, op) => gen_zext_cast(t, op, flag_policy),
         Ir::SextCast(t, op) => gen_sext_cast(t, op, flag_policy),
-        Ir::BitCast(t, op) => gen_bit_cast(t, op, flag_policy),
+        Ir::ArithCast(t, op) => gen_arith_cast(t, op, flag_policy),
 
         Ir::Value(op) => compile_op(op, flag_policy.clone()),
         Ir::Nop => Ok(Box::new(|_| 0)),
@@ -161,12 +161,12 @@ unsafe fn compile_op(
 ) -> Result<Box<dyn InterpretFunc>, CodegenError> {
     Ok(match op {
         Operand::Ir(ir) => compile_ir(ir, flag_policy.clone())?,
-        Operand::Register(id, t) => {
-            let id = *id;
+        Operand::Register(t, reg) => {
+            let reg = *reg;
             let t = *t;
-            Box::new(move |vm: &mut VmState| vm.gpr(id).get() & type_mask(t))
+            Box::new(move |vm: &mut VmState| vm.gpr(reg).get() & type_mask(t))
         }
-        Operand::Immediate(imm, t) => {
+        Operand::Immediate(t, imm) => {
             let imm = *imm;
             let t = *t;
             Box::new(move |_| imm & type_mask(t))
@@ -355,7 +355,7 @@ unsafe fn gen_addc(
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
-    let t = t.clone();
+    let t = *t;
 
     Ok(match t {
         Type::U8 => Box::new(move |ctx| {
@@ -444,7 +444,7 @@ unsafe fn gen_subc(
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
-    let t = t.clone();
+    let t = *t;
     Ok(match t {
         Type::U8 => Box::new(move |ctx| {
             let carry_in: u8 = flag_policy.carry(ctx).into();
@@ -705,7 +705,7 @@ unsafe fn gen_sext_cast(
     })
 }
 
-unsafe fn gen_bit_cast(
+unsafe fn gen_arith_cast(
     t: &Type,
     op: &Operand,
     flag_policy: Arc<dyn FlagPolicy>,
@@ -735,7 +735,7 @@ unsafe fn gen_and(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) & rhs.execute(ctx)) & type_mask(t)),
+        | Type::I64 => Box::new(move |ctx| ( lhs.execute(ctx) & rhs.execute(ctx)) & type_mask(t)),
         Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
     })
 }
@@ -806,7 +806,7 @@ unsafe fn gen_not(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| (!op.execute(ctx) & type_mask(t)) as u64),
+        | Type::I64 => Box::new(move |ctx| (!op.execute(ctx) & type_mask(t))),
         Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
     })
 }
@@ -869,7 +869,7 @@ unsafe fn gen_cmp_eq(
         | Type::I64
         | Type::F32
         | Type::F64 => Box::new(move |ctx| {
-            (lhs.execute(ctx) & type_mask(t) == rhs.execute(ctx) & type_mask(t)) as u64
+            ( lhs.execute(ctx) & type_mask(t) == rhs.execute(ctx) & type_mask(t)) as u64
         }),
         Type::Void => return Err(CodegenError::InvalidType),
     })
@@ -980,8 +980,8 @@ mod test {
         //Test UADD
         let ir = Ir::Add(
             Type::U64,
-            Operand::Immediate(30, Type::U64),
-            Operand::Immediate(50, Type::U64),
+            Operand::Immediate(Type::U64, 30),
+            Operand::Immediate(Type::U64, 50),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -993,8 +993,8 @@ mod test {
         //Test IADD
         let ir = Ir::Add(
             Type::I64,
-            Operand::Immediate((-10i64) as u64, Type::I64),
-            Operand::Immediate(10, Type::I64),
+            Operand::Immediate(Type::I64, (-10i64) as u64),
+            Operand::Immediate(Type::I64, 10),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1006,8 +1006,8 @@ mod test {
         //Test USUB
         let ir = Ir::Sub(
             Type::U8,
-            Operand::Immediate(10, Type::U8),
-            Operand::Immediate(9, Type::U8),
+            Operand::Immediate(Type::U8, 10),
+            Operand::Immediate(Type::U8, 9),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1019,8 +1019,8 @@ mod test {
         //Test subtract minus value ISUB
         let ir = Ir::Sub(
             Type::I16,
-            Operand::Immediate(10, Type::I16),
-            Operand::Immediate((-10i16) as u64, Type::I16),
+            Operand::Immediate(Type::I16, 10),
+            Operand::Immediate(Type::I16, (-10i16) as u64),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1032,8 +1032,8 @@ mod test {
         //Test IMUL
         let ir = Ir::Mul(
             Type::I32,
-            Operand::Immediate(10, Type::I32),
-            Operand::Immediate((-10i64) as u64, Type::I32),
+            Operand::Immediate(Type::I32, 10),
+            Operand::Immediate(Type::I32, (-10i64) as u64),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1045,8 +1045,8 @@ mod test {
         //Test UMUL-F64
         let ir = Ir::Mul(
             Type::F64,
-            Operand::Immediate((10f64).to_bits(), Type::F64),
-            Operand::Immediate((4.5f64).to_bits(), Type::F64),
+            Operand::Immediate(Type::F64, (10f64).to_bits()),
+            Operand::Immediate(Type::F64, (4.5f64).to_bits()),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1058,8 +1058,8 @@ mod test {
         //Test IDIV
         let ir = Ir::Div(
             Type::I64,
-            Operand::Immediate(10_u64, Type::I64),
-            Operand::Immediate((-5i64) as u64, Type::I64),
+            Operand::Immediate(Type::I64, 10_u64),
+            Operand::Immediate(Type::I64, (-5i64) as u64),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1071,8 +1071,8 @@ mod test {
         //Test UDIV-F64
         let ir = Ir::Div(
             Type::F64,
-            Operand::Immediate((10f64).to_bits(), Type::F64),
-            Operand::Immediate((3.3f64).to_bits(), Type::F64),
+            Operand::Immediate(Type::F64, (10f64).to_bits()),
+            Operand::Immediate(Type::F64, (3.3f64).to_bits()),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1084,8 +1084,8 @@ mod test {
         //Test LSHL
         let ir = Ir::LShl(
             Type::U8,
-            Operand::Immediate(0b1111_1111, Type::U8),
-            Operand::Immediate(4, Type::U8),
+            Operand::Immediate(Type::U8, 0b1111_1111),
+            Operand::Immediate(Type::U8, 4),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1097,8 +1097,8 @@ mod test {
         //Test LSHR
         let ir = Ir::LShr(
             Type::U8,
-            Operand::Immediate(0b0000_1111, Type::U8),
-            Operand::Immediate(4, Type::U8),
+            Operand::Immediate(Type::U8, 0b0000_1111),
+            Operand::Immediate(Type::U8, 4),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1110,8 +1110,8 @@ mod test {
         //Test Rotr
         let ir = Ir::Rotr(
             Type::U8,
-            Operand::Immediate(0b1010_1111, Type::U8),
-            Operand::Immediate(2, Type::U8),
+            Operand::Immediate(Type::U8, 0b1010_1111),
+            Operand::Immediate(Type::U8, 2),
         );
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
@@ -1121,7 +1121,7 @@ mod test {
         assert_eq!(result, 0b1110_1011);
 
         //Test Zext
-        let ir = Ir::ZextCast(Type::U16, Operand::Immediate((-10i8) as u64, Type::U16));
+        let ir = Ir::ZextCast(Type::U16, Operand::Immediate(Type::U16, (-10i8) as u64));
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
                 .unwrap()
@@ -1130,7 +1130,7 @@ mod test {
         assert_eq!(result as u16, 65526);
 
         //Test Sext
-        let ir = Ir::SextCast(Type::I64, Operand::Immediate(0xFF, Type::I8));
+        let ir = Ir::SextCast(Type::I64, Operand::Immediate(Type::I8, 0xFF));
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
                 .unwrap()
@@ -1139,7 +1139,7 @@ mod test {
         assert_eq!(result as i64, -1);
 
         //Test Sext-32
-        let ir = Ir::SextCast(Type::I32, Operand::Immediate(0xFF, Type::I8));
+        let ir = Ir::SextCast(Type::I32, Operand::Immediate(Type::I8, 0xFF));
         let result = unsafe {
             compile_ir(&ir, flag_policy.clone())
                 .unwrap()

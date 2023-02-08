@@ -46,8 +46,6 @@ where
                 code_block.execute(vm_state);
             }
 
-            vm_state.dump();
-
             let next_frame = vm_state.mem(vm_state.ip());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
 
@@ -92,7 +90,7 @@ where
         let last_dest = block.items().last().unwrap().dest().clone();
         results.push(block);
 
-        if let BlockDestination::Eip = last_dest {
+        if let BlockDestination::Ip = last_dest {
             break;
         }
 

@@ -140,6 +140,7 @@ pub struct Bitfield {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LogicalImm {
+    pub n: u8,
     pub immr: u8,
     pub imms: u8,
     pub rn: u8,

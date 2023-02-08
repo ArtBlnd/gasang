@@ -5,8 +5,8 @@ use crate::register::RegId;
 pub enum Operand {
     Ir(Box<Ir>),
     VoidIr(Box<Ir>),
-    Register(RegId, Type),
-    Immediate(u64, Type),
+    Register(Type, RegId),
+    Immediate(Type, u64),
     Ip,
     Flag,
 }
@@ -15,11 +15,27 @@ impl Operand {
     pub fn get_type(&self) -> Type {
         match self {
             Operand::Ir(ir) => ir.get_type(),
-            Operand::VoidIr(ir) => Type::Void,
-            Operand::Register(_, t) => *t,
-            Operand::Immediate(_, t) => *t,
+            Operand::VoidIr(_ir) => Type::Void,
+            Operand::Register(t, _) => *t,
+            Operand::Immediate(t, _) => *t,
             Operand::Ip => Type::U64,
             Operand::Flag => Type::U64,
         }
+    }
+
+    pub fn ir(ir: Ir) -> Self {
+        Operand::Ir(Box::new(ir))
+    }
+
+    pub fn void_ir(ir: Ir) -> Self {
+        Operand::VoidIr(Box::new(ir))
+    }
+
+    pub const fn reg(t: Type, reg: RegId) -> Self {
+        Operand::Register(t, reg)
+    }
+
+    pub const fn imm(t: Type, imm: u64) -> Self {
+        Operand::Immediate(t, imm)
     }
 }

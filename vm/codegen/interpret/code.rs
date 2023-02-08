@@ -20,14 +20,20 @@ pub struct CodeBlock {
 
 impl Executable for CodeBlock {
     unsafe fn execute(&self, vm_state: &mut VmState) {
+        if self.codes.is_empty() {
+            panic!("empty code block! maybe tried to compile unreadable place?");
+        }
+
         for (code, size) in self.codes.iter().zip(self.sizes.iter()) {
             for code in code {
                 let flag_backup = vm_state.flag();
 
                 let result = code.code.execute(vm_state);
                 match &code.code_dest {
-                    BlockDestination::Flags => todo!(),
-                    BlockDestination::Eip => {
+                    BlockDestination::Flags => {
+                        vm_state.set_flag(result);
+                    }
+                    BlockDestination::Ip => {
                         // We run code until Eip modification.
                         // if eip modification occurs, VM need to check we are executing eip's code.
                         vm_state.set_ip(result);
@@ -48,7 +54,7 @@ impl Executable for CodeBlock {
                         }
                         .expect("Failed to write memory");
                     }
-                    BlockDestination::MemoryRel(reg_id, offs) => {
+                    BlockDestination::MemoryRel(_reg_id, _offs) => {
                         todo!()
                     }
                     BlockDestination::None => {}
@@ -59,7 +65,7 @@ impl Executable for CodeBlock {
                 }
 
                 if code.restore_flag {
-                    vm_state.set_flag(flag_backup);
+                    vm_state.add_flag(flag_backup);
                 }
             }
 

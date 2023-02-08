@@ -61,6 +61,10 @@ impl VmState {
     }
 
     pub fn set_flag(&mut self, flag: u64) {
+        self.flags = flag;
+    }
+
+    pub fn add_flag(&mut self, flag: u64) {
         self.flags |= flag;
     }
 
@@ -74,14 +78,11 @@ impl VmState {
 
     pub fn dump(&self) {
         println!("EIP: 0x{:x}", self.ip);
-        println!("EFLAGS: 0x{:x}", self.flags);
+        println!("EFLAGS: {:064b}", self.flags);
 
         for reg in &self.gpr_registers {
-            println!("{}: 0x{:x}", reg.1.name(), reg.1.get());
+            print!("({}: 0x{:x}), ", reg.1.name(), reg.1.get());
         }
-
-        for reg in &self.fpr_registers {
-            println!("{}: 0x{:x}", reg.1.name(), reg.1.get().to_bits());
-        }
+        println!();
     }
 }

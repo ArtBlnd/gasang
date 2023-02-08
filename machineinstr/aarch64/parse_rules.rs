@@ -665,10 +665,12 @@ fn parse_add_sub_shifted_reg(raw_instr: u32) -> AArch64Instr {
              imm6: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rd: Extract<BitRange<0, 5>, u8>| {
-                let data = RmRnRd {
+                let data = ShiftRmImm6RnRd {
+                    shift: shift.value,
                     rm: rm.value,
                     rn: rn.value,
                     rd: rd.value,
+                    imm6: imm6.value,
                 };
 
                 match (sf_op_s.value, shift.value, imm6.value) {
@@ -1455,6 +1457,7 @@ fn parse_logical_imm(raw_instr: u32) -> AArch64Instr {
              rn: Extract<BitRange<5, 10>, u8>,
              rd: Extract<BitRange<0, 5>, u8>| {
                 let data = LogicalImm {
+                    n: n.value,
                     immr: immr.value,
                     imms: imms.value,
                     rn: rn.value,

@@ -34,7 +34,7 @@ fn main() {
     let start = std::time::Instant::now();
     for _inst in parser {
         n += 1;
-        // println!("{:08}: {:?}", n, inst);
+        println!("{:08}: {:?}", n, _inst);
     }
     let end = std::time::Instant::now();
 

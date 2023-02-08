@@ -34,12 +34,11 @@ fn main() {
         let end = sec.sh_offset + sec.sh_size;
 
         if name == ".text" {
-            image.set_entrypoint(sec.sh_addr);
+            image.set_entrypoint(file_elf.ehdr.e_entry);
         }
 
-        match name {
-            ".text" | ".data" | ".bss" | ".rodata" => {}
-            _ => continue,
+        if sec.sh_flags & elf::abi::SHF_ALLOC as u64 == 0 {
+            continue;
         }
 
         let (writable, executable) = get_access_info(sec.sh_flags);
@@ -55,22 +54,25 @@ fn main() {
     }
 
     let mut vm_state = VmBuilder::new(&image);
-    let gpr_registers: [RegId; 31] = std::array::from_fn(|idx| {
-        vm_state.add_gpr_register(GprRegister::new(format!("x{idx}"), 8))
-    });
-    let fpr_registers: [RegId; 31] = std::array::from_fn(|idx| {
-        vm_state.add_fpr_register(FprRegister::new(format!("d{idx}"), 8))
-    });
+    let gpr_registers: [RegId; 31] = (0..31)
+        .map(|idx| vm_state.add_gpr_register(GprRegister::new(format!("x{idx}"), 8)))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    let fpr_registers: [RegId; 31] = (0..31)
+        .map(|idx| vm_state.add_fpr_register(FprRegister::new(format!("d{idx}"), 8)))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
-    let stack_reg = vm_state.add_gpr_register(GprRegister::new("sp".to_string(), 8));
+    let stack_reg = vm_state.add_gpr_register(GprRegister::new("sp", 8));
 
-    let mut vm_state = vm_state.build(image.entrypoint(), AArch64UnixInterruptModel);
     let compiler = AArch64Compiler::new(gpr_registers, fpr_registers, stack_reg);
     let parse_rule = AArch64InstrParserRule;
     let codegen = InterpretCodegen::new(AArch64FlagPolicy);
 
     let mut engine = Engine::new(compiler, parse_rule, codegen);
-
+    let mut vm_state = vm_state.build(image.entrypoint(), AArch64UnixInterruptModel);
     unsafe {
         engine.run(&mut vm_state).unwrap();
     }
