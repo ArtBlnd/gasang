@@ -175,7 +175,7 @@ pub struct ExtractImm {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CmpAndBranchImm {
+pub struct Imm19Rt {
     pub imm19: u32,
     pub rt: u8,
 }

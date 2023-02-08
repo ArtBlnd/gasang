@@ -192,6 +192,14 @@ pub enum AArch64Instr {
     StlrVar64(LoadStoreOrdered),
     LdarVar64(LoadStoreOrdered),
 
+    LdrLitVar32(Imm19Rt),
+    LdrLitSimdFPVar32(Imm19Rt),
+    LdrLitVar64(Imm19Rt),
+    LdrLitSimdFPVar64(Imm19Rt),
+    LdrswLit(Imm19Rt),
+    LdrLitSimdFPVar128(Imm19Rt),
+    PrfmLit(Imm19Rt),
+
     BImm(Imm26),
     BlImm(Imm26),
 
@@ -201,10 +209,10 @@ pub enum AArch64Instr {
     Tbz(B5B40Imm14Rt),
     Tbnz(B5B40Imm14Rt),
 
-    Cbz32(CmpAndBranchImm),
-    Cbnz32(CmpAndBranchImm),
-    Cbz64(CmpAndBranchImm),
-    Cbnz64(CmpAndBranchImm),
+    Cbz32(Imm19Rt),
+    Cbnz32(Imm19Rt),
+    Cbz64(Imm19Rt),
+    Cbnz64(Imm19Rt),
 
     Wfet(Rt),
     Wfit(Rt),

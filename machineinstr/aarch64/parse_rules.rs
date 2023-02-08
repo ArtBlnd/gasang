@@ -528,9 +528,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "xx01_1_x_0_0x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |_raw_instr: u32| {
-                todo!("Load register (literal)");
-            },
+            parse_load_register_literal,
         )
         .bind(
             "xx01_1_x_0_1x_x_0xxxxx_xxxx_01_xxxxxxxxxx",
@@ -1672,7 +1670,7 @@ fn parse_cmp_and_branch_imm(raw_instr: u32) -> AArch64Instr {
              op: Extract<BitRange<24, 25>, u8>,
              imm19: Extract<BitRange<5, 24>, u32>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = CmpAndBranchImm {
+                let data = Imm19Rt {
                     imm19: imm19.value,
                     rt: rt.value,
                 };
@@ -4347,6 +4345,45 @@ fn parse_eval_into_flags(raw_instr: u32) -> AArch64Instr {
                 match (sf_op_s.value, opcode2.value, sz.value, o3.value, mask.value) {
                     (0b001, 0b000000, 0b0, 0b0, 0b1101) => AArch64Instr::SetfVar8(data),
                     (0b001, 0b000000, 0b1, 0b0, 0b1101) => AArch64Instr::SetfVar16(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        instr
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_load_register_literal(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_011_x_00_xxxxxxxxxxxxxxxxxxx_xxxxx",
+            |raw_instr: u32,
+             opc: Extract<BitRange<30, 32>, u8>,
+             v: Extract<BitRange<26, 27>, u8>,
+             imm19: Extract<BitRange<5, 24>, u32>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = Imm19Rt {  
+                    imm19: imm19.value,
+                    rt: rt.value,
+                };
+
+                match (opc.value, v.value) {
+                    (0b00, 0b0) => AArch64Instr::LdrLitVar32(data),
+                    (0b00, 0b1) => AArch64Instr::LdrLitSimdFPVar32(data),
+                    (0b01, 0b0) => AArch64Instr::LdrLitVar64(data),
+                    (0b01, 0b1) => AArch64Instr::LdrLitSimdFPVar64(data),
+                    (0b10, 0b0) => AArch64Instr::LdrswLit(data),
+                    (0b10, 0b1) => AArch64Instr::LdrLitSimdFPVar128(data),
+                    (0b11, 0b0) => AArch64Instr::PrfmLit(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
