@@ -1,6 +1,6 @@
 use crate::aarch64::*;
 
-use std::fmt::Debug;
+use std::fmt::{Debug};
 
 // AArch64 instruction
 #[derive(Clone, Debug, PartialEq, Eq)]

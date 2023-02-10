@@ -37,7 +37,7 @@ where
     pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
         let this = std::panic::AssertUnwindSafe(|| self.run_inner(vm_state));
         match std::panic::catch_unwind(|| this()) {
-            Err(_) => { },
+            Err(_) => {}
             Ok(Err(err)) => return Err(err),
             Ok(Ok(_)) => unreachable!(),
         }

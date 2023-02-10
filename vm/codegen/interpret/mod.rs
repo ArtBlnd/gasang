@@ -183,6 +183,9 @@ unsafe fn compile_op(
                 val
             })
         }
+        Operand::VmInfo(info_ty) => {
+            todo!()
+        }
     })
 }
 

@@ -1,5 +1,6 @@
 use crate::ir::{Ir, Type};
 use crate::register::RegId;
+use crate::vm_state::VmInfo;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operand {
@@ -9,7 +10,8 @@ pub enum Operand {
     Immediate(Type, u64),
     Ip,
     Flag,
-    Dbg(String, Box<Operand>)
+    Dbg(String, Box<Operand>),
+    VmInfo(VmInfo)
 }
 
 impl Operand {
@@ -21,7 +23,8 @@ impl Operand {
             Operand::Immediate(t, _) => *t,
             Operand::Ip => Type::U64,
             Operand::Flag => Type::U64,
-            Operand::Dbg(_, operand) => operand.get_type()
+            Operand::Dbg(_, operand) => operand.get_type(),
+            Operand::VmInfo(_) => Type::U64
         }
     }
 

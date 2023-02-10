@@ -23,7 +23,7 @@ impl Executable for CodeBlock {
         if self.codes.is_empty() {
             panic!("empty code block! maybe tried to compile unreadable place?");
         }
-        
+
         'body: for (code, size) in self.codes.iter().zip(self.sizes.iter()) {
             for code in code {
                 let flag_backup = vm_state.flag();
@@ -39,8 +39,8 @@ impl Executable for CodeBlock {
                         vm_state.set_ip(result);
                         break 'body;
                     }
-                    BlockDestination::GprRegister(reg_id) => vm_state.gpr_mut(*reg_id).set(result),
-                    BlockDestination::FprRegister(reg_id) => {
+                    BlockDestination::Gpr(reg_id) => vm_state.gpr_mut(*reg_id).set(result),
+                    BlockDestination::Fpr(reg_id) => {
                         vm_state.fpr_mut(*reg_id).set(f64::from_bits(result))
                     }
                     BlockDestination::Memory(addr) => {

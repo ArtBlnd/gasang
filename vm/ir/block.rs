@@ -7,8 +7,8 @@ use crate::register::RegId;
 pub enum BlockDestination {
     Flags,
     Ip,
-    GprRegister(RegId),
-    FprRegister(RegId),
+    Gpr(RegId),
+    Fpr(RegId),
     Memory(u64),
     MemoryRel(RegId, i64),
     None,

@@ -6,6 +6,11 @@ use std::collections::HashMap;
 
 use slab::Slab;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum VmInfo {
+    ThreadData,
+}
+
 pub struct VmState {
     pub(crate) gpr_registers: Slab<GprRegister>,
     pub(crate) fpr_registers: Slab<FprRegister>,
