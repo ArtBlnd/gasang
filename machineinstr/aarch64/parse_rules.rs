@@ -658,7 +658,7 @@ fn parse_add_sub_shifted_reg(raw_instr: u32) -> AArch64Instr {
             "xxx_01011_xx_0_xxxxxxxxxxxxxxxxxxxxx",
             |raw_instr: u32,
              sf_op_s: Extract<BitRange<29, 32>, u8>,
-             shift: Extract<BitRange<21, 24>, u8>,
+             shift: Extract<BitRange<22, 24>, u8>,
              rm: Extract<BitRange<16, 21>, u8>,
              imm6: Extract<BitRange<10, 16>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
@@ -796,11 +796,13 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: u32) -> AArch64Instr {
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
+             idxt: Extract<BitRange<24, 26>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
              imm12: Extract<BitRange<10, 22>, u16>,
              rm: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SizeImm12RnRt {
+                    idxt: idxt.value,
                     size: size.value,
                     imm12: imm12.value,
                     rn: rm.value,
@@ -1750,11 +1752,13 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
+             idxt: Extract<BitRange<24, 26>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SizeImm12RnRt {
+                    idxt: idxt.value,
                     size: size.value,
                     imm12: imm9.value,
                     rn: rn.value,
@@ -1996,11 +2000,13 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
+             idxt: Extract<BitRange<24, 26>, u8>, // Indexing type
              opc: Extract<BitRange<22, 24>, u8>,
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SizeImm12RnRt {
+                    idxt: idxt.value,
                     size: size.value,
                     imm12: imm9.value,
                     rn: rn.value,
@@ -2056,11 +2062,13 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
+             idxt: Extract<BitRange<24, 26>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
              imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SizeImm12RnRt {
+                    idxt: idxt.value,
                     size: size.value,
                     imm12: imm9.value,
                     rn: rn.value,
@@ -4371,7 +4379,7 @@ fn parse_load_register_literal(raw_instr: u32) -> AArch64Instr {
              v: Extract<BitRange<26, 27>, u8>,
              imm19: Extract<BitRange<5, 24>, u32>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = Imm19Rt {  
+                let data = Imm19Rt {
                     imm19: imm19.value,
                     rt: rt.value,
                 };

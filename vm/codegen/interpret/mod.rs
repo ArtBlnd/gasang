@@ -142,7 +142,7 @@ unsafe fn compile_ir(
 
         Ir::ZextCast(t, op) => gen_zext_cast(t, op, flag_policy),
         Ir::SextCast(t, op) => gen_sext_cast(t, op, flag_policy),
-        Ir::ArithCast(t, op) => gen_arith_cast(t, op, flag_policy),
+        Ir::BitCast(t, op) => gen_bit_cast(t, op, flag_policy),
 
         Ir::Value(op) => compile_op(op, flag_policy.clone()),
         Ir::Nop => Ok(Box::new(|_| 0)),
@@ -194,28 +194,33 @@ unsafe fn gen_add(
     op2: &Operand,
     flag_policy: Arc<dyn FlagPolicy>,
 ) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let t1 = op1.get_type();
+    let t2 = op2.get_type();
+
+    if t1.is_float() {
+        assert!(t2.is_float() && t1.size() == t2.size())
+    } else {
+        assert!(t1.is_scalar() && t2.is_scalar() && t1.size() == t2.size())
+    }
+
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
+    let t = *t;
     Ok(match t {
-        Type::U8 => Box::new(move |ctx| (lhs.execute(ctx) as u8 + rhs.execute(ctx) as u8) as u64),
-        Type::U16 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as u16 + rhs.execute(ctx) as u16) as u64)
-        }
-        Type::U32 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as u32 + rhs.execute(ctx) as u32) as u64)
-        }
-        Type::U64 => Box::new(move |ctx| lhs.execute(ctx) + rhs.execute(ctx)),
-        Type::I8 => Box::new(move |ctx| (lhs.execute(ctx) as i8 + rhs.execute(ctx) as i8) as u64),
-        Type::I16 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as i16 + rhs.execute(ctx) as i16) as u64)
-        }
-        Type::I32 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as i32 + rhs.execute(ctx) as i32) as u64)
-        }
-        Type::I64 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as i64 + rhs.execute(ctx) as i64) as u64)
-        }
+        Type::U8
+        | Type::I8
+        | Type::U16
+        | Type::I16
+        | Type::U32
+        | Type::I32
+        | Type::U64
+        | Type::I64 => Box::new(move |ctx| {
+            (lhs.execute(ctx) as i64)
+                .overflowing_add(rhs.execute(ctx) as i64)
+                .0 as u64
+                & type_mask(t)
+        }),
         Type::F32 => Box::new(move |ctx| {
             (f32::from_bits(lhs.execute(ctx) as u32) + f32::from_bits(rhs.execute(ctx) as u32))
                 .to_bits() as u64
@@ -233,28 +238,34 @@ unsafe fn gen_sub(
     op2: &Operand,
     flag_policy: Arc<dyn FlagPolicy>,
 ) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let t1 = op1.get_type();
+    let t2 = op2.get_type();
+
+    if t1.is_float() {
+        assert!(t2.is_float() && t1.size() == t2.size())
+    } else {
+        assert!(t1.is_scalar() && t2.is_scalar() && t1.size() == t2.size())
+    }
+
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
+    let t = *t;
     Ok(match t {
-        Type::U8 => Box::new(move |ctx| (lhs.execute(ctx) as u8 - rhs.execute(ctx) as u8) as u64),
-        Type::U16 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as u16 - rhs.execute(ctx) as u16) as u64)
-        }
-        Type::U32 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as u32 - rhs.execute(ctx) as u32) as u64)
-        }
-        Type::U64 => Box::new(move |ctx| lhs.execute(ctx) - rhs.execute(ctx)),
-        Type::I8 => Box::new(move |ctx| (lhs.execute(ctx) as i8 - rhs.execute(ctx) as i8) as u64),
-        Type::I16 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as i16 - rhs.execute(ctx) as i16) as u64)
-        }
-        Type::I32 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as i32 - rhs.execute(ctx) as i32) as u64)
-        }
-        Type::I64 => {
-            Box::new(move |ctx| (lhs.execute(ctx) as i64 - rhs.execute(ctx) as i64) as u64)
-        }
+        Type::U8
+        | Type::I8
+        | Type::U16
+        | Type::I16
+        | Type::U32
+        | Type::I32
+        | Type::U64
+        | Type::I64 => Box::new(move |ctx| {
+            (lhs.execute(ctx) as i64)
+                .overflowing_sub(rhs.execute(ctx) as i64)
+                .0 as u64
+                & type_mask(t) as u64
+        }),
+
         Type::F32 => Box::new(move |ctx| {
             (f32::from_bits(lhs.execute(ctx) as u32) - f32::from_bits(rhs.execute(ctx) as u32))
                 .to_bits() as u64
@@ -705,7 +716,7 @@ unsafe fn gen_sext_cast(
     })
 }
 
-unsafe fn gen_arith_cast(
+unsafe fn gen_bit_cast(
     t: &Type,
     op: &Operand,
     flag_policy: Arc<dyn FlagPolicy>,
@@ -735,7 +746,7 @@ unsafe fn gen_and(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| ( lhs.execute(ctx) & rhs.execute(ctx)) & type_mask(t)),
+        | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) & rhs.execute(ctx)) & type_mask(t)),
         Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
     })
 }
@@ -869,7 +880,7 @@ unsafe fn gen_cmp_eq(
         | Type::I64
         | Type::F32
         | Type::F64 => Box::new(move |ctx| {
-            ( lhs.execute(ctx) & type_mask(t) == rhs.execute(ctx) & type_mask(t)) as u64
+            (lhs.execute(ctx) & type_mask(t) == rhs.execute(ctx) & type_mask(t)) as u64
         }),
         Type::Void => return Err(CodegenError::InvalidType),
     })

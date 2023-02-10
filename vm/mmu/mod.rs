@@ -68,7 +68,7 @@ impl MmuData {
         let pt = self.page_table.read().unwrap();
 
         let Some(page) = pt.get_ref(addr) else {
-            return Err(MMUError::PageFault);
+            return Err(MMUError::PageFault(addr));
         };
 
         Ok(page.clone())

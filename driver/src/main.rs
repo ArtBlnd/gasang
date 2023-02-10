@@ -73,6 +73,14 @@ fn main() {
 
     let mut engine = Engine::new(compiler, parse_rule, codegen);
     let mut vm_state = vm_state.build(image.entrypoint(), AArch64UnixInterruptModel);
+
+    // allocate stack
+    const STACK_SIZE: u64 = 1024 * 1024 * 4;
+    vm_state.gpr_mut(stack_reg).set(0x10000000);
+    vm_state
+        .mmu()
+        .mmap(0x10000000 - STACK_SIZE, STACK_SIZE, true, true, false);
+
     unsafe {
         engine.run(&mut vm_state).unwrap();
     }

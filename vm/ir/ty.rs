@@ -13,3 +13,39 @@ pub enum Type {
     Void,
     Bool,
 }
+
+impl Type {
+    pub fn is_scalar(&self) -> bool {
+        match self {
+            Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::F32
+            | Type::F64
+            | Type::Bool => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            Type::F32 | Type::F64 => true,
+            _ => false,
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            Type::U8 | Type::I8 | Type::Bool => 1,
+            Type::U16 | Type::I16 => 2,
+            Type::U32 | Type::I32 | Type::F32 => 4,
+            Type::U64 | Type::I64 | Type::F64 => 8,
+            Type::Void => 0,
+        }
+    }
+}

@@ -29,7 +29,7 @@ pub enum Ir {
 
     ZextCast(Type, Operand),
     SextCast(Type, Operand),
-    ArithCast(Type, Operand),
+    BitCast(Type, Operand),
 
     If(Type, Operand, Operand, Operand), // If(ret_type, condition, if_true, if_false)
     CmpEq(Operand, Operand),             // Equal
@@ -65,7 +65,7 @@ impl Ir {
 
             Ir::ZextCast(t, _) => *t,
             Ir::SextCast(t, _) => *t,
-            Ir::ArithCast(t, _) => *t,
+            Ir::BitCast(t, _) => *t,
 
             Ir::Value(op) => op.get_type(),
             Ir::Nop => Type::Void,

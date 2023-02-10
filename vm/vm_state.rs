@@ -48,12 +48,17 @@ impl VmState {
         self.mmu.frame(addr)
     }
 
+    pub fn mmu(&self) -> &Mmu {
+        &self.mmu
+    }
+
     pub fn ip(&self) -> u64 {
         self.ip
     }
 
     pub fn set_ip(&mut self, eip: u64) {
         self.ip = eip;
+        println!("Jump to ip: {eip:x}");
     }
 
     pub fn flag(&self) -> u64 {

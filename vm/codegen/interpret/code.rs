@@ -24,7 +24,7 @@ impl Executable for CodeBlock {
             panic!("empty code block! maybe tried to compile unreadable place?");
         }
 
-        for (code, size) in self.codes.iter().zip(self.sizes.iter()) {
+        'body: for (code, size) in self.codes.iter().zip(self.sizes.iter()) {
             for code in code {
                 let flag_backup = vm_state.flag();
 
@@ -37,7 +37,7 @@ impl Executable for CodeBlock {
                         // We run code until Eip modification.
                         // if eip modification occurs, VM need to check we are executing eip's code.
                         vm_state.set_ip(result);
-                        break;
+                        break 'body;
                     }
                     BlockDestination::GprRegister(reg_id) => vm_state.gpr_mut(*reg_id).set(result),
                     BlockDestination::FprRegister(reg_id) => {
@@ -54,8 +54,17 @@ impl Executable for CodeBlock {
                         }
                         .expect("Failed to write memory");
                     }
-                    BlockDestination::MemoryRel(_reg_id, _offs) => {
-                        todo!()
+                    BlockDestination::MemoryRel(reg_id, offs) => {
+                        let (val, _) = vm_state.gpr(*reg_id).get().overflowing_add_signed(*offs);
+                        let mut frame = vm_state.mem(val);
+                        match code.code_type {
+                            Type::I8 | Type::U8 => frame.write_u8(result as u8),
+                            Type::I16 | Type::U16 => frame.write_u16(result as u16),
+                            Type::I32 | Type::U32 | Type::F32 => frame.write_u32(result as u32),
+                            Type::I64 | Type::U64 | Type::F64 => frame.write_u64(result),
+                            _ => unreachable!(),
+                        }
+                        .expect("Failed to write memory");
                     }
                     BlockDestination::None => {}
                     BlockDestination::SystemCall => {
@@ -68,7 +77,7 @@ impl Executable for CodeBlock {
                     vm_state.add_flag(flag_backup);
                 }
             }
-
+            
             vm_state.ip += *size as u64;
         }
     }

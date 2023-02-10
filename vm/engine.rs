@@ -5,7 +5,7 @@ use crate::compiler::Compiler;
 use crate::error::{CompileError, Error};
 use crate::ir::{BlockDestination, IrBlock};
 use crate::mmu::MemoryFrame;
-use crate::vm_state::VmState;
+use crate::vm_state::{VmState, self};
 
 use machineinstr::{MachineInstParser, MachineInstrParserRule};
 
@@ -35,6 +35,20 @@ where
     G: Codegen,
 {
     pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
+        let this = std::panic::AssertUnwindSafe(|| {
+            self.run_inner(vm_state)
+        });
+        if let Err(err) = std::panic::catch_unwind(|| {
+            this()
+        }) {
+            println!("panic: {:?}", err);
+        }
+        
+        vm_state.dump();
+        std::process::exit(-1);
+    }
+
+    pub unsafe fn run_inner(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
         // get entrypoint memory frame and compile it.
         let ep_frame = vm_state.mem(vm_state.ip());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
@@ -86,7 +100,7 @@ where
 
     let parser = MachineInstParser::new(BitReader::new(frame), rule.clone());
     for instr in parser {
-        let block = compiler.compile(instr.op)?;
+        let block = compiler.compile(instr.op);
         let last_dest = block.items().last().unwrap().dest().clone();
         results.push(block);
 

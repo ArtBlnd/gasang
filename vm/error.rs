@@ -11,8 +11,8 @@ pub enum MMUError {
     #[error("Access violation")]
     AccessViolation,
 
-    #[error("Page fault")]
-    PageFault,
+    #[error("Page fault: {0:016x}")]
+    PageFault(u64),
 }
 
 #[derive(Debug, Error, Clone)]
