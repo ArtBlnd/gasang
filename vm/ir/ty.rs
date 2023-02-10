@@ -48,4 +48,24 @@ impl Type {
             Type::Void => 0,
         }
     }
+
+    pub fn uscalar_from_size(size: usize) -> Type {
+        match size {
+            1 => Type::U8,
+            2 => Type::U16,
+            4 => Type::U32,
+            8 => Type::U64,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn iscalar_from_size(size: usize) -> Type {
+        match size {
+            1 => Type::I8,
+            2 => Type::I16,
+            4 => Type::I32,
+            8 => Type::I64,
+            _ => unreachable!(),
+        }
+    }
 }

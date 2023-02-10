@@ -34,7 +34,6 @@ impl Compiler for AArch64Compiler {
     type Item = AArch64Instr;
 
     fn compile(&self, item: Self::Item) -> IrBlock {
-
         println!("{item:?}");
 
         match item {
@@ -57,6 +56,7 @@ impl Compiler for AArch64Compiler {
             // Arithmetic instructions
             AArch64Instr::AddImm64(operand) => gen_add_imm64(self, operand),
             AArch64Instr::AddShiftedReg64(operand) => gen_add_shifted_reg64(self, operand),
+            AArch64Instr::AddExtReg64(operand) => gen_add_ext_reg64(self, operand),
             AArch64Instr::SubImm64(operand) => gen_sub_imm64(self, operand),
             AArch64Instr::SubShiftedReg64(operand) => gen_sub_shifted_reg_64(self, operand),
             AArch64Instr::SubsShiftedReg64(operand) => gen_subs_shifted_reg_64(self, operand),
@@ -74,11 +74,13 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Br(operand) => gen_br(self, operand),
             AArch64Instr::BCond(operand) => gen_b_cond(self, operand),
             AArch64Instr::Cbz64(operand) => gen_cbz64(self, operand),
-            AArch64Instr::Cbnz32(operand) => gen_cbnz32(self, operand),
+            AArch64Instr::Cbnz32(operand) => gen_cbnz(self, operand, Type::U32),
+            AArch64Instr::Cbnz64(operand) => gen_cbnz(self, operand, Type::U64),
             AArch64Instr::Ret(operand) => gen_ret(self, operand),
 
             // Conditional Instructions
-            AArch64Instr::CcmpImmVar32(operand) => gen_ccmp_imm_var32(self, operand),
+            AArch64Instr::CcmpImmVar32(operand) => gen_ccmp_imm(self, operand, Type::U32),
+            AArch64Instr::CcmpImmVar64(operand) => gen_ccmp_imm(self, operand, Type::U64),
             AArch64Instr::Csel32(operand) => gen_csel32(self, operand),
 
             // Interrupt Instructions
@@ -196,8 +198,11 @@ fn gen_ldr_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
     block.append(ir, ds);
 
     if wback {
-
-        let ir = Ir::Add(Type::U64, Operand::reg(Type::U64, src), Operand::Immediate(Type::I64, offset as u64));
+        let ir = Ir::Add(
+            Type::U64,
+            Operand::reg(Type::U64, src),
+            Operand::Immediate(Type::I64, offset as u64),
+        );
         let ds = BlockDestination::GprRegister(src);
 
         block.append(ir, ds);
@@ -228,7 +233,11 @@ fn gen_str_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
             Type::U32 => Type::I32,
             _ => unreachable!(),
         };
-        let ir = Ir::Add(ty, Operand::reg(ty, rn), Operand::imm(off_ty, offset as u64));
+        let ir = Ir::Add(
+            ty,
+            Operand::reg(ty, rn),
+            Operand::imm(off_ty, offset as u64),
+        );
         let ds = BlockDestination::GprRegister(rn);
 
         block.append(ir, ds);
@@ -549,12 +558,17 @@ fn gen_cbz64(compiler: &AArch64Compiler, operand: Imm19Rt) -> IrBlock {
     block
 }
 
-fn gen_cbnz32(compiler: &AArch64Compiler, operand: Imm19Rt) -> IrBlock {
+fn gen_cbnz(compiler: &AArch64Compiler, operand: Imm19Rt, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
     let offset = sign_extend((operand.imm19 << 2) as i64, 21);
 
-    let is_zero = cmp_eq_op_imm32(Operand::Register(Type::U32, compiler.gpr(operand.rt)), 0);
+    let is_zero = if ty == Type::U64 {
+        cmp_eq_op_imm64(Operand::Register(ty, compiler.gpr(operand.rt)), 0)
+    } else {
+        cmp_eq_op_imm32(Operand::Register(ty, compiler.gpr(operand.rt)), 0)
+    };
+
     let ir = Ir::If(
         Type::U64,
         is_zero,
@@ -568,24 +582,28 @@ fn gen_cbnz32(compiler: &AArch64Compiler, operand: Imm19Rt) -> IrBlock {
     block
 }
 
-fn gen_ccmp_imm_var32(compiler: &AArch64Compiler, operand: CondCmpImm) -> IrBlock {
+fn gen_ccmp_imm(compiler: &AArch64Compiler, operand: CondCmpImm, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
     let rn = compiler.gpr(operand.rn);
 
     let subc = Operand::void_ir(Ir::Subc(
-        Type::U32,
-        Operand::reg(Type::U32, rn),
-        Operand::imm(Type::U32, operand.imm5 as u64),
+        ty,
+        Operand::reg(ty, rn),
+        Operand::imm(ty, operand.imm5 as u64),
     ));
 
     let ir = Ir::If(
         Type::Void,
         condition_holds(operand.cond),
-        subc,
-        Operand::Ir(Box::new(Ir::Nop)),
+        Operand::ir(Ir::Or(
+            Type::U64,
+            Operand::Flag,
+            Operand::ir(Ir::BitCast(Type::U64, subc)),
+        )),
+        Operand::ir(replace_bits(Operand::Flag, operand.nzcv as u64, 60..64)),
     );
-    let ds = BlockDestination::None;
+    let ds = BlockDestination::Flags;
 
     block.append(ir, ds);
 
@@ -722,7 +740,11 @@ fn gen_ldrb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
     block.append(ir, ds);
 
     if wback {
-        let ir = Ir::Add(Type::U64, Operand::reg(Type::U64, src), Operand::imm(Type::I64, offset as u64));
+        let ir = Ir::Add(
+            Type::U64,
+            Operand::reg(Type::U64, src),
+            Operand::imm(Type::I64, offset as u64),
+        );
         let ds = BlockDestination::GprRegister(src);
 
         block.append(ir, ds);
@@ -736,6 +758,33 @@ fn gen_ret(compiler: &AArch64Compiler, operand: UncondBranchReg) -> IrBlock {
 
     let ir = Ir::Value(Operand::reg(Type::U64, compiler.gpr(operand.rn)));
     let ds = BlockDestination::Ip;
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_add_ext_reg64(compiler: &AArch64Compiler, operand: AddSubtractExtReg) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let ext_type = decode_reg_extend(operand.option);
+    let shift = operand.imm3;
+    assert!(shift <= 4);
+
+    let op1 = if operand.rn == 31 {
+        compiler.stack_reg
+    } else {
+        compiler.gpr(operand.rn)
+    };
+    let op2 = extend_reg(compiler.gpr(operand.rm), ext_type, shift, 64 / 8);
+
+    let ir = Ir::Add(Type::U64, Operand::reg(Type::U64, op1), Operand::ir(op2));
+    let ds = if operand.rd == 31 {
+        compiler.stack_reg
+    } else {
+        compiler.gpr(operand.rd)
+    };
+    let ds = BlockDestination::GprRegister(ds);
+
     block.append(ir, ds);
 
     block

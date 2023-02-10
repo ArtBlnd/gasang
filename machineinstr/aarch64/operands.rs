@@ -36,7 +36,6 @@ pub struct SizeImm12RnRt {
     pub rt: u8,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Imm26 {
     pub imm26: u32,

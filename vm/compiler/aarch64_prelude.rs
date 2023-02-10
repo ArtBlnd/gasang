@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::ir::*;
 use crate::register::RegId;
 use utility::*;
@@ -109,7 +111,10 @@ pub fn cmp_eq_op_imm64(op: Operand, immediate: u64) -> Operand {
 }
 
 pub fn cmp_eq_op_imm32(op: Operand, immediate: u32) -> Operand {
-    Operand::Ir(Box::new(Ir::CmpEq(op, Operand::imm(Type::U32, immediate as u64))))
+    Operand::Ir(Box::new(Ir::CmpEq(
+        op,
+        Operand::imm(Type::U32, immediate as u64),
+    )))
 }
 
 pub fn cmp_ne_op_imm(op: Operand, immediate: u64) -> Operand {
@@ -207,7 +212,10 @@ pub fn replicate_reg64(val: RegId, n: u8) -> Ir {
 
     Ir::If(
         Type::U64,
-        Operand::ir(Ir::BitCast(Type::Bool, Operand::ir(Ir::LShr(Type::U64, val, Operand::imm(Type::U64, n as u64))))),
+        Operand::ir(Ir::BitCast(
+            Type::Bool,
+            Operand::ir(Ir::LShr(Type::U64, val, Operand::imm(Type::U64, n as u64))),
+        )),
         Operand::imm(Type::U64, u64::MAX),
         Operand::imm(Type::U64, 0),
     )
@@ -239,4 +247,71 @@ pub const fn decode_bit_masks(immn: u8, imms: u8, immr: u8, immediate: bool, m: 
     let tmask = replicate(telem, m as u64, esize);
 
     (wmask, tmask)
+}
+
+pub enum ExtendType {
+    UXTB,
+    UXTH,
+    UXTW,
+    UXTX,
+    SXTB,
+    SXTH,
+    SXTW,
+    SXTX,
+}
+
+pub const fn decode_reg_extend(op: u8) -> ExtendType {
+    match op {
+        0b000 => ExtendType::UXTB,
+        0b001 => ExtendType::UXTH,
+        0b010 => ExtendType::UXTW,
+        0b011 => ExtendType::UXTX,
+        0b100 => ExtendType::SXTB,
+        0b101 => ExtendType::SXTH,
+        0b110 => ExtendType::SXTW,
+        0b111 => ExtendType::SXTX,
+        _ => unreachable!(),
+    }
+}
+
+pub fn extend_reg(reg: RegId, ext_type: ExtendType, shift: u8, n: u8) -> Ir {
+    assert!(shift <= 4);
+    let n = Type::uscalar_from_size(n as usize);
+
+    let (unsigned, ty) = match ext_type {
+        ExtendType::SXTB => (false, Type::I8),
+        ExtendType::SXTH => (false, Type::I16),
+        ExtendType::SXTW => (false, Type::I32),
+        ExtendType::SXTX => (false, Type::I64),
+        ExtendType::UXTB => (true, Type::U8),
+        ExtendType::UXTH => (true, Type::U16),
+        ExtendType::UXTW => (true, Type::U32),
+        ExtendType::UXTX => (true, Type::U64),
+    };
+
+    let ir = Ir::LShl(
+        ty,
+        Operand::Register(ty, reg),
+        Operand::Immediate(Type::U8, shift as u64),
+    );
+
+    if unsigned {
+        Ir::ZextCast(n, Operand::ir(ir))
+    } else {
+        Ir::SextCast(n, Operand::ir(ir))
+    }
+}
+
+pub fn replace_bits(val: Operand, imm: u64, range: Range<u64>) -> Ir {
+    let imm = Operand::imm(val.get_type(), imm << range.start);
+    let mask = Operand::imm(
+        val.get_type(),
+        !(ones(range.end - range.start) << range.start),
+    );
+
+    Ir::Or(
+        val.get_type(),
+        Operand::ir(Ir::And(val.get_type(), val, mask)),
+        imm,
+    )
 }

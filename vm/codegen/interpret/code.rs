@@ -20,10 +20,12 @@ pub struct CodeBlock {
 
 impl Executable for CodeBlock {
     unsafe fn execute(&self, vm_state: &mut VmState) {
+        println!("ip modified: {}", vm_state.ip);
+
         if self.codes.is_empty() {
             panic!("empty code block! maybe tried to compile unreadable place?");
         }
-
+        
         'body: for (code, size) in self.codes.iter().zip(self.sizes.iter()) {
             for code in code {
                 let flag_backup = vm_state.flag();
@@ -77,7 +79,7 @@ impl Executable for CodeBlock {
                     vm_state.add_flag(flag_backup);
                 }
             }
-            
+
             vm_state.ip += *size as u64;
         }
     }

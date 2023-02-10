@@ -174,6 +174,14 @@ unsafe fn compile_op(
         Operand::VoidIr(ir) => compile_ir(ir, flag_policy.clone())?,
         Operand::Ip => Box::new(move |ctx| ctx.ip()),
         Operand::Flag => Box::new(move |ctx| ctx.flag()),
+        Operand::Dbg(op) => {
+            let op = compile_op(op, flag_policy.clone())?;
+            Box::new(move |ctx| {
+                let val = op(ctx);
+                println!("Debug: {}", val);
+                val
+            })
+        }
     })
 }
 
@@ -228,7 +236,7 @@ unsafe fn gen_add(
         Type::F64 => Box::new(move |ctx| {
             (f64::from_bits(lhs.execute(ctx)) + f64::from_bits(rhs.execute(ctx))).to_bits()
         }),
-        Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -273,7 +281,7 @@ unsafe fn gen_sub(
         Type::F64 => Box::new(move |ctx| {
             (f64::from_bits(lhs.execute(ctx)) - f64::from_bits(rhs.execute(ctx))).to_bits()
         }),
-        Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -313,7 +321,7 @@ unsafe fn gen_mul(
             (f64::from_bits(lhs.execute(ctx)) * f64::from_bits(rhs.execute(ctx))).to_bits()
         }),
 
-        Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -353,7 +361,7 @@ unsafe fn gen_div(
             (f64::from_bits(lhs.execute(ctx)) / f64::from_bits(rhs.execute(ctx))).to_bits()
         }),
 
-        Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -441,8 +449,8 @@ unsafe fn gen_addc(
 
             (lhs as i64 + rhs as i64 + carry_in) as u64
         }),
-        Type::F32 | Type::F64 => return Err(CodegenError::InvalidType),
-        Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 => unreachable!("invalid type: {:?}", t),
+        Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -529,8 +537,8 @@ unsafe fn gen_subc(
 
             (lhs as i64 - rhs as i64 + carry_in) as u64
         }),
-        Type::F32 | Type::F64 => return Err(CodegenError::InvalidType),
-        Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 => unreachable!("invalid type: {:?}", t),
+        Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -551,7 +559,7 @@ unsafe fn gen_lshl(
         Type::I16 => Box::new(move |ctx| (lhs.execute(ctx) << rhs.execute(ctx)) as i16 as u64),
         Type::I32 => Box::new(move |ctx| (lhs.execute(ctx) << rhs.execute(ctx)) as i32 as u64),
         Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) << rhs.execute(ctx)) as i64 as u64),
-        Type::F32 | Type::F64 | Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -573,7 +581,7 @@ unsafe fn gen_lshr(
         Type::I16 => Box::new(move |ctx| (lhs.execute(ctx) >> rhs.execute(ctx)) as i16 as u64),
         Type::I32 => Box::new(move |ctx| (lhs.execute(ctx) >> rhs.execute(ctx)) as i32 as u64),
         Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) >> rhs.execute(ctx)) as i64 as u64),
-        Type::F32 | Type::F64 | Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -595,7 +603,7 @@ unsafe fn gen_ashr(
         Type::I16 => Box::new(move |ctx| (lhs.execute(ctx) as i16 >> rhs.execute(ctx)) as u64),
         Type::I32 => Box::new(move |ctx| (lhs.execute(ctx) as i32 >> rhs.execute(ctx)) as u64),
         Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) as i64 >> rhs.execute(ctx)) as u64),
-        Type::F32 | Type::F64 | Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -631,7 +639,7 @@ unsafe fn gen_rotr(
         Type::I64 => Box::new(move |ctx| {
             ((lhs.execute(ctx) as i64).rotate_right(rhs.execute(ctx) as u32)) as u64
         }),
-        Type::F32 | Type::F64 | Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -662,7 +670,7 @@ unsafe fn gen_load(
             let var = op.execute(ctx);
             ctx.mem(var).read_u64().unwrap()
         }),
-        Type::Void => return Err(CodegenError::InvalidType),
+        Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -681,7 +689,7 @@ unsafe fn gen_zext_cast(
         | Type::I16
         | Type::I32
         | Type::I64 => Box::new(move |ctx| op.execute(ctx)),
-        Type::F32 | Type::F64 | Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -712,7 +720,7 @@ unsafe fn gen_sext_cast(
             let v: i64 = op.execute(ctx) as i64;
             v as u64 & to
         }),
-        Type::F32 | Type::F64 | Type::Void | Type::Bool => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -747,7 +755,7 @@ unsafe fn gen_and(
         | Type::I16
         | Type::I32
         | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) & rhs.execute(ctx)) & type_mask(t)),
-        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -770,7 +778,7 @@ unsafe fn gen_or(
         | Type::I16
         | Type::I32
         | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) | rhs.execute(ctx)) & type_mask(t)),
-        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -795,7 +803,7 @@ unsafe fn gen_xor(
         | Type::I16
         | Type::I32
         | Type::I64 => Box::new(move |ctx| (lhs.execute(ctx) ^ rhs.execute(ctx)) & type_mask(t)),
-        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -818,7 +826,7 @@ unsafe fn gen_not(
         | Type::I16
         | Type::I32
         | Type::I64 => Box::new(move |ctx| (!op.execute(ctx) & type_mask(t))),
-        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
+        Type::F32 | Type::F64 | Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -837,15 +845,7 @@ unsafe fn gen_if(
 
     let t = *t;
     Ok(match t {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::I8
-        | Type::I16
-        | Type::I32
-        | Type::I64 => Box::new(move |ctx| {
+        _ => Box::new(move |ctx| {
             type_mask(t)
                 & if cond.execute(ctx) != 0 {
                     if_true.execute(ctx)
@@ -853,7 +853,6 @@ unsafe fn gen_if(
                     if_false.execute(ctx)
                 }
         }),
-        Type::F32 | Type::F64 | Type::Void => return Err(CodegenError::InvalidType),
     })
 }
 
@@ -882,7 +881,7 @@ unsafe fn gen_cmp_eq(
         | Type::F64 => Box::new(move |ctx| {
             (lhs.execute(ctx) & type_mask(t) == rhs.execute(ctx) & type_mask(t)) as u64
         }),
-        Type::Void => return Err(CodegenError::InvalidType),
+        Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -911,7 +910,7 @@ unsafe fn gen_cmp_ne(
         | Type::F64 => Box::new(move |ctx| {
             (lhs.execute(ctx) & type_mask(t) != rhs.execute(ctx) & type_mask(t)) as u64
         }),
-        Type::Void => return Err(CodegenError::InvalidType),
+        Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -940,7 +939,7 @@ unsafe fn gen_cmp_gt(
         | Type::F64 => Box::new(move |ctx| {
             (lhs.execute(ctx) & type_mask(t) > rhs.execute(ctx) & type_mask(t)) as u64
         }),
-        Type::Void => return Err(CodegenError::InvalidType),
+        Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 
@@ -969,7 +968,7 @@ unsafe fn gen_cmp_lt(
         | Type::F64 => Box::new(move |ctx| {
             (lhs.execute(ctx) & type_mask(t) < rhs.execute(ctx) & type_mask(t)) as u64
         }),
-        Type::Void => return Err(CodegenError::InvalidType),
+        Type::Void => unreachable!("invalid type: {:?}", t),
     })
 }
 

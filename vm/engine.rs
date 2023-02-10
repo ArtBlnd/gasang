@@ -5,7 +5,7 @@ use crate::compiler::Compiler;
 use crate::error::{CompileError, Error};
 use crate::ir::{BlockDestination, IrBlock};
 use crate::mmu::MemoryFrame;
-use crate::vm_state::{VmState, self};
+use crate::vm_state::{self, VmState};
 
 use machineinstr::{MachineInstParser, MachineInstrParserRule};
 
@@ -35,15 +35,13 @@ where
     G: Codegen,
 {
     pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
-        let this = std::panic::AssertUnwindSafe(|| {
-            self.run_inner(vm_state)
-        });
-        if let Err(err) = std::panic::catch_unwind(|| {
-            this()
-        }) {
-            println!("panic: {:?}", err);
+        let this = std::panic::AssertUnwindSafe(|| self.run_inner(vm_state));
+        match std::panic::catch_unwind(|| this()) {
+            Err(_) => { },
+            Ok(Err(err)) => return Err(err),
+            Ok(Ok(_)) => unreachable!(),
         }
-        
+
         vm_state.dump();
         std::process::exit(-1);
     }
@@ -53,17 +51,15 @@ where
         let ep_frame = vm_state.mem(vm_state.ip());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
 
-        let mut code = self.codegen.compile(ep_block);
+        let mut code = self.codegen.compile(ep_block)?;
 
         loop {
-            for code_block in &code {
-                code_block.execute(vm_state);
-            }
+            code.execute(vm_state);
 
             let next_frame = vm_state.mem(vm_state.ip());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
 
-            code = self.codegen.compile(next_block);
+            code = self.codegen.compile(next_block)?;
         }
     }
 
