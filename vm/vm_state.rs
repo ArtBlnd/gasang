@@ -58,7 +58,6 @@ impl VmState {
 
     pub fn set_ip(&mut self, eip: u64) {
         self.ip = eip;
-        println!("Jump to ip: {eip:x}");
     }
 
     pub fn flag(&self) -> u64 {

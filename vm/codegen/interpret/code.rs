@@ -20,8 +20,6 @@ pub struct CodeBlock {
 
 impl Executable for CodeBlock {
     unsafe fn execute(&self, vm_state: &mut VmState) {
-        println!("ip modified: {}", vm_state.ip);
-
         if self.codes.is_empty() {
             panic!("empty code block! maybe tried to compile unreadable place?");
         }

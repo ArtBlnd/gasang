@@ -174,11 +174,12 @@ unsafe fn compile_op(
         Operand::VoidIr(ir) => compile_ir(ir, flag_policy.clone())?,
         Operand::Ip => Box::new(move |ctx| ctx.ip()),
         Operand::Flag => Box::new(move |ctx| ctx.flag()),
-        Operand::Dbg(op) => {
+        Operand::Dbg(s, op) => {
             let op = compile_op(op, flag_policy.clone())?;
+            let s = s.to_string();
             Box::new(move |ctx| {
                 let val = op(ctx);
-                println!("Debug: {}", val);
+                println!("{s} {val}");
                 val
             })
         }

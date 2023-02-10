@@ -9,7 +9,7 @@ pub enum Operand {
     Immediate(Type, u64),
     Ip,
     Flag,
-    Dbg(Box<Operand>)
+    Dbg(String, Box<Operand>)
 }
 
 impl Operand {
@@ -21,7 +21,7 @@ impl Operand {
             Operand::Immediate(t, _) => *t,
             Operand::Ip => Type::U64,
             Operand::Flag => Type::U64,
-            Operand::Dbg(operand) => operand.get_type()
+            Operand::Dbg(_, operand) => operand.get_type()
         }
     }
 
@@ -41,7 +41,7 @@ impl Operand {
         Operand::Immediate(t, imm)
     }
 
-    pub fn dbg(operand: Operand) -> Self {
-        Operand::Dbg(Box::new(operand))
+    pub fn dbg(msg: impl AsRef<str>, operand: Operand) -> Self {
+        Operand::Dbg(msg.as_ref().to_string(), Box::new(operand))
     }
 }
