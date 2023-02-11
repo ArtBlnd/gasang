@@ -37,6 +37,7 @@ pub const fn decode_operand_for_ld_st_reg_imm(
     if operand.idxt == 0b00 {
         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
         let post = extract_bits16(0..2, operand.imm12) == 0b01;
+        
 
         (true, post, operand.size, sign_extend(imm9, 9))
     } else {

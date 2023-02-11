@@ -11,7 +11,7 @@ pub enum Operand {
     Ip,
     Flag,
     Dbg(String, Box<Operand>),
-    VmInfo(VmInfo)
+    VmInfo(VmInfo),
 }
 
 impl Operand {
@@ -24,7 +24,7 @@ impl Operand {
             Operand::Ip => Type::U64,
             Operand::Flag => Type::U64,
             Operand::Dbg(_, operand) => operand.get_type(),
-            Operand::VmInfo(_) => Type::U64
+            Operand::VmInfo(_) => Type::U64,
         }
     }
 

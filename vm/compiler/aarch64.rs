@@ -206,7 +206,7 @@ fn gen_ldr_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
         let ir = Ir::Add(
             Type::U64,
             Operand::reg(Type::U64, src),
-            Operand::Immediate(Type::I64, offset as u64),
+            Operand::dbg("Wback imm: ",Operand::Immediate(Type::I64, offset as u64)),
         );
         let ds = BlockDestination::Gpr(src);
 
@@ -873,8 +873,8 @@ fn gen_ldr_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset, ty: T
         ty,
         Operand::ir(Ir::Add(
             Type::U64,
-            Operand::dbg("from register1:", Operand::Register(Type::U64, src)),
-            Operand::dbg("from register2:", Operand::ir(offset)),
+            Operand::Register(Type::U64, src),
+            Operand::ir(offset),
         )),
     );
     let ir = Ir::ZextCast(ty, Operand::ir(ir));

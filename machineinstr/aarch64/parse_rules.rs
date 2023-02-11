@@ -1754,13 +1754,13 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
              v: Extract<BitRange<26, 27>, u8>,
              idxt: Extract<BitRange<24, 26>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
-             imm9: Extract<BitRange<12, 21>, u16>,
+             imm12: Extract<BitRange<10, 22>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SizeImm12RnRt {
                     idxt: idxt.value,
                     size: size.value,
-                    imm12: imm9.value,
+                    imm12: imm12.value,
                     rn: rn.value,
                     rt: rt.value,
                 };
@@ -2002,13 +2002,13 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
              v: Extract<BitRange<26, 27>, u8>,
              idxt: Extract<BitRange<24, 26>, u8>, // Indexing type
              opc: Extract<BitRange<22, 24>, u8>,
-             imm9: Extract<BitRange<12, 21>, u16>,
+             imm12: Extract<BitRange<10, 22>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SizeImm12RnRt {
                     idxt: idxt.value,
                     size: size.value,
-                    imm12: imm9.value,
+                    imm12: imm12.value,
                     rn: rn.value,
                     rt: rt.value,
                 };
@@ -2064,13 +2064,13 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
              v: Extract<BitRange<26, 27>, u8>,
              idxt: Extract<BitRange<24, 26>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
-             imm9: Extract<BitRange<12, 21>, u16>,
+             imm12: Extract<BitRange<10, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = SizeImm12RnRt {
                     idxt: idxt.value,
                     size: size.value,
-                    imm12: imm9.value,
+                    imm12: imm12.value,
                     rn: rn.value,
                     rt: rt.value,
                 };

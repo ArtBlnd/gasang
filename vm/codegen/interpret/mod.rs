@@ -375,83 +375,29 @@ unsafe fn gen_addc(
     op2: &Operand,
     flag_policy: Arc<dyn FlagPolicy>,
 ) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let t1 = op1.get_type();
+    let t2 = op2.get_type();
+
+    if t1.is_float() {
+        assert!(t2.is_float() && t1.size() == t2.size())
+    } else {
+        assert!(t1.is_scalar() && t2.is_scalar() && t1.size() == t2.size())
+    }
+
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     let t = *t;
-
     Ok(match t {
-        Type::U8 => Box::new(move |ctx| {
-            let carry_in: u8 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            (lhs as u8 + rhs as u8 + carry_in) as u64
-        }),
-        Type::U16 => Box::new(move |ctx| {
-            let carry_in: u16 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            (lhs as u16 + rhs as u16 + carry_in) as u64
-        }),
-        Type::U32 => Box::new(move |ctx| {
-            let carry_in: u32 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            (lhs as u32 + rhs as u32 + carry_in) as u64
-        }),
-        Type::U64 => Box::new(move |ctx| {
-            let carry_in: u64 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            lhs + rhs + carry_in
-        }),
-        Type::I8 => Box::new(move |ctx| {
-            let carry_in: i8 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            (lhs as i8 + rhs as i8 + carry_in) as u64
-        }),
-        Type::I16 => Box::new(move |ctx| {
-            let carry_in: i16 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            (lhs as i16 + rhs as i16 + carry_in) as u64
-        }),
-        Type::I32 => Box::new(move |ctx| {
-            let carry_in: i32 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            (lhs as i32 + rhs as i32 + carry_in) as u64
-        }),
-        Type::I64 => Box::new(move |ctx| {
-            let carry_in: i64 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.add_carry(t, lhs, rhs, ctx);
-
-            (lhs as i64 + rhs as i64 + carry_in) as u64
+        Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::I8 | Type::I16 | Type::I32 | Type::I64 => Box::new(move |ctx| {
+            let lhs = lhs.execute(ctx) as i64;
+            let rhs = rhs.execute(ctx) as i64;
+            
+            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx);
+            
+            lhs.overflowing_add(rhs)
+            .0 as u64
+            & type_mask(t)
         }),
         Type::F32 | Type::F64 => unreachable!("invalid type: {:?}", t),
         Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),
@@ -464,82 +410,29 @@ unsafe fn gen_subc(
     op2: &Operand,
     flag_policy: Arc<dyn FlagPolicy>,
 ) -> Result<Box<dyn InterpretFunc>, CodegenError> {
+    let t1 = op1.get_type();
+    let t2 = op2.get_type();
+
+    if t1.is_float() {
+        assert!(t2.is_float() && t1.size() == t2.size())
+    } else {
+        assert!(t1.is_scalar() && t2.is_scalar() && t1.size() == t2.size())
+    }
+
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     let t = *t;
     Ok(match t {
-        Type::U8 => Box::new(move |ctx| {
-            let carry_in: u8 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            (lhs as u8 - rhs as u8 + carry_in) as u64
-        }),
-        Type::U16 => Box::new(move |ctx| {
-            let carry_in: u16 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            (lhs as u16 - rhs as u16 + carry_in) as u64
-        }),
-        Type::U32 => Box::new(move |ctx| {
-            let carry_in: u32 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            (lhs as u32 - rhs as u32 + carry_in) as u64
-        }),
-        Type::U64 => Box::new(move |ctx| {
-            let carry_in: u64 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            lhs - rhs + carry_in
-        }),
-        Type::I8 => Box::new(move |ctx| {
-            let carry_in: i8 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            (lhs as i8 - rhs as i8 + carry_in) as u64
-        }),
-        Type::I16 => Box::new(move |ctx| {
-            let carry_in: i16 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            (lhs as i16 - rhs as i16 + carry_in) as u64
-        }),
-        Type::I32 => Box::new(move |ctx| {
-            let carry_in: i32 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            (lhs as i32 - rhs as i32 + carry_in) as u64
-        }),
-        Type::I64 => Box::new(move |ctx| {
-            let carry_in: i64 = flag_policy.carry(ctx).into();
-            let lhs = lhs.execute(ctx);
-            let rhs = rhs.execute(ctx);
-
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
-
-            (lhs as i64 - rhs as i64 + carry_in) as u64
+        Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::I8 | Type::I16 | Type::I32 | Type::I64 => Box::new(move |ctx| {
+            let lhs = lhs.execute(ctx) as i64;
+            let rhs = rhs.execute(ctx) as i64;
+            
+            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx);
+            
+            lhs.overflowing_sub(rhs)
+            .0 as u64
+            & type_mask(t)
         }),
         Type::F32 | Type::F64 => unreachable!("invalid type: {:?}", t),
         Type::Void | Type::Bool => unreachable!("invalid type: {:?}", t),

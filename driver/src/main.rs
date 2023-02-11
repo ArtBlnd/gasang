@@ -76,10 +76,10 @@ fn main() {
 
     // allocate stack
     const STACK_SIZE: u64 = 1024 * 1024 * 4;
-    vm_state.gpr_mut(stack_reg).set(0x10000000);
+    vm_state.gpr_mut(stack_reg).set(576460752303390720);
     vm_state
         .mmu()
-        .mmap(0x10000000 - STACK_SIZE, STACK_SIZE, true, true, false);
+        .mmap(576460752303390720 - STACK_SIZE, STACK_SIZE, true, true, false);
 
     unsafe {
         engine.run(&mut vm_state).unwrap();
