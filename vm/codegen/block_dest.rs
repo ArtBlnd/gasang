@@ -30,9 +30,9 @@ where
             let compiled_ir = Box::new(codegen.compile(ir));
             Box::new(StoreMemoryIr(ty, compiled_ir))
         }
-        BlockDestination::None => todo!(),
-        BlockDestination::SystemCall => todo!(),
-        BlockDestination::Exit => todo!(),
+        BlockDestination::None => Box::new(NoneDest),
+        BlockDestination::SystemCall => Box::new(SystemCall),
+        BlockDestination::Exit => Box::new(Exit),
     }
 }
 
@@ -78,7 +78,7 @@ impl CompiledBlockDestinationTrait for SetMemory {
             Type::U32 | Type::I32 | Type::F32 => vm.mem(self.1).write_u32(val as u32),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(self.1).write_u64(val as u64),
             Type::Void | Type::Bool => unreachable!(),
-        };
+        }.unwrap();
     }
 }
 
@@ -94,7 +94,7 @@ impl CompiledBlockDestinationTrait for SetMemoryI64 {
             Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(val as u32),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(val as u64),
             Type::Void | Type::Bool => unreachable!(),
-        };
+        }.unwrap();
     }
 }
 
@@ -108,6 +108,25 @@ impl CompiledBlockDestinationTrait for StoreMemoryIr {
             Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(val as u32),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(val as u64),
             Type::Void | Type::Bool => unreachable!(),
-        };
+        }.unwrap();
+    }
+}
+
+struct NoneDest; 
+impl CompiledBlockDestinationTrait for NoneDest {
+    unsafe fn reflect(&self, _: u64, _: &mut VmState, _: &dyn InterruptModel) {}
+}
+
+struct SystemCall;
+impl CompiledBlockDestinationTrait for SystemCall {
+    unsafe fn reflect(&self, val: u64, vm: &mut VmState, interrupt_model: &dyn InterruptModel) {
+        interrupt_model.syscall(val, vm)
+    }
+}
+
+struct Exit;
+impl CompiledBlockDestinationTrait for Exit {
+    unsafe fn reflect(&self, _: u64, _: &mut VmState, _: &dyn InterruptModel) {
+        panic!("exit");
     }
 }

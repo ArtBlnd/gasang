@@ -231,7 +231,7 @@ fn gen_ldr_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
         let ir = Ir::Add(
             Type::U64,
             Operand::reg(Type::U64, src),
-            Operand::dbg("Wback imm: ", Operand::Immediate(Type::I64, offset as u64)),
+            Operand::imm(Type::I64, offset as u64),
         );
         let ds = BlockDestination::Gpr(Type::U64, src);
 
@@ -1023,7 +1023,7 @@ fn gen_and_imm(compiler: &AArch64Compiler, operand: LogicalImm, ty: Type) -> IrB
     let ir = Ir::And(ty, src, Operand::Immediate(ty, imm));
 
     let ds = BlockDestination::Gpr(
-        Type::U64,
+        ty,
         if operand.rd == 31 {
             compiler.stack_reg
         } else {
@@ -1187,7 +1187,7 @@ fn gen_orr_imm(compiler: &AArch64Compiler, operand: LogicalImm, ty: Type) -> IrB
         let ds = BlockDestination::Gpr(Type::U64, compiler.stack_reg);
         block.append(ir, ds);
     } else {
-        let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
+        let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
         block.append(ir, ds);
     };
 
@@ -1219,7 +1219,7 @@ fn gen_str_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset, ty: T
     let rm = compiler.gpr(operand.rm);
 
     let ext_type = decode_reg_extend(operand.option);
-    let offset = extend_reg(rm, ext_type, shift, 64);
+    let offset = extend_reg(rm, ext_type, shift, 8);
 
     let dst = if operand.rn == 31 {
         compiler.stack_reg
