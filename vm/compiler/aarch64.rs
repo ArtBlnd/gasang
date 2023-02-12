@@ -63,6 +63,8 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Sturb(operand) => gen_sturb_imm(self, operand),
             AArch64Instr::StrReg32(operand) => gen_str_reg(self, operand, Type::U32),
             AArch64Instr::StrReg64(operand) => gen_str_reg(self, operand, Type::U64),
+            AArch64Instr::Stur32(operand) => gen_stur(self, operand, Type::U32),
+            AArch64Instr::Stur64(operand) => gen_stur(self, operand, Type::U64),
 
             // Arithmetic instructions
             AArch64Instr::AddImm64(operand) => gen_add_imm64(self, operand),
@@ -664,7 +666,7 @@ fn gen_csel32(compiler: &AArch64Compiler, operand: RmCondRnRd) -> IrBlock {
 fn gen_svc(_compiler: &AArch64Compiler, operand: ExceptionGen) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let ir = Ir::Value(Operand::imm(Type::U16, operand.imm16 as u64));
+    let ir = Ir::Value(Operand::imm(Type::U64, operand.imm16 as u64));
     let ds = BlockDestination::SystemCall;
 
     block.append(ir, ds);
@@ -1231,6 +1233,26 @@ fn gen_str_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset, ty: T
 
     let ir = Ir::Value(Operand::reg(ty, compiler.gpr(operand.rt)));
     let ds = BlockDestination::MemoryIr(addr);
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_stur(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let rn = if operand.rn == 31{
+        compiler.stack_reg
+    } else {
+        compiler.gpr(operand.rn)
+    };
+    let rt = operand.rt;
+
+    let offs = sign_extend((operand.imm12 >> 2) as i64, 9) as i64;
+
+    let ir = Ir::Value(Operand::reg(ty, compiler.gpr(rt)));
+    let ds = BlockDestination::MemoryRelI64(ty, rn, offs);
 
     block.append(ir, ds);
 
