@@ -37,7 +37,6 @@ pub const fn decode_operand_for_ld_st_reg_imm(
     if operand.idxt == 0b00 {
         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
         let post = extract_bits16(0..2, operand.imm12) == 0b01;
-        
 
         (true, post, operand.size, sign_extend(imm9, 9))
     } else {
@@ -192,7 +191,7 @@ pub const fn ones(n: u64) -> u64 {
 
 pub const fn ror(x: u64, shift: u64, size: u64) -> u64 {
     let m = shift % size;
-    x >> m | ((x << (size - m)) & ones(shift))
+    x >> m | ((x.overflowing_shl((size - m) as u32).0) & ones(shift))
 }
 
 pub const fn replicate(x: u64, n: u64, size: u64) -> u64 {
@@ -201,7 +200,7 @@ pub const fn replicate(x: u64, n: u64, size: u64) -> u64 {
 
     while i > 0 {
         result |= x;
-        result <<= size;
+        result = result.overflowing_shl(size as u32).0;
         i -= 1;
     }
 
@@ -236,7 +235,7 @@ pub const fn decode_bit_masks(immn: u8, imms: u8, immr: u8, immediate: bool, m: 
 
     let s = imms & levels as u8;
     let r = immr & levels as u8;
-    let diff = s - r;
+    let (diff, _) = s.overflowing_sub(r);
 
     let esize = 1 << len;
     let d = extract_bits16(0..len as usize, diff as u16);
@@ -315,4 +314,12 @@ pub fn replace_bits(val: Operand, imm: u64, range: Range<u64>) -> Ir {
         Operand::ir(Ir::And(val.get_type(), val, mask)),
         imm,
     )
+}
+
+pub fn gen_mask64<T>(range: Range<T>) -> u64
+where
+    T: Into<usize> + Copy,
+{
+    let mask = (u64::MAX >> range.start.into()) << range.start.into();
+    (mask << range.end.into()) >> range.end.into()
 }

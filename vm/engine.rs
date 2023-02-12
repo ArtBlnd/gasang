@@ -1,8 +1,11 @@
 use std::convert::Infallible;
 
-use crate::codegen::{Codegen, Executable};
+use crate::codegen::{
+    codegen_block_dest, Codegen, CompiledBlock, CompiledBlockDestination, Executable,
+};
 use crate::compiler::Compiler;
 use crate::error::{CompileError, Error};
+use crate::interrupt::InterruptModel;
 use crate::ir::{BlockDestination, IrBlock};
 use crate::mmu::MemoryFrame;
 use crate::vm_state::{self, VmState};
@@ -11,28 +14,33 @@ use machineinstr::{MachineInstParser, MachineInstrParserRule};
 
 use utility::BitReader;
 
-pub struct Engine<C, R, G> {
+pub struct Engine<C, R, M, G> {
     compiler: C,
     parse_rule: R,
+    interrupt_model: M,
 
     codegen: G,
 }
 
-impl<C, R, G> Engine<C, R, G> {
-    pub fn new(compiler: C, parse_rule: R, codegen: G) -> Self {
+impl<C, R, M, G> Engine<C, R, M, G> {
+    pub fn new(compiler: C, parse_rule: R, interrupt_model: M, codegen: G) -> Self {
         Self {
             compiler,
             parse_rule,
+            interrupt_model,
             codegen,
         }
     }
 }
 
-impl<C, R, G> Engine<C, R, G>
+impl<C, R, M, G> Engine<C, R, M, G>
 where
     C: Compiler,
     R: MachineInstrParserRule<MachineInstr = C::Item>,
+    M: InterruptModel,
     G: Codegen,
+
+    G::Code: 'static,
 {
     pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
         let this = std::panic::AssertUnwindSafe(|| self.run_inner(vm_state));
@@ -51,19 +59,21 @@ where
         let ep_frame = vm_state.mem(vm_state.ip());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
 
-        let mut code = self.codegen.compile(ep_block)?;
+        let mut compiled = codegen_ir_blocks(ep_block, &self.codegen);
 
         loop {
-            code.execute(vm_state);
+            for code in compiled {
+                code.execute(vm_state, &self.interrupt_model);
+            }
 
             let next_frame = vm_state.mem(vm_state.ip());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
 
-            code = self.codegen.compile(next_block)?;
+            compiled = codegen_ir_blocks(next_block, &self.codegen);
         }
     }
 
-    fn compile_until_branch_or_eof(
+    unsafe fn compile_until_branch_or_eof(
         &mut self,
         frame: MemoryFrame,
     ) -> Result<Vec<IrBlock>, CompileError> {
@@ -71,7 +81,33 @@ where
     }
 }
 
-fn compile_until_branch_or_eof<R, C>(
+unsafe fn codegen_ir_blocks<C>(blocks: Vec<IrBlock>, codegen: &C) -> Vec<CompiledBlock<C::Code>>
+where
+    C: Codegen,
+    C::Code: 'static,
+{
+    let mut result = Vec::with_capacity(blocks.len());
+    for block in blocks {
+        let mut compiled_block = CompiledBlock::new(block.original_size() as u64);
+
+        if block.restore_flag() {
+            compiled_block.set_restore_flag();
+        }
+
+        for item in block.items() {
+            let code = codegen.compile(item.root().clone());
+            let dest = codegen_block_dest(codegen, item.dest().clone());
+
+            compiled_block.push(code, dest);
+        }
+
+        result.push(compiled_block);
+    }
+
+    result
+}
+
+unsafe fn compile_until_branch_or_eof<R, C>(
     frame: MemoryFrame,
     rule: &R,
     compiler: &C,

@@ -68,4 +68,15 @@ impl Type {
             _ => unreachable!(),
         }
     }
+
+    pub fn gen_mask(&self) -> u64 {
+        match self {
+            Type::Bool => 0b1u64,
+            Type::U8 | Type::I8 => u8::max_value() as u64,
+            Type::U16 | Type::I16 => u16::max_value() as u64,
+            Type::U32 | Type::I32 | Type::F32 => u32::max_value() as u64,
+            Type::U64 | Type::I64 | Type::F64 => u64::max_value(),
+            Type::Void => 0b0,
+        }
+    }
 }

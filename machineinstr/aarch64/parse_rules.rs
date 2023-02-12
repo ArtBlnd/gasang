@@ -1503,6 +1503,7 @@ fn parse_load_store_reg_pair_offset(raw_instr: u32) -> AArch64Instr {
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = LoadStoreRegPair {
+                    opc: opc.value,
                     imm7: imm7.value,
                     o: 0b010,
                     rt2: rt2.value,
@@ -1860,6 +1861,7 @@ fn parse_load_store_reg_pair_pre_indexed(raw_instr: u32) -> AArch64Instr {
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = LoadStoreRegPair {
+                    opc: opc.value,
                     o: 0b011,
                     imm7: imm7.value,
                     rt2: rt2.value,
@@ -1909,6 +1911,7 @@ fn parse_load_store_reg_pair_post_indexed(raw_instr: u32) -> AArch64Instr {
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
                 let data = LoadStoreRegPair {
+                    opc: opc.value,
                     o: 0b001,
                     imm7: imm7.value,
                     rt2: rt2.value,

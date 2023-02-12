@@ -3,7 +3,7 @@ use crate::VmState;
 
 pub struct AArch64UnixInterruptModel;
 impl InterruptModel for AArch64UnixInterruptModel {
-    unsafe fn syscall(&self, _: u64, vm: &VmState) {
+    unsafe fn syscall(&self, _: u64, vm: &mut VmState) {
         let nr = vm.gpr(vm.reg_by_name("x8").unwrap()).get();
         let arg0 = vm.gpr(vm.reg_by_name("x0").unwrap()).get();
         let arg1 = vm.gpr(vm.reg_by_name("x1").unwrap()).get();
@@ -16,7 +16,7 @@ impl InterruptModel for AArch64UnixInterruptModel {
     }
 }
 
-pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &VmState) {
+pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut VmState) {
     match nr {
         // write arg0:fd arg1:buf arg0: length
         0x40 => {
@@ -41,6 +41,41 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &VmState) {
         // exit_group arg0:error_code
         0x5e => {
             std::process::exit(args[0] as i32);
+        }
+
+        // geteuid
+        0xaf => {
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            // We only have one user emulated on this machine.
+            ret.set(0);
+        }
+
+        // getuid
+        0xae => {
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            // We only have one user emulated on this machine.
+            ret.set(0);
+        }
+
+        0xb0 => {
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            // We only have one group emulated on this machine.
+            ret.set(0);
+        }
+
+        // getegid
+        0xb1 => {
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            // We only have one group emulated on this machine.
+            ret.set(0);
         }
         _ => unimplemented!("unknown interrupt! {}", nr),
     }

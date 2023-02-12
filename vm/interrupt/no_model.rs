@@ -3,7 +3,7 @@ use crate::VmState;
 
 pub struct NoModel;
 impl InterruptModel for NoModel {
-    unsafe fn syscall(&self, _int: u64, _vm: &VmState) {
+    unsafe fn syscall(&self, _int: u64, _vm: &mut VmState) {
         unimplemented!()
     }
 }

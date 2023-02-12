@@ -1,16 +1,18 @@
 use smallvec::SmallVec;
 
-use crate::ir::Ir;
+use crate::ir::*;
 use crate::register::RegId;
 
 #[derive(Clone, Debug)]
 pub enum BlockDestination {
     Flags,
     Ip,
-    Gpr(RegId),
-    Fpr(RegId),
-    Memory(u64),
-    MemoryRel(RegId, i64),
+    Gpr(Type, RegId),
+    Fpr(Type, RegId),
+    Memory(Type, u64),
+    MemoryRelI64(Type, RegId, i64),
+    MemoryRelU64(Type, RegId, u64),
+    MemoryIr(Ir),
     None,
     SystemCall,
     Exit,
@@ -19,7 +21,6 @@ pub enum BlockDestination {
 #[derive(Clone, Debug)]
 pub struct IrBlock {
     items: SmallVec<[IrBlockItem; 2]>,
-
     original_size: usize,
     restore_flag: bool,
 }
@@ -34,6 +35,26 @@ impl IrBlock {
     }
 
     pub fn append(&mut self, ir: Ir, dest: BlockDestination) {
+        let ir_type = ir.get_type();
+
+        let dest_type = match &dest {
+            BlockDestination::Flags => Some(&Type::U64),
+            BlockDestination::Ip => Some(&Type::U64),
+            BlockDestination::Gpr(ty, _) => Some(ty),
+            BlockDestination::Fpr(ty, _) => Some(ty),
+            BlockDestination::Memory(ty, _) => Some(ty),
+            BlockDestination::MemoryRelI64(ty, _, _) => Some(ty),
+            BlockDestination::MemoryRelU64(ty, _, _) => Some(ty),
+            BlockDestination::MemoryIr(_) => None,
+            BlockDestination::None => None,
+            BlockDestination::SystemCall => Some(&Type::U64),
+            BlockDestination::Exit => None,
+        };
+
+        if let Some(dest_type) = dest_type {
+            assert_eq!(&ir_type, dest_type);
+        }
+
         self.items.push(IrBlockItem {
             ir_root: ir,
             ir_dest: dest,

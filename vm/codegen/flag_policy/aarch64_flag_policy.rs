@@ -6,7 +6,7 @@ use crate::VmState;
 pub struct AArch64FlagPolicy;
 
 impl FlagPolicy for AArch64FlagPolicy {
-    fn add_carry(&self, ty: Type, a: u64, b: u64, vm: &mut VmState) {
+    fn add_carry(&self, ty: Type, a: u64, b: u64, vm: &VmState) {
         let (n, z, c, v) = match ty {
             Type::U8 | Type::I8 => {
                 let ua = a as u8;
@@ -105,11 +105,11 @@ impl FlagPolicy for AArch64FlagPolicy {
         vm.add_flag(n << 63 | z << 62 | c << 61 | v << 60)
     }
 
-    fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &mut VmState) {
+    fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &VmState) {
         self.add_carry(ty, a, (-(b as i64)) as u64, vm)
     }
 
-    fn carry(&self, vm: &mut VmState) -> bool {
+    fn carry(&self, vm: &VmState) -> bool {
         ((vm.flag() >> 61) & 1) == 1
     }
 }

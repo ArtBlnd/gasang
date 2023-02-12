@@ -150,6 +150,7 @@ pub struct LogicalImm {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LoadStoreRegPair {
+    pub opc: u8,
     pub imm7: u8,
     pub o: u8,
     pub rt2: u8,

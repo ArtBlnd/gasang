@@ -5,6 +5,7 @@ pub mod error;
 pub mod image;
 pub mod interrupt;
 pub mod ir;
+pub mod loader;
 pub mod mmu;
 pub mod register;
 pub mod vm_builder;

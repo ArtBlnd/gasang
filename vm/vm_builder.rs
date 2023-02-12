@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::image::Image;
 use crate::interrupt::InterruptModel;
+use crate::loader::Loader;
 use crate::mmu::Mmu;
 use crate::register::*;
 use crate::vm_state::VmState;
@@ -16,22 +17,10 @@ pub struct VmBuilder {
 }
 
 impl VmBuilder {
-    pub fn new(image: &Image) -> Self {
+    pub fn new(loader: impl Loader) -> Self {
         let mmu = Mmu::new();
 
-        for section in image.sections() {
-            let addr = image.section_addr(section);
-            let data = image.section_data(section);
-            let size = data.len();
-
-            mmu.mmap(addr, size as u64, true, true, false);
-            unsafe {
-                mmu.frame(addr).write(data).expect("Failed VM Initialize");
-            }
-
-            let (writable, executable) = image.section_access_info(section);
-            mmu.mmap(addr, size as u64, true, writable, executable)
-        }
+        loader.load(&mmu);
 
         Self {
             gpr_registers: Slab::new(),
@@ -41,10 +30,7 @@ impl VmBuilder {
         }
     }
 
-    pub fn build<M>(self, entry_point: u64, model: M) -> VmState
-    where
-        M: InterruptModel + 'static,
-    {
+    pub fn build(self, entry_point: u64) -> VmState {
         let mut reg_name_map = HashMap::new();
         for gpr in &self.gpr_registers {
             let k = gpr.1.name();
@@ -66,10 +52,8 @@ impl VmBuilder {
             reg_name_map,
 
             mmu: self.mmu,
-            flags: 0,
+            flags: Default::default(),
             ip: entry_point,
-
-            interrupt_model: Box::new(model),
         }
     }
 

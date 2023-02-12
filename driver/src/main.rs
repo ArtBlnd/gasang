@@ -9,6 +9,8 @@ use vm::compiler::aarch64::AArch64Compiler;
 use vm::engine::Engine;
 use vm::image::*;
 use vm::interrupt::AArch64UnixInterruptModel;
+use vm::loader::elf::ElfLoader;
+use vm::loader::Loader;
 use vm::register::{FprRegister, GprRegister, RegId};
 use vm::vm_builder::VmBuilder;
 
@@ -20,40 +22,10 @@ fn main() {
     let filename = &args[1];
 
     let file_buf = std::fs::read(PathBuf::from(filename)).unwrap();
-    let file_elf = ElfBytes::<AnyEndian>::minimal_parse(&file_buf).unwrap();
+    let loader = ElfLoader::new(&file_buf);
+    let entry = loader.entry();
 
-    let mut image = Image::from_image(file_buf.to_vec());
-
-    let Ok((Some(sec_headers), Some(strtbl))) = file_elf.section_headers_with_strtab() else {
-        panic!("Bad elf file!");
-    };
-
-    for sec in sec_headers {
-        let name = strtbl.get(sec.sh_name as usize).unwrap();
-        let beg = sec.sh_offset;
-        let end = sec.sh_offset + sec.sh_size;
-
-        if name == ".text" {
-            image.set_entrypoint(file_elf.ehdr.e_entry);
-        }
-
-        if sec.sh_flags & elf::abi::SHF_ALLOC as u64 == 0 {
-            continue;
-        }
-
-        let (writable, executable) = get_access_info(sec.sh_flags);
-
-        image.add_section(
-            name,
-            sec.sh_addr,
-            writable,
-            executable,
-            beg as usize,
-            end as usize,
-        );
-    }
-
-    let mut vm_state = VmBuilder::new(&image);
+    let mut vm_state = VmBuilder::new(loader);
     let gpr_registers: [RegId; 31] = (0..31)
         .map(|idx| vm_state.add_gpr_register(GprRegister::new(format!("x{idx}"), 8)))
         .collect::<Vec<_>>()
@@ -71,15 +43,19 @@ fn main() {
     let parse_rule = AArch64InstrParserRule;
     let codegen = InterpretCodegen::new(AArch64FlagPolicy);
 
-    let mut engine = Engine::new(compiler, parse_rule, codegen);
-    let mut vm_state = vm_state.build(image.entrypoint(), AArch64UnixInterruptModel);
+    let mut engine = Engine::new(compiler, parse_rule, AArch64UnixInterruptModel, codegen);
+    let mut vm_state = vm_state.build(entry);
 
     // allocate stack
     const STACK_SIZE: u64 = 1024 * 1024 * 4;
     vm_state.gpr_mut(stack_reg).set(576460752303390720);
-    vm_state
-        .mmu()
-        .mmap(576460752303390720 - STACK_SIZE, STACK_SIZE, true, true, false);
+    vm_state.mmu().mmap(
+        576460752303390720 - STACK_SIZE,
+        STACK_SIZE,
+        true,
+        true,
+        false,
+    );
 
     unsafe {
         engine.run(&mut vm_state).unwrap();

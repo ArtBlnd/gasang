@@ -3,6 +3,7 @@ use crate::mmu::{MemoryFrame, Mmu};
 use crate::register::*;
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use slab::Slab;
 
@@ -16,12 +17,10 @@ pub struct VmState {
     pub(crate) fpr_registers: Slab<FprRegister>,
     pub(crate) reg_name_map: HashMap<String, RegId>,
 
-    pub(crate) flags: u64,
+    pub(crate) flags: AtomicU64,
     pub(crate) ip: u64,
 
     pub(crate) mmu: Mmu,
-
-    pub(crate) interrupt_model: Box<dyn InterruptModel>,
 }
 
 impl VmState {
@@ -63,32 +62,27 @@ impl VmState {
 
     pub fn set_ip(&mut self, eip: u64) {
         self.ip = eip;
-        println!("<====={eip:x}=====>")
     }
 
     pub fn flag(&self) -> u64 {
-        self.flags
+        self.flags.load(Ordering::SeqCst)
     }
 
-    pub fn set_flag(&mut self, flag: u64) {
-        self.flags = flag;
+    pub fn set_flag(&self, flag: u64) {
+        self.flags.store(flag, Ordering::SeqCst);
     }
 
-    pub fn add_flag(&mut self, flag: u64) {
-        self.flags |= flag;
+    pub fn add_flag(&self, flag: u64) {
+        self.flags.fetch_or(flag, Ordering::SeqCst);
     }
 
-    pub fn del_flag(&mut self, flag: u64) {
-        self.flags &= !flag;
-    }
-
-    pub fn interrupt_model(&self) -> &dyn InterruptModel {
-        self.interrupt_model.as_ref()
+    pub fn del_flag(&self, flag: u64) {
+        self.flags.fetch_and(!flag, Ordering::SeqCst);
     }
 
     pub fn dump(&self) {
         println!("EIP: 0x{:x}", self.ip);
-        println!("EFLAGS: {:064b}", self.flags);
+        println!("EFLAGS: {:064b}", self.flag());
 
         for reg in &self.gpr_registers {
             print!("({}: 0x{:x}), ", reg.1.name(), reg.1.get());
