@@ -10,12 +10,13 @@ mod block;
 pub use block::*;
 mod code;
 pub use code::*;
+mod value;
+pub use value::*;
 
 pub mod cranelift;
 pub mod flag_policy;
 pub mod interpret;
 
-use crate::error::CodegenError;
 use crate::ir::Ir;
 
 pub trait Codegen {

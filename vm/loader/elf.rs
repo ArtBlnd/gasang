@@ -15,7 +15,7 @@ impl<'d> Loader for ElfLoader<'d> {
             let size = seg.p_memsz;
             let data = self.raw.segment_data(&seg).unwrap();
 
-            mmu.mmap(addr, size as u64, true, true, false);
+            mmu.mmap(addr, size, true, true, false);
             unsafe {
                 mmu.frame(addr).write(data).expect("Failed VM Initialize");
             }
@@ -26,9 +26,9 @@ impl<'d> Loader for ElfLoader<'d> {
 
             assert!(seg.p_flags & elf::abi::PF_MASKPROC == 0);
 
-            assert!(readable == true);
+            assert!(readable);
 
-            mmu.mmap(addr, size as u64, readable, writable, executable)
+            mmu.mmap(addr, size, readable, writable, executable)
         }
 
         for sec in self.raw.section_headers().unwrap() {
@@ -38,7 +38,7 @@ impl<'d> Loader for ElfLoader<'d> {
             let writable = sec.sh_flags & SHF_WRITE as u64 != 0;
             let executable = sec.sh_flags & SHF_EXECINSTR as u64 != 0;
 
-            mmu.mmap(addr, size as u64, true, writable, executable)
+            mmu.mmap(addr, size, true, writable, executable)
         }
     }
 

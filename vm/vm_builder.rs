@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use crate::image::Image;
-use crate::interrupt::InterruptModel;
 use crate::loader::Loader;
 use crate::mmu::Mmu;
 use crate::register::*;

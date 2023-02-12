@@ -1,13 +1,10 @@
-use elf::endian::AnyEndian;
-use elf::ElfBytes;
-
 use machineinstr::aarch64::AArch64InstrParserRule;
 
 use vm::codegen::flag_policy::AArch64FlagPolicy;
 use vm::codegen::interpret::InterpretCodegen;
 use vm::compiler::aarch64::AArch64Compiler;
 use vm::engine::Engine;
-use vm::image::*;
+
 use vm::interrupt::AArch64UnixInterruptModel;
 use vm::loader::elf::ElfLoader;
 use vm::loader::Loader;

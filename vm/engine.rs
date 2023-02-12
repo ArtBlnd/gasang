@@ -1,14 +1,12 @@
 use std::convert::Infallible;
 
-use crate::codegen::{
-    codegen_block_dest, Codegen, CompiledBlock, CompiledBlockDestination, Executable,
-};
+use crate::codegen::{codegen_block_dest, Codegen, CompiledBlock, Executable};
 use crate::compiler::Compiler;
 use crate::error::{CompileError, Error};
 use crate::interrupt::InterruptModel;
 use crate::ir::{BlockDestination, IrBlock};
 use crate::mmu::MemoryFrame;
-use crate::vm_state::{self, VmState};
+use crate::vm_state::VmState;
 
 use machineinstr::{MachineInstParser, MachineInstrParserRule};
 
@@ -44,7 +42,7 @@ where
 {
     pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
         let this = std::panic::AssertUnwindSafe(|| self.run_inner(vm_state));
-        match std::panic::catch_unwind(|| this()) {
+        match std::panic::catch_unwind(this) {
             Err(_) => {}
             Ok(Err(err)) => return Err(err),
             Ok(Ok(_)) => unreachable!(),

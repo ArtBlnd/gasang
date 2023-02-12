@@ -1,14 +1,15 @@
+use crate::codegen::Value;
 use crate::VmState;
 
-pub trait CompiledCode: for<'a> Fn(&'a VmState) -> u64 {
-    unsafe fn execute(&self, vm: &VmState) -> u64;
+pub trait CompiledCode: for<'a> Fn(&'a VmState) -> Value {
+    unsafe fn execute(&self, vm: &VmState) -> Value;
 }
 
 impl<T> CompiledCode for T
 where
-    for<'a> T: Fn(&'a VmState) -> u64,
+    for<'a> T: Fn(&'a VmState) -> Value,
 {
-    unsafe fn execute<'vm>(&self, vm: &'vm VmState) -> u64 {
+    unsafe fn execute<'vm>(&self, vm: &'vm VmState) -> Value {
         self(vm)
     }
 }

@@ -99,6 +99,7 @@ impl FlagPolicy for AArch64FlagPolicy {
             Type::F32 | Type::F64 => unimplemented!("Float type is not supported!"),
             Type::Void => panic!("Void type is not supported!"),
             Type::Bool => panic!("Bool type is not supported!"),
+            _ => panic!("Unknown type!"),
         };
 
         let (n, z, c, v): (u64, u64, u64, u64) = (n.into(), z.into(), c.into(), v.into());

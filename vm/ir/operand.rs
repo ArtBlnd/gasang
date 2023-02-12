@@ -6,7 +6,8 @@ use crate::vm_state::VmInfo;
 pub enum Operand {
     Ir(Box<Ir>),
     VoidIr(Box<Ir>),
-    Register(Type, RegId),
+    Gpr(Type, RegId),
+    Fpr(Type, RegId),
     Immediate(Type, u64),
     Ip,
     Flag,
@@ -19,7 +20,8 @@ impl Operand {
         match self {
             Operand::Ir(ir) => ir.get_type(),
             Operand::VoidIr(_ir) => Type::Void,
-            Operand::Register(t, _) => *t,
+            Operand::Gpr(t, _) => *t,
+            Operand::Fpr(t, _) => *t,
             Operand::Immediate(t, _) => *t,
             Operand::Ip => Type::U64,
             Operand::Flag => Type::U64,
@@ -36,8 +38,8 @@ impl Operand {
         Operand::VoidIr(Box::new(ir))
     }
 
-    pub const fn reg(t: Type, reg: RegId) -> Self {
-        Operand::Register(t, reg)
+    pub const fn gpr(t: Type, reg: RegId) -> Self {
+        Operand::Gpr(t, reg)
     }
 
     pub const fn imm(t: Type, imm: u64) -> Self {

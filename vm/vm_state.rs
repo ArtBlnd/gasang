@@ -1,4 +1,3 @@
-use crate::interrupt::InterruptModel;
 use crate::mmu::{MemoryFrame, Mmu};
 use crate::register::*;
 

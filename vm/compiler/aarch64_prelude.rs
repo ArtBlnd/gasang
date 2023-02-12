@@ -170,7 +170,7 @@ pub fn overflow_flag() -> Operand {
 }
 
 pub fn shift_reg(reg: RegId, shift_type: ShiftType, amount: u64, t: Type) -> Ir {
-    let reg = Operand::reg(t, reg);
+    let reg = Operand::gpr(t, reg);
     let amount = Operand::imm(t, amount);
 
     match shift_type {
@@ -208,7 +208,7 @@ pub const fn replicate(x: u64, n: u64, size: u64) -> u64 {
 }
 
 pub fn replicate_reg64(val: RegId, n: u8) -> Ir {
-    let val = Operand::reg(Type::U64, val);
+    let val = Operand::gpr(Type::U64, val);
 
     Ir::If(
         Type::U64,
@@ -291,7 +291,7 @@ pub fn extend_reg(reg: RegId, ext_type: ExtendType, shift: u8, n: u8) -> Ir {
 
     let ir = Ir::LShl(
         ty,
-        Operand::Register(ty, reg),
+        Operand::Gpr(ty, reg),
         Operand::Immediate(Type::U8, shift as u64),
     );
 
