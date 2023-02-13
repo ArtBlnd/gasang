@@ -98,7 +98,6 @@ struct SetMemoryI64(Type, RegId, i64);
 impl CompiledBlockDestinationTrait for SetMemoryI64 {
     unsafe fn reflect(&self, mut val: Value, vm: &mut VmState, _: &dyn InterruptModel) {
         let (addr, of) = vm.gpr(self.1).get().overflowing_add_signed(self.2);
-        println!("{addr:0x}");
         assert_eq!(of, false);
 
         match self.0 {
