@@ -257,9 +257,9 @@ fn gen_str_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
     };
 
     let rt = if operand.rt == 31 {
-        Operand::imm(Type::U64, 0)
+        Operand::imm(ty, 0)
     } else {
-        Operand::gpr(Type::U64, compiler.gpr(operand.rt))
+        Operand::gpr(ty, compiler.gpr(operand.rt))
     };
 
     let ir = Ir::Value(rt);
@@ -624,7 +624,7 @@ fn gen_ccmp_imm(compiler: &AArch64Compiler, operand: CondCmpImm, ty: Type) -> Ir
     ));
 
     let ir = Ir::If(
-        Type::Void,
+        Type::U64,
         condition_holds(operand.cond),
         Operand::ir(Ir::Or(
             Type::U64,

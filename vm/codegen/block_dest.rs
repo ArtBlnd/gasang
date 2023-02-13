@@ -6,6 +6,9 @@ use crate::VmState;
 
 pub trait CompiledBlockDestinationTrait {
     unsafe fn reflect(&self, val: Value, vm: &mut VmState, interrupt_mode: &dyn InterruptModel);
+    fn is_dest_ip_or_exit(&self) -> bool {
+        false
+    }
 }
 
 pub type CompiledBlockDestination = Box<dyn CompiledBlockDestinationTrait>;
@@ -47,6 +50,10 @@ struct SetIp;
 impl CompiledBlockDestinationTrait for SetIp {
     unsafe fn reflect(&self, mut val: Value, vm: &mut VmState, _: &dyn InterruptModel) {
         vm.set_ip(*val.u64());
+    }
+
+    fn is_dest_ip_or_exit(&self) -> bool {
+        true
     }
 }
 struct SetGpr(Type, RegId);
@@ -91,6 +98,7 @@ struct SetMemoryI64(Type, RegId, i64);
 impl CompiledBlockDestinationTrait for SetMemoryI64 {
     unsafe fn reflect(&self, mut val: Value, vm: &mut VmState, _: &dyn InterruptModel) {
         let (addr, of) = vm.gpr(self.1).get().overflowing_add_signed(self.2);
+        println!("{addr:0x}");
         assert_eq!(of, false);
 
         match self.0 {
@@ -140,5 +148,9 @@ struct Exit;
 impl CompiledBlockDestinationTrait for Exit {
     unsafe fn reflect(&self, _: Value, _: &mut VmState, _: &dyn InterruptModel) {
         panic!("exit");
+    }
+
+    fn is_dest_ip_or_exit(&self) -> bool {
+        true
     }
 }

@@ -1,5 +1,6 @@
 use crate::codegen::{CompiledBlockDestination, CompiledCode, Executable};
 use crate::interrupt::InterruptModel;
+use crate::ir::BlockDestination;
 use crate::VmState;
 
 use smallvec::SmallVec;
@@ -46,6 +47,9 @@ where
 
             let val = code.execute(vm);
             dest.reflect(val, vm, interrupt_mode);
+            if dest.is_dest_ip_or_exit() {
+                return;
+            }
         }
 
         vm.set_ip(vm.ip() + self.size);

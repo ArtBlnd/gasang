@@ -77,6 +77,11 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut VmState) {
             // We only have one group emulated on this machine.
             ret.set(0);
         }
+
+        // brk
+        0xd6 => {
+            // do nothing
+        }
         _ => unimplemented!("unknown interrupt! {}", nr),
     }
 }
