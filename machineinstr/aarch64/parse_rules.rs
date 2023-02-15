@@ -474,9 +474,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |_raw_instr: u32| {
-                todo!("Compare and swap pair");
-            },
+            parse_compare_and_swap_pair,
         )
         .bind(
             "0x00_1_1_0_00_x_000000_xxxx_xx_xxxxxxxxxx",
@@ -498,15 +496,11 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "1101_1_0_0_1x_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |_raw_instr: u32| {
-                todo!("Load/store memory tags");
-            },
+            parse_load_store_memory_tags,
         )
         .bind(
             "1x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
-            |_raw_instr: u32| {
-                todo!("Load/store exclusive pair");
-            },
+            parse_load_store_exclusive_pair,
         )
         .bind(
             "xx00_1_0_0_00_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
@@ -522,9 +516,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "xx01_1_0_0_1x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
-            |_raw_instr: u32| {
-                todo!("LDAPR/STLR(unscaled immediate)");
-            },
+            parse_ldapr_stlr_unscaled_imm,
         )
         .bind(
             "xx01_1_x_0_0x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
@@ -538,9 +530,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "xx10_1_x_0_00_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
-            |_raw_instr: u32| {
-                todo!("Load/Store no allocate pair (offset)");
-            },
+            parse_ld_st_no_alloc_pair_offset,
         )
         .bind(
             "xx10_1_x_0_01_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
@@ -564,9 +554,7 @@ fn parse_aarch64_load_and_stores(raw_instr: u32) -> AArch64Instr {
         )
         .bind(
             "xx11_1_x_0_0x_x_0xxxxx_xxxx_10_xxxxxxxxxx",
-            |_raw_instr: u32| {
-                todo!("Load/Store register (unprevilaged)");
-            },
+            parse_load_store_reg_unprivileged,
         )
         .bind(
             "xx11_1_x_0_0x_x_0xxxxx_xxxx_11_xxxxxxxxxx",
@@ -2750,7 +2738,7 @@ fn parse_load_store_exclusive_register(raw_instr: u32) -> AArch64Instr {
              rt2: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = LoadStoreRegExclusive {
+                let data = RsRt2RnRt {
                     rs: rs.value,
                     rt2: rt2.value,
                     rn: rn.value,
@@ -2804,7 +2792,7 @@ fn parse_load_store_ordered(raw_instr: u32) -> AArch64Instr {
              rt2: Extract<BitRange<10, 15>, u8>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = LoadStoreOrdered {
+                let data = RsRt2RnRt {
                     rs: rs.value,
                     rt2: rt2.value,
                     rn: rn.value,
@@ -4395,6 +4383,289 @@ fn parse_load_register_literal(raw_instr: u32) -> AArch64Instr {
                     (0b10, 0b0) => AArch64Instr::LdrswLit(data),
                     (0b10, 0b1) => AArch64Instr::LdrLitSimdFPVar128(data),
                     (0b11, 0b0) => AArch64Instr::PrfmLit(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        instr
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_compare_and_swap_pair(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "0_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             sz: Extract<BitRange<30, 31>, u8>,
+             l: Extract<BitRange<22, 23>, u8>,
+             rs: Extract<BitRange<16, 21>, u8>,
+             o0: Extract<BitRange<15, 16>, u8>,
+             rt2: Extract<BitRange<10, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = RsRnRt {
+                    rs: rs.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (sz.value, l.value, o0.value, rt2.value) {
+                    (0b0, 0b0, 0b0, 0b11111) => AArch64Instr::CaspVar32(data),
+                    (0b0, 0b0, 0b1, 0b11111) => AArch64Instr::CasplVar32(data),
+                    (0b0, 0b1, 0b0, 0b11111) => AArch64Instr::CaspaVar32(data),
+                    (0b0, 0b1, 0b1, 0b11111) => AArch64Instr::CaspalVar32(data),
+
+                    (0b1, 0b0, 0b0, 0b11111) => AArch64Instr::CaspVar64(data),
+                    (0b1, 0b0, 0b1, 0b11111) => AArch64Instr::CasplVar64(data),
+                    (0b1, 0b1, 0b0, 0b11111) => AArch64Instr::CaspaVar64(data),
+                    (0b1, 0b1, 0b1, 0b11111) => AArch64Instr::CaspalVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        instr
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_load_store_memory_tags(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "11011001_xx_1_xxxxxxxxx_xx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             opc: Extract<BitRange<22, 24>, u8>,
+             imm9: Extract<BitRange<12, 221>, u16>,
+             op2: Extract<BitRange<10, 12>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = LoadStoreMemoryTags {
+                    imm9: imm9.value,
+                    op2: op2.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (opc.value, imm9.value, op2.value) {
+                    (0b00, _, 0b01 | 0b10 | 0b11) => AArch64Instr::StgEncoding(data),
+                    (0b00, 0b000000000, 0b00) => AArch64Instr::Stzgm(data),
+                    (0b01, _, 0b00) => AArch64Instr::Ldg(data),
+                    (0b01, _, 0b01 | 0b10 | 0b11) => AArch64Instr::StzgEncoding(data),
+                    (0b10, _, 0b01 | 0b10 | 0b11) => AArch64Instr::St2gEncoding(data),
+                    (0b10, 0b000000000, 0b00) => AArch64Instr::Stgm(data),
+                    (0b11, _, 0b01 | 0b10 | 0b11) => AArch64Instr::Stz2gEncoding(data),
+                    (0b11, 0b000000000, 0b00) => AArch64Instr::Ldgm(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        instr
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_load_store_exclusive_pair(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "1_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             sz: Extract<BitRange<30, 31>, u8>,
+             l: Extract<BitRange<22, 23>, u8>,
+             rs: Extract<BitRange<16, 21>, u8>,
+             o0: Extract<BitRange<15, 16>, u8>,
+             rt2: Extract<BitRange<10, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = RsRt2RnRt {
+                    rs: rs.value,
+                    rt2: rt2.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (sz.value, l.value, o0.value) {
+                    (0b0, 0b0, 0b0) => AArch64Instr::StxpVar32(data),
+                    (0b0, 0b0, 0b1) => AArch64Instr::StlxpVar32(data),
+                    (0b0, 0b1, 0b0) => AArch64Instr::LdxpVar32(data),
+                    (0b0, 0b1, 0b1) => AArch64Instr::LdaxpVar32(data),
+
+                    (0b1, 0b0, 0b0) => AArch64Instr::StxpVar64(data),
+                    (0b1, 0b0, 0b1) => AArch64Instr::StlxpVar64(data),
+                    (0b1, 0b1, 0b0) => AArch64Instr::LdxpVar64(data),
+                    (0b1, 0b1, 0b1) => AArch64Instr::LdaxpVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        instr
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_ldapr_stlr_unscaled_imm(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_011001_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
+            |raw_instr: u32,
+             size: Extract<BitRange<30, 32>, u8>,
+             opc: Extract<BitRange<22, 24>, u8>,
+             imm9: Extract<BitRange<12, 21>, u16>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = Imm9RnRt {
+                    imm9: imm9.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (size.value, opc.value,) {
+                    (0b00, 0b00) => AArch64Instr::Stlurb(data),
+                    (0b00, 0b01) => AArch64Instr::Ldapurb(data),
+                    (0b00, 0b10) => AArch64Instr::LdapursbVar64(data),
+                    (0b00, 0b11) => AArch64Instr::LdapursbVar32(data),
+
+                    (0b01, 0b00) => AArch64Instr::Stlurh(data),
+                    (0b01, 0b01) => AArch64Instr::Ldapurh(data),
+                    (0b01, 0b10) => AArch64Instr::LdapurshVar64(data),
+                    (0b01, 0b11) => AArch64Instr::LdapurshVar32(data),
+
+                    (0b10, 0b00) => AArch64Instr::StlurVar32(data),
+                    (0b10, 0b01) => AArch64Instr::LdapurVar32(data),
+                    (0b10, 0b10) => AArch64Instr::Ldapursw(data),
+
+                    (0b11, 0b00) => AArch64Instr::StlurVar64(data),
+                    (0b11, 0b01) => AArch64Instr::LdapurVar64(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        instr
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_ld_st_no_alloc_pair_offset(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_101_x_000_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+            |raw_instr: u32,
+             opc: Extract<BitRange<30, 32>, u8>,
+             v: Extract<BitRange<26, 27>, u8>,
+             l: Extract<BitRange<22, 23>, u16>,
+             imm7: Extract<BitRange<15, 22>, u8>,
+             rt2: Extract<BitRange<10, 15>, u8>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = LdStNoAllocPairOffset {
+                    imm7: imm7.value,
+                    rt2: rt2.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (opc.value, v.value, l.value) {
+                    (0b00, 0b0, 0b0) => AArch64Instr::StnpVar32(data),
+                    (0b00, 0b0, 0b1) => AArch64Instr::LdnpVar32(data),
+                    (0b00, 0b1, 0b0) => AArch64Instr::StnpSimdFPVar32(data),
+                    (0b00, 0b1, 0b1) => AArch64Instr::LdnpSimdFPVar32(data),
+
+                    (0b01, 0b1, 0b0) => AArch64Instr::StnpSimdFPVar64(data),
+                    (0b01, 0b1, 0b1) => AArch64Instr::LdnpSimdFPVar64(data),
+                    (0b10, 0b0, 0b0) => AArch64Instr::StnpVar64(data),
+                    (0b10, 0b0, 0b1) => AArch64Instr::LdnpVar64(data),
+                    (0b10, 0b1, 0b0) => AArch64Instr::StnpSimdFPVar128(data),
+                    (0b10, 0b1, 0b1) => AArch64Instr::LdnpSimdFPVar128(data),
+
+                    _ => todo!("Unknown instruction {:032b}", raw_instr),
+                }
+            },
+        );
+
+        m
+    });
+
+    if let Some(instr) = MATCHER.handle(raw_instr) {
+        instr
+    } else {
+        todo!("Unknown instruction {:032b}", raw_instr);
+    }
+}
+
+fn parse_load_store_reg_unprivileged(raw_instr: u32) -> AArch64Instr {
+    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Instr>> = Lazy::new(|| {
+        let mut m = BitPatternMatcher::new();
+        m.bind(
+            "xx_111_x_00_xx_0_xxxxxxxxx_10_xxxxx_xxxxx",
+            |raw_instr: u32,
+             size: Extract<BitRange<30, 32>, u8>,
+             v: Extract<BitRange<26, 27>, u8>,
+             opc: Extract<BitRange<22, 24>, u8>,
+             imm9: Extract<BitRange<12, 21>, u16>,
+             rn: Extract<BitRange<5, 10>, u8>,
+             rt: Extract<BitRange<0, 5>, u8>| {
+                let data = Imm9RnRt {
+                    imm9: imm9.value,
+                    rn: rn.value,
+                    rt: rt.value,
+                };
+
+                match (size.value, v.value, opc.value) {
+                    (0b00, 0b0, 0b00) => AArch64Instr::Sttrb(data),
+                    (0b00, 0b0, 0b01) => AArch64Instr::Ldtrb(data),
+                    (0b00, 0b0, 0b10) => AArch64Instr::LdtrsbVar64(data),
+                    (0b00, 0b0, 0b11) => AArch64Instr::LdtrsbVar32(data),
+
+                    (0b01, 0b0, 0b00) => AArch64Instr::Sttrh(data),
+                    (0b01, 0b0, 0b01) => AArch64Instr::Ldtrh(data),
+                    (0b01, 0b0, 0b10) => AArch64Instr::LdtrshVar64(data),
+                    (0b01, 0b0, 0b11) => AArch64Instr::LdtrshVar32(data),
+
+                    (0b10, 0b0, 0b00) => AArch64Instr::SttrVar32(data),
+                    (0b10, 0b0, 0b01) => AArch64Instr::LdtrVar32(data),
+                    (0b10, 0b0, 0b10) => AArch64Instr::Ldtrsw(data),
+
+                    (0b11, 0b0, 0b00) => AArch64Instr::SttrVar64(data),
+                    (0b11, 0b0, 0b01) => AArch64Instr::LdtrVar64(data),
 
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }

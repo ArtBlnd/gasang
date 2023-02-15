@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::compiler::aarch64_prelude::*;
 use crate::compiler::Compiler;
 use crate::ir::*;
@@ -6,25 +8,29 @@ use crate::register::RegId;
 use machineinstr::aarch64::*;
 
 pub struct AArch64Compiler {
-    gpr_registers: [RegId; 31],
-    fpr_registers: [RegId; 31],
-    stack_reg: RegId,
+    register_info: HashMap<String, RegId>
 }
 
 impl AArch64Compiler {
-    pub fn new(gpr_registers: [RegId; 31], fpr_registers: [RegId; 31], stack_reg: RegId) -> Self {
+    pub fn new(reg_info: HashMap<String, RegId>) -> Self {
         Self {
-            gpr_registers,
-            fpr_registers,
-            stack_reg,
+            register_info: reg_info
         }
     }
     pub fn gpr(&self, index: u8) -> RegId {
-        self.gpr_registers[index as usize]
+        self.register_info.get(&format!("x{}", index)).unwrap().clone()
     }
 
     pub fn fpr(&self, index: u8) -> RegId {
-        self.fpr_registers[index as usize]
+        self.register_info.get(&format!("v{}", index)).unwrap().clone()
+    }
+
+    pub fn stack_reg(&self) -> RegId {
+        self.register_info.get("sp").unwrap().clone()
+    }
+
+    pub fn reg_by_name(&self, name: impl AsRef<str>) -> RegId {
+        self.register_info.get(name.as_ref()).unwrap().clone()
     }
 }
 
@@ -67,6 +73,9 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Stur64(operand) => gen_stur(self, operand, Type::U64),
             AArch64Instr::SturSimdFP64(operand) => gen_stur_simd_fp64(self, operand),
 
+            // Advanced SIMD and FP
+            AArch64Instr::DupGeneral(operand) => gen_dup_general(self, operand),
+
             // Arithmetic instructions
             AArch64Instr::AddImm64(operand) => gen_add_imm64(self, operand),
             AArch64Instr::AddShiftedReg64(operand) => gen_add_shifted_reg64(self, operand),
@@ -93,6 +102,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::AndsShiftedReg32(operand) => {
                 gen_ands_shifted_reg(self, operand, Type::U32)
             }
+            AArch64Instr::AndShiftedReg64(operand) => gen_and_shifted_reg(self, operand, Type::U64),
             AArch64Instr::OrrImm64(operand) => gen_orr_imm(self, operand, Type::U64),
             AArch64Instr::OrrImm32(operand) => gen_orr_imm(self, operand, Type::U32),
 
@@ -213,7 +223,7 @@ fn gen_ldr_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
     let dst = compiler.gpr(operand.rt);
     let src = if operand.rn == 31 {
         // If rn is 31, we use stack register instead of gpr registers.
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -251,7 +261,7 @@ fn gen_str_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
     let pre_offs = if post_index { 0 } else { offset };
 
     let rn = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -296,11 +306,13 @@ fn gen_ldr_lit_var64(compiler: &AArch64Compiler, operand: Imm19Rt) -> IrBlock {
 fn gen_stp_var(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
+    let scale = 2 + (operand.opc >> 1);
+
     let (wback, post_index) = decode_o_for_ld_st_pair_offset(operand.o);
-    let offset = sign_extend(operand.imm7 as i64, 7) << 3;
+    let offset = sign_extend(operand.imm7 as i64, 7) << scale;
 
     let dst = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -336,7 +348,7 @@ fn gen_add_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
 
     let rd = compiler.gpr(operand.rd);
     let rn = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -389,7 +401,7 @@ fn gen_sub_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
 
     let rd = compiler.gpr(operand.rd);
     let rn = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -470,7 +482,7 @@ fn gen_subs_imm(compiler: &AArch64Compiler, operand: ShImm12RnRd, ty: Type) -> I
     };
 
     let rn = if operand.rn == 0b11111 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -751,7 +763,7 @@ fn gen_ldrb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
     let dst = compiler.gpr(operand.rt);
     let src = if operand.rn == 31 {
         // If rn is 31, we use stack register instead of gpr registers.
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -801,7 +813,7 @@ fn gen_add_ext_reg64(compiler: &AArch64Compiler, operand: AddSubtractExtReg) -> 
     assert!(shift <= 4);
 
     let op1 = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -809,7 +821,7 @@ fn gen_add_ext_reg64(compiler: &AArch64Compiler, operand: AddSubtractExtReg) -> 
 
     let ir = Ir::Add(Type::U64, Operand::gpr(Type::U64, op1), Operand::ir(op2));
     let ds = if operand.rd == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rd)
     };
@@ -826,7 +838,7 @@ fn gen_ldrh_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
     let (_wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand);
 
     let src = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -861,7 +873,7 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
         operand.crm,
         operand.op2,
     ) {
-        (0b11, 0b011, 0b1101, 0b0000, 0b0010) => Operand::Immediate(Type::U64, 0x00000000004DFD58), // tpidr_el10, get current thread.
+        (0b11, 0b011, 0b1101, 0b0000, 0b0010) => Operand::Sys(Type::U64, compiler.reg_by_name("tpidr_el0")), // tpidr_el0, get current thread.
         (0b11, 0b011, 0b0000, 0b0000, 0b0111) => {
             let implementer = 0; // Reserved for software use
             let variant = 0;
@@ -894,7 +906,7 @@ fn gen_ldr_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset, ty: T
     let offset = Ir::SextCast(Type::I64, Operand::ir(offset));
 
     let src = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -936,13 +948,13 @@ fn gen_ldp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> I
 
     let (_wback, post_index) = decode_o_for_ld_st_pair_offset(operand.o);
 
-    let scale = operand.opc >> (1 + 2);
+    let scale = 2 + (operand.opc >> 1);
     let signed = operand.opc & 0b1 != 0;
     let offset = sign_extend(operand.imm7 as i64, 7) << scale;
     let dbytes = ty.size();
 
     let src = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -1028,7 +1040,7 @@ fn gen_and_imm(compiler: &AArch64Compiler, operand: LogicalImm, ty: Type) -> IrB
     let ds = BlockDestination::Gpr(
         ty,
         if operand.rd == 31 {
-            compiler.stack_reg
+            compiler.stack_reg()
         } else {
             compiler.gpr(operand.rd)
         },
@@ -1123,7 +1135,7 @@ fn gen_strb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
     let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand);
 
     let dst = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -1154,7 +1166,7 @@ fn gen_sturb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock 
     let offset = sign_extend((operand.imm12 >> 2) as i64, 9);
 
     let dst = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -1187,7 +1199,7 @@ fn gen_orr_imm(compiler: &AArch64Compiler, operand: LogicalImm, ty: Type) -> IrB
 
     if operand.rd == 31 {
         let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
-        let ds = BlockDestination::Gpr(Type::U64, compiler.stack_reg);
+        let ds = BlockDestination::Gpr(Type::U64, compiler.stack_reg());
         block.append(ir, ds);
     } else {
         let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
@@ -1225,7 +1237,7 @@ fn gen_str_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset, ty: T
     let offset = extend_reg(rm, ext_type, shift, 8);
 
     let dst = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -1244,7 +1256,7 @@ fn gen_stur(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> IrB
     let mut block = IrBlock::new(4);
 
     let rn = if operand.rn == 31 {
-        compiler.stack_reg
+        compiler.stack_reg()
     } else {
         compiler.gpr(operand.rn)
     };
@@ -1258,6 +1270,31 @@ fn gen_stur(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> IrB
     block.append(ir, ds);
 
     block
+}
+
+fn gen_and_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let shift_type = decode_shift(operand.shift);
+
+    let op1 = compiler.gpr(operand.rn);
+    let op2 = shift_reg(
+        compiler.gpr(operand.rm),
+        shift_type,
+        operand.imm6 as u64,
+        ty,
+    );
+
+    let ir = Ir::And(ty, Operand::gpr(ty, op1), Operand::ir(op2));
+    let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_dup_general(compiler: &AArch64Compiler, operand: AdvancedSimdCopy) -> IrBlock {
+    todo!()
 }
 
 fn gen_stur_simd_fp64(_compiler: &AArch64Compiler, _operand: SizeImm12RnRt) -> IrBlock {

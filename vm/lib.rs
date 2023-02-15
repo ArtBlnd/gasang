@@ -1,14 +1,12 @@
 pub mod codegen;
 pub mod compiler;
+pub mod cpu;
 pub mod engine;
 pub mod error;
 pub mod image;
 pub mod interrupt;
 pub mod ir;
-pub mod loader;
 pub mod mmu;
 pub mod register;
-pub mod vm_builder;
-pub mod vm_state;
 
-pub use vm_state::VmState;
+pub use cpu::Cpu;

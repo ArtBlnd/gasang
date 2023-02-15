@@ -1,6 +1,6 @@
 use crate::interrupt::InterruptModel;
-use crate::VmState;
+use crate::Cpu;
 
 pub trait Executable {
-    unsafe fn execute(&self, vm: &mut VmState, interrupt_mode: &dyn InterruptModel);
+    unsafe fn execute(&self, vm: &mut Cpu, interrupt_mode: &dyn InterruptModel);
 }

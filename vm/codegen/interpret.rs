@@ -158,6 +158,11 @@ unsafe fn compile_op(
             let _t = *t;
             Box::new(move |vm| vm.fpr(reg).get().to_bits().into())
         }
+        Operand::Sys(t, reg) => {
+            let reg = *reg;
+            let _t = *t;
+            Box::new(move |vm| vm.sys(reg).get().into())
+        }
         Operand::Immediate(t, imm) => {
             let imm = *imm;
             let _t = *t;
@@ -168,14 +173,12 @@ unsafe fn compile_op(
         Operand::Flag => Box::new(move |ctx| ctx.flag().into()),
         Operand::Dbg(s, op) => {
             let op = compile_op(op, flag_policy.clone())?;
-            let _s = s.to_string();
+            let s = s.to_string();
             Box::new(move |ctx| {
-                let _val = op(ctx);
-                todo!()
+                let mut val = op(ctx);
+                println!("{s}, {:x}", val.u64());
+                val.into()
             })
-        }
-        Operand::VmInfo(_info_ty) => {
-            todo!()
         }
     })
 }

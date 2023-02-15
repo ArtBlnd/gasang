@@ -278,15 +278,7 @@ pub struct CondCmpImm {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LoadStoreRegExclusive {
-    pub rs: u8,
-    pub rt2: u8,
-    pub rn: u8,
-    pub rt: u8,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LoadStoreOrdered {
+pub struct RsRt2RnRt {
     pub rs: u8,
     pub rt2: u8,
     pub rn: u8,
@@ -421,4 +413,35 @@ pub struct RotateRightIntoFlags {
     pub imm6: u8,
     pub rn: u8,
     pub mask: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoadStoreMemoryTags {
+    pub imm9: u16,
+    pub op2: u8,
+    pub rn: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Imm9RnRt {
+    pub imm9: u16,
+    pub rn: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LdStNoAllocPairOffset {
+    pub imm7: u8,
+    pub rt2: u8,
+    pub rn: u8,
+    pub rt: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoadStoreRegPac {
+    pub s: u8,
+    pub imm9: u16,
+    pub rn: u8,
+    pub rt: u8,
 }

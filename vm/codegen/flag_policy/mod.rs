@@ -4,11 +4,11 @@ mod dummy;
 pub use dummy::*;
 
 use crate::ir::Type;
-use crate::VmState;
+use crate::Cpu;
 
 pub trait FlagPolicy {
-    fn carry(&self, vm: &VmState) -> bool;
+    fn carry(&self, vm: &Cpu) -> bool;
 
-    fn add_carry(&self, ty: Type, a: u64, b: u64, vm: &VmState);
-    fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &VmState);
+    fn add_carry(&self, ty: Type, a: u64, b: u64, vm: &Cpu);
+    fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &Cpu);
 }

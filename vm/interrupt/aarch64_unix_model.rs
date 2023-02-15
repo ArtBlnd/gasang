@@ -1,9 +1,9 @@
 use crate::interrupt::InterruptModel;
-use crate::VmState;
+use crate::Cpu;
 
 pub struct AArch64UnixInterruptModel;
 impl InterruptModel for AArch64UnixInterruptModel {
-    unsafe fn syscall(&self, _: u64, vm: &mut VmState) {
+    unsafe fn syscall(&self, _: u64, vm: &mut Cpu) {
         let nr = vm.gpr(vm.reg_by_name("x8").unwrap()).get();
         let arg0 = vm.gpr(vm.reg_by_name("x0").unwrap()).get();
         let arg1 = vm.gpr(vm.reg_by_name("x1").unwrap()).get();
@@ -16,7 +16,7 @@ impl InterruptModel for AArch64UnixInterruptModel {
     }
 }
 
-pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut VmState) {
+pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
     match nr {
         // write arg0:fd arg1:buf arg0: length
         0x40 => {
@@ -80,7 +80,13 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut VmState) {
 
         // brk
         0xd6 => {
-            // do nothing
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            todo!();
+
+            // return zero.
+            ret.set(0);
         }
         _ => unimplemented!("unknown interrupt! {}", nr),
     }

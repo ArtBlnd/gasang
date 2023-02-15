@@ -74,3 +74,35 @@ impl FprRegister {
         self.value
     }
 }
+
+pub struct SysRegister {
+    pub name: String,
+    pub size: u8,
+    pub value: u64,
+}
+
+impl SysRegister {
+    pub fn new(name: impl AsRef<str>, size: u8) -> Self {
+        Self {
+            name: name.as_ref().to_string(),
+            size,
+            value: 0,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn size(&self) -> u8 {
+        self.size
+    }
+
+    pub fn set(&mut self, value: u64) {
+        self.value = value;
+    }
+
+    pub fn get(&self) -> u64 {
+        self.value
+    }
+}

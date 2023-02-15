@@ -1,7 +1,7 @@
 use crate::codegen::{CompiledBlockDestination, CompiledCode, Executable};
 use crate::interrupt::InterruptModel;
 use crate::ir::BlockDestination;
-use crate::VmState;
+use crate::Cpu;
 
 use smallvec::SmallVec;
 
@@ -41,7 +41,7 @@ impl<C> Executable for CompiledBlock<C>
 where
     C: CompiledCode,
 {
-    unsafe fn execute(&self, vm: &mut VmState, interrupt_mode: &dyn InterruptModel) {
+    unsafe fn execute(&self, vm: &mut Cpu, interrupt_mode: &dyn InterruptModel) {
         for code in &self.code {
             let CompiledBlockItem { code, dest } = code;
 

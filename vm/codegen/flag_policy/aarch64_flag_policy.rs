@@ -1,12 +1,12 @@
 use crate::codegen::flag_policy::FlagPolicy;
 use crate::ir::Type;
-use crate::VmState;
+use crate::Cpu;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AArch64FlagPolicy;
 
 impl FlagPolicy for AArch64FlagPolicy {
-    fn add_carry(&self, ty: Type, a: u64, b: u64, vm: &VmState) {
+    fn add_carry(&self, ty: Type, a: u64, b: u64, vm: &Cpu) {
         let (n, z, c, v) = match ty {
             Type::U8 | Type::I8 => {
                 let ua = a as u8;
@@ -106,11 +106,11 @@ impl FlagPolicy for AArch64FlagPolicy {
         vm.add_flag(n << 63 | z << 62 | c << 61 | v << 60)
     }
 
-    fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &VmState) {
+    fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &Cpu) {
         self.add_carry(ty, a, (-(b as i64)) as u64, vm)
     }
 
-    fn carry(&self, vm: &VmState) -> bool {
+    fn carry(&self, vm: &Cpu) -> bool {
         ((vm.flag() >> 61) & 1) == 1
     }
 }

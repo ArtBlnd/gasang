@@ -1,18 +1,17 @@
 use crate::ir::{Ir, Type};
 use crate::register::RegId;
-use crate::vm_state::VmInfo;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operand {
     Ir(Box<Ir>),
     VoidIr(Box<Ir>),
     Gpr(Type, RegId),
+    Sys(Type, RegId),
     Fpr(Type, RegId),
     Immediate(Type, u64),
     Ip,
     Flag,
     Dbg(String, Box<Operand>),
-    VmInfo(VmInfo),
 }
 
 impl Operand {
@@ -22,11 +21,11 @@ impl Operand {
             Operand::VoidIr(_ir) => Type::Void,
             Operand::Gpr(t, _) => *t,
             Operand::Fpr(t, _) => *t,
+            Operand::Sys(t, _) => *t,
             Operand::Immediate(t, _) => *t,
             Operand::Ip => Type::U64,
             Operand::Flag => Type::U64,
             Operand::Dbg(_, operand) => operand.get_type(),
-            Operand::VmInfo(_) => Type::U64,
         }
     }
 

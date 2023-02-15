@@ -2,11 +2,11 @@ use std::convert::Infallible;
 
 use crate::codegen::{codegen_block_dest, Codegen, CompiledBlock, Executable};
 use crate::compiler::Compiler;
+use crate::cpu::Cpu;
 use crate::error::{CompileError, Error};
 use crate::interrupt::InterruptModel;
 use crate::ir::{BlockDestination, IrBlock};
 use crate::mmu::MemoryFrame;
-use crate::vm_state::VmState;
 
 use machineinstr::{MachineInstParser, MachineInstrParserRule};
 
@@ -40,7 +40,7 @@ where
 
     G::Code: 'static,
 {
-    pub unsafe fn run(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
+    pub unsafe fn run(&mut self, vm_state: &mut Cpu) -> Result<Infallible, Error> {
         let this = std::panic::AssertUnwindSafe(|| self.run_inner(vm_state));
         match std::panic::catch_unwind(this) {
             Err(_) => {}
@@ -48,11 +48,10 @@ where
             Ok(Ok(_)) => unreachable!(),
         }
 
-        vm_state.dump();
         std::process::exit(-1);
     }
 
-    pub unsafe fn run_inner(&mut self, vm_state: &mut VmState) -> Result<Infallible, Error> {
+    pub unsafe fn run_inner(&mut self, vm_state: &mut Cpu) -> Result<Infallible, Error> {
         // get entrypoint memory frame and compile it.
         let ep_frame = vm_state.mem(vm_state.ip());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
