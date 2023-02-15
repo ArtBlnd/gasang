@@ -1,7 +1,7 @@
 use crate::codegen::flag_policy::FlagPolicy;
 use crate::codegen::*;
 use crate::error::CodegenError;
-use crate::ir::{Ir, Operand, Type};
+use crate::ir::{Ir, Operand, Type, VecType};
 use crate::value::Value;
 
 use std::sync::Arc;
@@ -141,7 +141,7 @@ unsafe fn compile_ir(
         Ir::BitCast(t, op) => gen_bit_cast(t, op, flag_policy),
 
         Ir::Value(op) => compile_op(op, flag_policy.clone()),
-        Ir::Nop => Ok(Box::new(|_| Value::new())),
+        Ir::Nop => Ok(Box::new(|_| Value::new(0))),
 
         Ir::If(t, cond, if_true, if_false) => gen_if(t, cond, if_true, if_false, flag_policy),
         Ir::CmpEq(op1, op2) => gen_cmp_eq(op1, op2, flag_policy),
@@ -162,10 +162,10 @@ unsafe fn compile_op(
             let t = *t;
             Box::new(move |ctx| {
                 match t {
-                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
-                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
-                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
-                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                    Type::U8 | Type::I8 => Value::from_u8(ctx.gpr(reg).u8()),
+                    Type::U16 | Type::I16 => Value::from_u16(ctx.gpr(reg).u16()),
+                    Type::U32 | Type::I32 => Value::from_u32(ctx.gpr(reg).u32()),
+                    Type::U64 | Type::I64 => Value::from_u64(ctx.gpr(reg).u64()),
                     _ => unreachable!("Invalid type"),
                 }
             })
@@ -175,10 +175,15 @@ unsafe fn compile_op(
             let t = *t;
             Box::new(move |ctx| {
                 match t {
-                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
-                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
-                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
-                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                    Type::U8 | Type::I8 => Value::from_u8(ctx.fpr(reg).u8()),
+                    Type::U16 | Type::I16 => Value::from_u16(ctx.fpr(reg).u16()),
+                    Type::U32 | Type::I32 => Value::from_u32(ctx.fpr(reg).u32()),
+                    Type::U64 | Type::I64 => Value::from_u64(ctx.fpr(reg).u64()),
+                    Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                        let mut ret = Value::new(16);
+                        *ret.u64x2_mut() = ctx.fpr(reg).u64x2();
+                        ret
+                    }
                     _ => unreachable!("Invalid type"),
                 }
             })
@@ -188,10 +193,10 @@ unsafe fn compile_op(
             let t = *t;
             Box::new(move |ctx| {
                 match t {
-                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
-                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
-                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
-                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                    Type::U8 | Type::I8 => Value::from_u8(ctx.sys(reg).u8()),
+                    Type::U16 | Type::I16 => Value::from_u16(ctx.sys(reg).u16()),
+                    Type::U32 | Type::I32 => Value::from_u32(ctx.sys(reg).u32()),
+                    Type::U64 | Type::I64 => Value::from_u64(ctx.sys(reg).u64()),
                     _ => unreachable!("Invalid type"),
                 }
             })
@@ -202,8 +207,8 @@ unsafe fn compile_op(
             Box::new(move |_| imm.into())
         }
         Operand::VoidIr(ir) => compile_ir(ir, flag_policy.clone())?,
-        Operand::Ip => Box::new(move |ctx| ctx.ip().into()),
-        Operand::Flag => Box::new(move |ctx| ctx.flag().into()),
+        Operand::Ip => Box::new(move |ctx| Value::from_u64(ctx.ip())),
+        Operand::Flag => Box::new(move |ctx| Value::from_u64(ctx.flag())),
         Operand::Dbg(s, op) => {
             let op = compile_op(op, flag_policy.clone())?;
             let s = s.to_string();

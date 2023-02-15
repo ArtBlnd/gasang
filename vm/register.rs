@@ -23,7 +23,7 @@ impl GprRegister {
         Self {
             name: name.as_ref().to_string(),
             size,
-            value: Value::new(),
+            value: Value::new(size as usize),
         }
     }
 
@@ -62,7 +62,7 @@ impl FprRegister {
         Self {
             name: name.as_ref().to_string(),
             size,
-            value: Value::new(),
+            value: Value::new(size as usize),
         }
     }
 
@@ -101,7 +101,7 @@ impl SysRegister {
         Self {
             name: name.as_ref().to_string(),
             size,
-            value: Value::new(),
+            value: Value::new(size as usize),
         }
     }
 

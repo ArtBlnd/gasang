@@ -71,7 +71,8 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::StrReg64(operand) => gen_str_reg(self, operand, Type::U64),
             AArch64Instr::Stur32(operand) => gen_stur(self, operand, Type::U32),
             AArch64Instr::Stur64(operand) => gen_stur(self, operand, Type::U64),
-            AArch64Instr::SturSimdFP64(operand) => gen_stur_simd_fp64(self, operand),
+            AArch64Instr::SturSimdFP64(operand) => gen_stur_simd_fp(self, operand, Type::U64),
+            AArch64Instr::SturSimdFP128(operand) => gen_stur_simd_fp(self, operand, Type::Vec(VecType::U64, 2)),
 
             // Advanced SIMD and FP
             AArch64Instr::DupGeneral(operand) => gen_dup_general(self, operand),
@@ -196,16 +197,20 @@ fn gen_orr_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty:
     let rm = compiler.gpr(operand.rm);
     let rd = compiler.gpr(operand.rd);
 
-    if operand.imm6 == 0 && operand.shift == 0 && operand.rn == 0b11111 {
-        let ir = Ir::Value(Operand::gpr(ty, rm));
-        let ds = BlockDestination::Gpr(ty, rd);
+    let shift_type = decode_shift(operand.shift);
 
-        block.append(ir, ds);
+    let op1 = if operand.rn == 31 {
+        Operand::Immediate(ty, 0)
     } else {
-        // let rn = self.gpr(operand.rn);
+        Operand::Gpr(ty, compiler.gpr(operand.rn))
+    };
 
-        todo!()
-    }
+    let op2 = Operand::ir(shift_reg(rm, shift_type, operand.imm6 as u64, ty));
+
+    let ir = Ir::Or(ty, op1, op2);
+    let ds = BlockDestination::Gpr(ty, rd);
+
+    block.append(ir, ds);
 
     block
 }
@@ -1160,10 +1165,10 @@ fn gen_strb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
     block
 }
 
-fn gen_sturb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
+fn gen_sturb_imm(compiler: &AArch64Compiler, operand: LdStRegUnscaledImm) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let offset = sign_extend((operand.imm12 >> 2) as i64, 9);
+    let offset = sign_extend(operand.imm9 as i64, 9);
 
     let dst = if operand.rn == 31 {
         compiler.stack_reg()
@@ -1252,7 +1257,7 @@ fn gen_str_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset, ty: T
     block
 }
 
-fn gen_stur(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> IrBlock {
+fn gen_stur(compiler: &AArch64Compiler, operand: LdStRegUnscaledImm, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
     let rn = if operand.rn == 31 {
@@ -1262,7 +1267,7 @@ fn gen_stur(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> IrB
     };
     let rt = operand.rt;
 
-    let offs = sign_extend((operand.imm12 >> 2) as i64, 9);
+    let offs = sign_extend(operand.imm9 as i64, 9);
 
     let ir = Ir::Value(Operand::gpr(ty, compiler.gpr(rt)));
     let ds = BlockDestination::MemoryRelI64(ty, rn, offs);
@@ -1314,6 +1319,20 @@ fn gen_dup_general(compiler: &AArch64Compiler, operand: AdvancedSimdCopy) -> IrB
     block
 }
 
-fn gen_stur_simd_fp64(_compiler: &AArch64Compiler, _operand: SizeImm12RnRt) -> IrBlock {
-    todo!()
+fn gen_stur_simd_fp(compiler: &AArch64Compiler, operand: LdStRegUnscaledImm, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+    let offset = sign_extend(operand.imm9 as i64, 9);
+
+    let src = if operand.rn == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rn)
+    };
+
+    let ir = Ir::Value(Operand::Fpr(ty, compiler.fpr(operand.rt)));
+    let ds = BlockDestination::MemoryRelI64(ty, src, offset);
+
+    block.append(ir, ds);
+
+    block
 }

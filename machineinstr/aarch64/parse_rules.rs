@@ -1741,15 +1741,12 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: u32) -> AArch64Instr {
             |raw_instr: u32,
              size: Extract<BitRange<30, 32>, u8>,
              v: Extract<BitRange<26, 27>, u8>,
-             idxt: Extract<BitRange<24, 26>, u8>,
              opc: Extract<BitRange<22, 24>, u8>,
-             imm12: Extract<BitRange<10, 22>, u16>,
+             imm9: Extract<BitRange<12, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = SizeImm12RnRt {
-                    idxt: idxt.value,
-                    size: size.value,
-                    imm12: imm12.value,
+                let data = LdStRegUnscaledImm {
+                    imm9: imm9.value,
                     rn: rn.value,
                     rt: rt.value,
                 };

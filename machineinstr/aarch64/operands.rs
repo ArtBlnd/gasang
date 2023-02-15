@@ -446,3 +446,10 @@ pub struct LoadStoreRegPac {
     pub rn: u8,
     pub rt: u8,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LdStRegUnscaledImm {
+    pub imm9: u16,
+    pub rn: u8,
+    pub rt: u8,
+}

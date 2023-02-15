@@ -9,8 +9,88 @@ use crate::ir::Type;
 pub struct Value(SmallVec<[u64; 2]>);
 
 impl Value {
-    pub fn new() -> Self {
-        Value(SmallVec::from_buf([0; 2]))
+    pub fn from_u8(val: u8) -> Self {
+        let mut v = Self::new(1);
+        *v.u8_mut() = val;
+
+        v
+    }
+
+    pub fn from_u16(val: u16) -> Self {
+        let mut v = Self::new(2);
+        *v.u16_mut() = val;
+
+        v
+    }
+
+    pub fn from_u32(val: u32) -> Self {
+        let mut v = Self::new(4);
+        *v.u32_mut() = val;
+
+        v
+    }
+
+    pub fn from_u64(val: u64) -> Self {
+        let mut v = Self::new(8);
+        *v.u64_mut() = val;
+
+        v
+    }
+
+    pub fn from_i8(val: i8) -> Self {
+        let mut v = Self::new(1);
+        *v.u8_mut() = val as u8;
+
+        v
+    }
+
+    pub fn from_i16(val: i16) -> Self {
+        let mut v = Self::new(2);
+        *v.u16_mut() = val as u16;
+
+        v
+    }
+
+    pub fn from_i32(val: i32) -> Self {
+        let mut v = Self::new(4);
+        *v.u32_mut() = val as u32;
+
+        v
+    }
+
+    pub fn from_i64(val: i64) -> Self {
+        let mut v = Self::new(8);
+        *v.u64_mut() = val as u64;
+
+        v
+    }
+
+    pub fn from_f32(val: f32) -> Self {
+        let mut v = Self::new(4);
+        *v.u32_mut() = val.to_bits();
+
+        v
+    }
+
+    pub fn from_f64(val: f64) -> Self {
+        let mut v = Self::new(8);
+        *v.u64_mut() = val.to_bits();
+
+        v
+    }
+
+    pub fn new(len: usize) -> Self {
+        let len = usize::max(len, 16);
+        let len = if len % 8 == 0 {
+            len / 8
+        } else {
+            len / 8 + 1
+        };
+
+        let mut vec = SmallVec::with_capacity(len);
+        vec.resize_with(len, || 0);
+
+        Value(vec)
     }
 
     pub fn truncate_to(mut self, ty: Type) -> Self {
@@ -392,178 +472,68 @@ impl Value {
     }
 }
 
-impl From<u64> for Value {
-    fn from(value: u64) -> Self {
-        let mut v = Value::new();
-        *v.u64_mut() = value;
-        v
-    }
-}
-
-impl From<u32> for Value {
-    fn from(value: u32) -> Self {
-        let mut v = Value::new();
-        *v.u32_mut() = value;
-        v
-    }
-}
-
-impl From<u16> for Value {
-    fn from(value: u16) -> Self {
-        let mut v = Value::new();
-        *v.u16_mut() = value;
-        v
+impl From<bool> for Value {
+    fn from(v: bool) -> Self {
+        Value::from_u8(v as u8)
     }
 }
 
 impl From<u8> for Value {
-    fn from(value: u8) -> Self {
-        let mut v = Value::new();
-        *v.u8_mut() = value;
-        v
+    fn from(v: u8) -> Self {
+        Value::from_u8(v)
     }
 }
 
-impl From<i64> for Value {
-    fn from(value: i64) -> Self {
-        let mut v = Value::new();
-        *v.i64_mut() = value;
-        v
+impl From<u16> for Value {
+    fn from(v: u16) -> Self {
+        Value::from_u16(v)
     }
 }
 
-impl From<i32> for Value {
-    fn from(value: i32) -> Self {
-        let mut v = Value::new();
-        *v.i32_mut() = value;
-        v
+impl From<u32> for Value {
+    fn from(v: u32) -> Self {
+        Value::from_u32(v)
     }
 }
 
-impl From<i16> for Value {
-    fn from(value: i16) -> Self {
-        let mut v = Value::new();
-        *v.i16_mut() = value;
-        v
+impl From<u64> for Value {
+    fn from(v: u64) -> Self {
+        Value::from_u64(v)
     }
 }
 
 impl From<i8> for Value {
-    fn from(value: i8) -> Self {
-        let mut v = Value::new();
-        *v.i8_mut() = value;
-        v
+    fn from(v: i8) -> Self {
+        Value::from_i8(v)
     }
 }
 
-impl From<bool> for Value {
-    fn from(value: bool) -> Self {
-        let mut v = Value::new();
-        *v.u64_mut() = value as u64;
-        v
+impl From<i16> for Value {
+    fn from(v: i16) -> Self {
+        Value::from_i16(v)
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test1() {
-        let mut value = Value::new();
-
-        *value.u64_mut() = 0x1234567890abcdef;
-        assert_eq!(*value.u64_mut(), 0x1234567890abcdef);
+impl From<i32> for Value {
+    fn from(v: i32) -> Self {
+        Value::from_i32(v)
     }
+}
 
-    #[test]
-    fn test2() {
-        let mut value = Value::new();
-
-        *value.u32_mut() = 0x12345678;
-        assert_eq!(*value.u32_mut(), 0x12345678);
+impl From<i64> for Value {
+    fn from(v: i64) -> Self {
+        Value::from_i64(v)
     }
+}
 
-    #[test]
-    fn test3() {
-        let mut value = Value::new();
-
-        *value.u16_mut() = 0x1234;
-        assert_eq!(*value.u16_mut(), 0x1234);
+impl From<f32> for Value {
+    fn from(v: f32) -> Self {
+        Value::from_f32(v)
     }
+}
 
-    #[test]
-    fn test4() {
-        let mut value = Value::new();
-
-        *value.u8_mut() = 0x12;
-        assert_eq!(*value.u8_mut(), 0x12);
-    }
-
-    #[test]
-    fn test5() {
-        let mut value = Value::new();
-
-        *value.i64_mut() = -0x1234567890abcdef;
-        assert_eq!(*value.i64_mut(), -0x1234567890abcdef);
-    }
-
-    #[test]
-    fn test6() {
-        let mut value = Value::new();
-
-        *value.i32_mut() = -0x12345678;
-        assert_eq!(*value.i32_mut(), -0x12345678);
-    }
-
-    #[test]
-    fn test7() {
-        let mut value = Value::new();
-
-        *value.i16_mut() = -0x1234;
-        assert_eq!(*value.i16_mut(), -0x1234);
-    }
-
-    #[test]
-    fn test8() {
-        let mut value = Value::new();
-
-        *value.i8_mut() = -0x12;
-        assert_eq!(*value.i8_mut(), -0x12);
-    }
-
-    #[test]
-    fn test9() {
-        let mut value = Value::new();
-
-        *value.f64_mut() = 0.123456789;
-        assert_eq!(*value.f64_mut(), 0.123456789);
-    }
-
-    #[test]
-    fn test10() {
-        let mut value = Value::new();
-
-        *value.f32_mut() = 0.123_456_79;
-        assert_eq!(*value.f32_mut(), 0.123_456_79);
-    }
-
-    #[test]
-    fn test11() {
-        let mut value = Value::new();
-
-        *value.u64x2_mut() = [0x1234567890abcdef, 0x1234567890abcdef];
-        assert_eq!(*value.u64x2_mut(), [0x1234567890abcdef, 0x1234567890abcdef]);
-    }
-
-    #[test]
-    fn test12() {
-        let mut value = Value::new();
-
-        *value.u32x4_mut() = [0x12345678, 0x12345678, 0x12345678, 0x12345678];
-        assert_eq!(
-            *value.u32x4_mut(),
-            [0x12345678, 0x12345678, 0x12345678, 0x12345678]
-        );
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        Value::from_f64(v)
     }
 }

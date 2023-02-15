@@ -1,6 +1,6 @@
 use crate::codegen::*;
 use crate::interrupt::InterruptModel;
-use crate::ir::{BlockDestination, Type};
+use crate::ir::{BlockDestination, Type, VecType};
 use crate::register::RegId;
 use crate::Cpu;
 use crate::value::Value;
@@ -96,6 +96,7 @@ impl CompiledBlockDestinationTrait for SetMemory {
             Type::U16 | Type::I16 => vm.mem(self.1).write_u16(*val.u16_mut()),
             Type::U32 | Type::I32 | Type::F32 => vm.mem(self.1).write_u32(*val.u32_mut()),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(self.1).write_u64(*val.u64_mut()),
+            Type::Vec(VecType::U64 | VecType::I64, 2) => vm.mem(self.1).write(&val.u8_slice_ref()[..16]),
             _ => unreachable!(),
         }
         .unwrap();
@@ -113,6 +114,7 @@ impl CompiledBlockDestinationTrait for SetMemoryI64 {
             Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16_mut()),
             Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32_mut()),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64_mut()),
+            Type::Vec(VecType::U64 | VecType::I64, 2) => vm.mem(addr).write(&val.u8_slice_ref()[..16]),
             _ => unreachable!(),
         }
         .unwrap();
@@ -128,6 +130,7 @@ impl CompiledBlockDestinationTrait for StoreMemoryIr {
             Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16_mut()),
             Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32_mut()),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64_mut()),
+            Type::Vec(VecType::U64 | VecType::I64, 2) => vm.mem(addr).write(&val.u8_slice_ref()[..16]),
             _ => unreachable!(),
         }
         .unwrap();
