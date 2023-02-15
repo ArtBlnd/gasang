@@ -63,6 +63,8 @@ where
                 code.execute(vm_state, &self.interrupt_model);
             }
 
+            vm_state.dump();
+
             let next_frame = vm_state.mem(vm_state.ip());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
 

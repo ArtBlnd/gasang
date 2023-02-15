@@ -1,5 +1,7 @@
 use smallvec::SmallVec;
 
+use std::slice;
+
 use crate::ir::Type;
 
 
@@ -307,6 +309,86 @@ impl Value {
 
     pub fn f32x4(&self) -> [f32; 4] {
         *self.f32x4_ref()
+    }
+
+    pub fn u64_slice_ref(&self) -> &[u64] {
+        unsafe { slice::from_raw_parts(self.u64_ref(), self.0.len()) }
+    }
+
+    pub fn u32_slice_ref(&self) -> &[u32] {
+        unsafe { slice::from_raw_parts(self.u32_ref(), self.0.len() * 2) }
+    }
+
+    pub fn u16_slice_ref(&self) -> &[u16] {
+        unsafe { slice::from_raw_parts(self.u16_ref(), self.0.len() * 4) }
+    }
+
+    pub fn u8_slice_ref(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.u8_ref(), self.0.len() * 8) }
+    }
+
+    pub fn i64_slice_ref(&self) -> &[i64] {
+        unsafe { slice::from_raw_parts(self.i64_ref(), self.0.len()) }
+    }
+
+    pub fn i32_slice_ref(&self) -> &[i32] {
+        unsafe { slice::from_raw_parts(self.i32_ref(), self.0.len() * 2) }
+    }
+
+    pub fn i16_slice_ref(&self) -> &[i16] {
+        unsafe { slice::from_raw_parts(self.i16_ref(), self.0.len() * 4) }
+    }
+
+    pub fn i8_slice_ref(&self) -> &[i8] {
+        unsafe { slice::from_raw_parts(self.i8_ref(), self.0.len() * 8) }
+    }
+
+    pub fn f64_slice_ref(&self) -> &[f64] {
+        unsafe { slice::from_raw_parts(self.f64_ref(), self.0.len()) }
+    }
+
+    pub fn f32_slice_ref(&self) -> &[f32] {
+        unsafe { slice::from_raw_parts(self.f32_ref(), self.0.len() * 2) }
+    }
+
+    pub fn u64_slice_mut(&mut self) -> &mut [u64] {
+        unsafe { slice::from_raw_parts_mut(self.u64_mut(), self.0.len()) }
+    }
+
+    pub fn u32_slice_mut(&mut self) -> &mut [u32] {
+        unsafe { slice::from_raw_parts_mut(self.u32_mut(), self.0.len() * 2) }
+    }
+
+    pub fn u16_slice_mut(&mut self) -> &mut [u16] {
+        unsafe { slice::from_raw_parts_mut(self.u16_mut(), self.0.len() * 4) }
+    }
+
+    pub fn u8_slice_mut(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.u8_mut(), self.0.len() * 8) }
+    }
+
+    pub fn i64_slice_mut(&mut self) -> &mut [i64] {
+        unsafe { slice::from_raw_parts_mut(self.i64_mut(), self.0.len()) }
+    }
+
+    pub fn i32_slice_mut(&mut self) -> &mut [i32] {
+        unsafe { slice::from_raw_parts_mut(self.i32_mut(), self.0.len() * 2) }
+    }
+
+    pub fn i16_slice_mut(&mut self) -> &mut [i16] {
+        unsafe { slice::from_raw_parts_mut(self.i16_mut(), self.0.len() * 4) }
+    }
+
+    pub fn i8_slice_mut(&mut self) -> &mut [i8] {
+        unsafe { slice::from_raw_parts_mut(self.i8_mut(), self.0.len() * 8) }
+    }
+
+    pub fn f64_slice_mut(&mut self) -> &mut [f64] {
+        unsafe { slice::from_raw_parts_mut(self.f64_mut(), self.0.len()) }
+    }
+
+    pub fn f32_slice_mut(&mut self) -> &mut [f32] {
+        unsafe { slice::from_raw_parts_mut(self.f32_mut(), self.0.len() * 2) }
     }
 }
 

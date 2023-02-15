@@ -24,6 +24,7 @@ where
         BlockDestination::Ip => Box::new(SetIp),
         BlockDestination::Gpr(ty, reg_id) => Box::new(SetGpr(ty, reg_id)),
         BlockDestination::Fpr(ty, reg_id) => Box::new(SetFpr(ty, reg_id)),
+        BlockDestination::FprSlot(ty, reg_id, slot) => Box::new(SetFprSlot(ty, reg_id, slot)),
         BlockDestination::Memory(ty, addr) => Box::new(SetMemory(ty, addr)),
         BlockDestination::MemoryRelI64(ty, reg_id, offset) => {
             Box::new(SetMemoryI64(ty, reg_id, offset))
@@ -74,14 +75,14 @@ impl CompiledBlockDestinationTrait for SetGpr {
 struct SetFpr(Type, RegId);
 impl CompiledBlockDestinationTrait for SetFpr {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
-        let gpr = vm.gpr_mut(self.1);
+        let fpr = vm.fpr_mut(self.1);
         match self.0 {
-            Type::U8 | Type::I8 => *gpr.u8_mut() = *val.u8_mut(),
-            Type::U16 | Type::I16 => *gpr.u16_mut() = *val.u16_mut(),
-            Type::U32 | Type::I32 => *gpr.u32_mut() = *val.u32_mut(),
-            Type::U64 | Type::I64 => *gpr.u64_mut() = *val.u64_mut(),
-            Type::F32 => *gpr.f32_mut() = *val.f32_mut(),
-            Type::F64 => *gpr.f64_mut() = *val.f64_mut(),
+            Type::U8 | Type::I8 => *fpr.u8_mut() = *val.u8_mut(),
+            Type::U16 | Type::I16 => *fpr.u16_mut() = *val.u16_mut(),
+            Type::U32 | Type::I32 => *fpr.u32_mut() = *val.u32_mut(),
+            Type::U64 | Type::I64 => *fpr.u64_mut() = *val.u64_mut(),
+            Type::F32 => *fpr.f32_mut() = *val.f32_mut(),
+            Type::F64 => *fpr.f64_mut() = *val.f64_mut(),
             _ => unreachable!(),
         }
     }
@@ -153,5 +154,20 @@ impl CompiledBlockDestinationTrait for Exit {
 
     fn is_dest_ip_or_exit(&self) -> bool {
         true
+    }
+}
+
+struct SetFprSlot(Type, RegId, u8);
+impl CompiledBlockDestinationTrait for SetFprSlot {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+        let fpr = vm.fpr_mut(self.1);
+
+        match self.0 {
+            Type::U8 | Type::I8 => fpr.u8_slice_mut()[self.2 as usize] = *val.u8_mut(),
+            Type::U16 | Type::I16 => fpr.u16_slice_mut()[self.2 as usize] = *val.u16_mut(),
+            Type::U32 | Type::I32 => fpr.u32_slice_mut()[self.2 as usize] = *val.u32_mut(),
+            Type::U64 | Type::I64 => fpr.u64_slice_mut()[self.2 as usize] = *val.u64_mut(),
+            _ => unreachable!(),
+        }
     }
 }

@@ -2152,6 +2152,7 @@ fn parse_advanced_simd_copy(raw_instr: u32) -> AArch64Instr {
              rn: Extract<BitRange<5, 10>, u8>,
              rd: Extract<BitRange<0, 5>, u8>| {
                 let data = AdvancedSimdCopy {
+                    q: q.value,
                     imm5: imm5.value,
                     imm4: imm4.value,
                     rn: rn.value,

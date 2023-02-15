@@ -1294,7 +1294,24 @@ fn gen_and_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty:
 }
 
 fn gen_dup_general(compiler: &AArch64Compiler, operand: AdvancedSimdCopy) -> IrBlock {
-    todo!()
+    let mut block = IrBlock::new(4);
+
+    let size = operand.imm5.trailing_zeros();
+    assert!(size <= 3);
+    let esize = 8 << size;
+    let datasize = if operand.q == 1 {128} else {64};
+    let elements = datasize / esize;
+
+    let t = Type::uscalar_from_size(esize / 8);
+
+    for i in 0..elements {
+        let ir = Ir::Value(Operand::Gpr(t, compiler.gpr(operand.rn)));
+        let ds = BlockDestination::FprSlot(t, compiler.fpr(operand.rd), i as u8);
+
+        block.append(ir, ds);
+    }
+
+    block
 }
 
 fn gen_stur_simd_fp64(_compiler: &AArch64Compiler, _operand: SizeImm12RnRt) -> IrBlock {

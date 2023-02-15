@@ -214,6 +214,7 @@ pub struct Barriers {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AdvancedSimdCopy {
+    pub q: u8,
     pub imm5: u8,
     pub imm4: u8,
     pub rn: u8,
