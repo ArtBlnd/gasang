@@ -8,5 +8,6 @@ pub mod interrupt;
 pub mod ir;
 pub mod mmu;
 pub mod register;
+pub mod value;
 
 pub use cpu::Cpu;

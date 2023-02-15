@@ -10,8 +10,6 @@ mod block;
 pub use block::*;
 mod code;
 pub use code::*;
-mod value;
-pub use value::*;
 
 pub mod cranelift;
 pub mod flag_policy;

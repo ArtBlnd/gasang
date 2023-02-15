@@ -1,4 +1,6 @@
-use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::{fmt::{Debug, Display, Formatter, Result as FmtResult}, ops::{DerefMut, Deref}};
+
+use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegId(pub u8);
@@ -13,7 +15,7 @@ impl Display for RegId {
 pub struct GprRegister {
     name: String,
     size: u8,
-    value: u64,
+    value: Value,
 }
 
 impl GprRegister {
@@ -21,7 +23,7 @@ impl GprRegister {
         Self {
             name: name.as_ref().to_string(),
             size,
-            value: 0,
+            value: Value::new(),
         }
     }
 
@@ -32,21 +34,27 @@ impl GprRegister {
     pub fn size(&self) -> u8 {
         self.size
     }
+}
 
-    pub fn set(&mut self, value: u64) {
-        self.value = value;
+impl Deref for GprRegister {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
+}
 
-    pub fn get(&self) -> u64 {
-        self.value
+impl DerefMut for GprRegister {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct FprRegister {
-    pub name: String,
-    pub size: u8,
-    pub value: f64,
+    name: String,
+    size: u8,
+    value: Value,
 }
 
 impl FprRegister {
@@ -54,7 +62,7 @@ impl FprRegister {
         Self {
             name: name.as_ref().to_string(),
             size,
-            value: 0.0,
+            value: Value::new(),
         }
     }
 
@@ -65,20 +73,27 @@ impl FprRegister {
     pub fn size(&self) -> u8 {
         self.size
     }
+}
 
-    pub fn set(&mut self, value: f64) {
-        self.value = value;
-    }
+impl Deref for FprRegister {
+    type Target = Value;
 
-    pub fn get(&self) -> f64 {
-        self.value
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
 }
 
+impl DerefMut for FprRegister {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+
 pub struct SysRegister {
-    pub name: String,
-    pub size: u8,
-    pub value: u64,
+    name: String,
+    size: u8,
+    value: Value,
 }
 
 impl SysRegister {
@@ -86,7 +101,7 @@ impl SysRegister {
         Self {
             name: name.as_ref().to_string(),
             size,
-            value: 0,
+            value: Value::new(),
         }
     }
 
@@ -97,12 +112,18 @@ impl SysRegister {
     pub fn size(&self) -> u8 {
         self.size
     }
+}
 
-    pub fn set(&mut self, value: u64) {
-        self.value = value;
+impl Deref for SysRegister {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
+}
 
-    pub fn get(&self) -> u64 {
-        self.value
+impl DerefMut for SysRegister {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
     }
 }

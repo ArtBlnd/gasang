@@ -3,6 +3,7 @@ use crate::interrupt::InterruptModel;
 use crate::ir::{BlockDestination, Type};
 use crate::register::RegId;
 use crate::Cpu;
+use crate::value::Value;
 
 pub trait CompiledBlockDestinationTrait {
     unsafe fn reflect(&self, val: Value, vm: &mut Cpu, interrupt_mode: &dyn InterruptModel);
@@ -42,14 +43,14 @@ where
 struct SetFlags;
 impl CompiledBlockDestinationTrait for SetFlags {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
-        vm.set_flag(*val.u64());
+        vm.set_flag(*val.u64_mut());
     }
 }
 
 struct SetIp;
 impl CompiledBlockDestinationTrait for SetIp {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
-        vm.set_ip(*val.u64());
+        vm.set_ip(*val.u64_mut());
     }
 
     fn is_dest_ip_or_exit(&self) -> bool {
@@ -59,24 +60,30 @@ impl CompiledBlockDestinationTrait for SetIp {
 struct SetGpr(Type, RegId);
 impl CompiledBlockDestinationTrait for SetGpr {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
-        let val = *val.u64();
-
-        let origin = vm.gpr(self.1).get();
-        let val = origin & !self.0.gen_mask() | val & self.0.gen_mask();
-
-        vm.gpr_mut(self.1).set(val);
+        let gpr = vm.gpr_mut(self.1);
+        match self.0 {
+            Type::U8 | Type::I8 => *gpr.u8_mut() = *val.u8_mut(),
+            Type::U16 | Type::I16 => *gpr.u16_mut() = *val.u16_mut(),
+            Type::U32 | Type::I32 => *gpr.u32_mut() = *val.u32_mut(),
+            Type::U64 | Type::I64 => *gpr.u64_mut() = *val.u64_mut(),
+            _ => unreachable!(),
+        }
     }
 }
 
 struct SetFpr(Type, RegId);
 impl CompiledBlockDestinationTrait for SetFpr {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
-        let val = *val.u64();
-
-        let origin = vm.gpr(self.1).get();
-        let val = origin & !self.0.gen_mask() | val & self.0.gen_mask();
-
-        vm.gpr_mut(self.1).set(val);
+        let gpr = vm.gpr_mut(self.1);
+        match self.0 {
+            Type::U8 | Type::I8 => *gpr.u8_mut() = *val.u8_mut(),
+            Type::U16 | Type::I16 => *gpr.u16_mut() = *val.u16_mut(),
+            Type::U32 | Type::I32 => *gpr.u32_mut() = *val.u32_mut(),
+            Type::U64 | Type::I64 => *gpr.u64_mut() = *val.u64_mut(),
+            Type::F32 => *gpr.f32_mut() = *val.f32_mut(),
+            Type::F64 => *gpr.f64_mut() = *val.f64_mut(),
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -84,10 +91,10 @@ struct SetMemory(Type, u64);
 impl CompiledBlockDestinationTrait for SetMemory {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
         match self.0 {
-            Type::U8 | Type::I8 => vm.mem(self.1).write_u8(*val.u8()),
-            Type::U16 | Type::I16 => vm.mem(self.1).write_u16(*val.u16()),
-            Type::U32 | Type::I32 | Type::F32 => vm.mem(self.1).write_u32(*val.u32()),
-            Type::U64 | Type::I64 | Type::F64 => vm.mem(self.1).write_u64(*val.u64()),
+            Type::U8 | Type::I8 => vm.mem(self.1).write_u8(*val.u8_mut()),
+            Type::U16 | Type::I16 => vm.mem(self.1).write_u16(*val.u16_mut()),
+            Type::U32 | Type::I32 | Type::F32 => vm.mem(self.1).write_u32(*val.u32_mut()),
+            Type::U64 | Type::I64 | Type::F64 => vm.mem(self.1).write_u64(*val.u64_mut()),
             _ => unreachable!(),
         }
         .unwrap();
@@ -97,14 +104,14 @@ impl CompiledBlockDestinationTrait for SetMemory {
 struct SetMemoryI64(Type, RegId, i64);
 impl CompiledBlockDestinationTrait for SetMemoryI64 {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
-        let (addr, of) = vm.gpr(self.1).get().overflowing_add_signed(self.2);
+        let (addr, of) = vm.gpr(self.1).u64().overflowing_add_signed(self.2);
         assert_eq!(of, false);
 
         match self.0 {
-            Type::U8 | Type::I8 => vm.mem(addr).write_u8(*val.u8()),
-            Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16()),
-            Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32()),
-            Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64()),
+            Type::U8 | Type::I8 => vm.mem(addr).write_u8(*val.u8_mut()),
+            Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16_mut()),
+            Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32_mut()),
+            Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64_mut()),
             _ => unreachable!(),
         }
         .unwrap();
@@ -114,12 +121,12 @@ impl CompiledBlockDestinationTrait for SetMemoryI64 {
 struct StoreMemoryIr(Type, Box<dyn CompiledCode>);
 impl CompiledBlockDestinationTrait for StoreMemoryIr {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
-        let addr = unsafe { *self.1.execute(vm).u64() };
+        let addr = unsafe { *self.1.execute(vm).u64_mut() };
         match self.0 {
-            Type::U8 | Type::I8 => vm.mem(addr).write_u8(*val.u8()),
-            Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16()),
-            Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32()),
-            Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64()),
+            Type::U8 | Type::I8 => vm.mem(addr).write_u8(*val.u8_mut()),
+            Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16_mut()),
+            Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32_mut()),
+            Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64_mut()),
             _ => unreachable!(),
         }
         .unwrap();
@@ -134,7 +141,7 @@ impl CompiledBlockDestinationTrait for NoneDest {
 struct SystemCall;
 impl CompiledBlockDestinationTrait for SystemCall {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, interrupt_model: &dyn InterruptModel) {
-        interrupt_model.syscall(*val.u64(), vm)
+        interrupt_model.syscall(*val.u64_mut(), vm)
     }
 }
 

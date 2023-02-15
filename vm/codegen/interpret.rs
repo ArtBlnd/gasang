@@ -2,6 +2,7 @@ use crate::codegen::flag_policy::FlagPolicy;
 use crate::codegen::*;
 use crate::error::CodegenError;
 use crate::ir::{Ir, Operand, Type};
+use crate::value::Value;
 
 use std::sync::Arc;
 
@@ -51,8 +52,16 @@ unsafe fn compile_ir(
         }
         Ir::Value(Operand::Gpr(t, reg)) => {
             let reg = *reg;
-            let _t = *t;
-            return Ok(Box::new(move |ctx| ctx.gpr(reg).get().into()));
+            let t = *t;
+            return Ok(Box::new(move |ctx| {
+                match t {
+                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
+                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
+                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
+                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                    _ => unreachable!("Invalid type"),
+                }
+            }));
         }
         Ir::LShr(t, op1, Operand::Immediate(t1, val)) => {
             assert!(t == t1, "Type mismatch");
@@ -63,10 +72,10 @@ unsafe fn compile_ir(
             return Ok(Box::new(move |ctx| {
                 let mut ret = op1(ctx);
                 match t.size() {
-                    1 => *ret.u8() >>= val,
-                    2 => *ret.u16() >>= val,
-                    4 => *ret.u32() >>= val,
-                    8 => *ret.u64() >>= val,
+                    1 => *ret.u8_mut() >>= val,
+                    2 => *ret.u16_mut() >>= val,
+                    4 => *ret.u32_mut() >>= val,
+                    8 => *ret.u64_mut() >>= val,
                     _ => unreachable!(),
                 }
 
@@ -150,22 +159,46 @@ unsafe fn compile_op(
         Operand::Ir(ir) => compile_ir(ir, flag_policy.clone())?,
         Operand::Gpr(t, reg) => {
             let reg = *reg;
-            let _t = *t;
-            Box::new(move |vm| vm.gpr(reg).get().into())
+            let t = *t;
+            Box::new(move |ctx| {
+                match t {
+                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
+                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
+                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
+                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                    _ => unreachable!("Invalid type"),
+                }
+            })
         }
         Operand::Fpr(t, reg) => {
             let reg = *reg;
-            let _t = *t;
-            Box::new(move |vm| vm.fpr(reg).get().to_bits().into())
+            let t = *t;
+            Box::new(move |ctx| {
+                match t {
+                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
+                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
+                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
+                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                    _ => unreachable!("Invalid type"),
+                }
+            })
         }
         Operand::Sys(t, reg) => {
             let reg = *reg;
-            let _t = *t;
-            Box::new(move |vm| vm.sys(reg).get().into())
+            let t = *t;
+            Box::new(move |ctx| {
+                match t {
+                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
+                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
+                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
+                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                    _ => unreachable!("Invalid type"),
+                }
+            })
         }
         Operand::Immediate(t, imm) => {
             let imm = *imm;
-            let _t = *t;
+            let t = *t;
             Box::new(move |_| imm.into())
         }
         Operand::VoidIr(ir) => compile_ir(ir, flag_policy.clone())?,
@@ -204,26 +237,26 @@ unsafe fn gen_add(
     let t = *t;
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u8();
-            let rhs = *rhs(ctx).u8();
+            let lhs = lhs(ctx).u8();
+            let rhs = rhs(ctx).u8();
 
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u16();
-            let rhs = *rhs(ctx).u16();
+            let lhs = lhs(ctx).u16();
+            let rhs = rhs(ctx).u16();
 
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u32();
-            let rhs = *rhs(ctx).u32();
+            let lhs = lhs(ctx).u32();
+            let rhs = rhs(ctx).u32();
 
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u64();
-            let rhs = *rhs(ctx).u64();
+            let lhs = lhs(ctx).u64();
+            let rhs = rhs(ctx).u64();
 
             lhs.overflowing_add(rhs).0.into()
         }),
@@ -252,26 +285,26 @@ unsafe fn gen_sub(
     let t = *t;
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u8();
-            let rhs = *rhs(ctx).u8();
+            let lhs = lhs(ctx).u8();
+            let rhs = rhs(ctx).u8();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u16();
-            let rhs = *rhs(ctx).u16();
+            let lhs = lhs(ctx).u16();
+            let rhs = rhs(ctx).u16();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u32();
-            let rhs = *rhs(ctx).u32();
+            let lhs = lhs(ctx).u32();
+            let rhs = rhs(ctx).u32();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u64();
-            let rhs = *rhs(ctx).u64();
+            let lhs = lhs(ctx).u64();
+            let rhs = rhs(ctx).u64();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
@@ -290,26 +323,26 @@ unsafe fn gen_mul(
 
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u8();
-            let rhs = *rhs(ctx).u8();
+            let lhs = lhs(ctx).u8();
+            let rhs = rhs(ctx).u8();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u16();
-            let rhs = *rhs(ctx).u16();
+            let lhs = lhs(ctx).u16();
+            let rhs = rhs(ctx).u16();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u32();
-            let rhs = *rhs(ctx).u32();
+            let lhs = lhs(ctx).u32();
+            let rhs = rhs(ctx).u32();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u64();
-            let rhs = *rhs(ctx).u64();
+            let lhs = lhs(ctx).u64();
+            let rhs = rhs(ctx).u64();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
@@ -328,26 +361,26 @@ unsafe fn gen_div(
 
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u8();
-            let rhs = *rhs(ctx).u8();
+            let lhs = lhs(ctx).u8();
+            let rhs = rhs(ctx).u8();
 
             lhs.overflowing_div(rhs).0.into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u16();
-            let rhs = *rhs(ctx).u16();
+            let lhs = lhs(ctx).u16();
+            let rhs = rhs(ctx).u16();
 
             lhs.overflowing_div(rhs).0.into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u32();
-            let rhs = *rhs(ctx).u32();
+            let lhs = lhs(ctx).u32();
+            let rhs = rhs(ctx).u32();
 
             lhs.overflowing_div(rhs).0.into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u64();
-            let rhs = *rhs(ctx).u64();
+            let lhs = lhs(ctx).u64();
+            let rhs = rhs(ctx).u64();
 
             lhs.overflowing_div(rhs).0.into()
         }),
@@ -376,29 +409,29 @@ unsafe fn gen_addc(
     let t = *t;
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u8();
-            let rhs = *rhs(ctx).u8();
+            let lhs = lhs(ctx).u8();
+            let rhs = rhs(ctx).u8();
 
             flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx);
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u16();
-            let rhs = *rhs(ctx).u16();
+            let lhs = lhs(ctx).u16();
+            let rhs = rhs(ctx).u16();
 
             flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx);
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u32();
-            let rhs = *rhs(ctx).u32();
+            let lhs = lhs(ctx).u32();
+            let rhs = rhs(ctx).u32();
 
             flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx);
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u64();
-            let rhs = *rhs(ctx).u64();
+            let lhs = lhs(ctx).u64();
+            let rhs = rhs(ctx).u64();
 
             flag_policy.add_carry(t, lhs, rhs, ctx);
             lhs.overflowing_add(rhs).0.into()
@@ -428,29 +461,29 @@ unsafe fn gen_subc(
     let t = *t;
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u8();
-            let rhs = *rhs(ctx).u8();
+            let lhs = lhs(ctx).u8();
+            let rhs = rhs(ctx).u8();
 
             flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx);
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u16();
-            let rhs = *rhs(ctx).u16();
+            let lhs = lhs(ctx).u16();
+            let rhs = rhs(ctx).u16();
 
             flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx);
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u32();
-            let rhs = *rhs(ctx).u32();
+            let lhs = lhs(ctx).u32();
+            let rhs = rhs(ctx).u32();
 
             flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx);
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = *lhs(ctx).u64();
-            let rhs = *rhs(ctx).u64();
+            let lhs = lhs(ctx).u64();
+            let rhs = rhs(ctx).u64();
 
             flag_policy.sub_carry(t, lhs, rhs, ctx);
             lhs.overflowing_sub(rhs).0.into()
@@ -474,28 +507,28 @@ unsafe fn gen_lshl(
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u8() <<= *rhs.u8();
+            *lhs.u8_mut() <<= rhs.u8();
             lhs
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u16() <<= *rhs.u16();
+            *lhs.u16_mut() <<= rhs.u16();
             lhs
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u32() <<= *rhs.u32();
+            *lhs.u32_mut() <<= rhs.u32();
             lhs
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u64() <<= *rhs.u64();
+            *lhs.u64_mut() <<= rhs.u64();
             lhs
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -516,28 +549,28 @@ unsafe fn gen_lshr(
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u8() >>= *rhs.u8();
+            *lhs.u8_mut() >>= rhs.u8();
             lhs
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u16() >>= *rhs.u16();
+            *lhs.u16_mut() >>= rhs.u16();
             lhs
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u32() >>= *rhs.u32();
+            *lhs.u32_mut() >>= rhs.u32();
             lhs
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u64() >>= *rhs.u64();
+            *lhs.u64_mut() >>= rhs.u64();
             lhs
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -561,56 +594,56 @@ unsafe fn gen_ashr(
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u8() >>= *rhs.u8();
+            *lhs.u8_mut() >>= rhs.u8();
             lhs
         }),
         Type::U16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u16() >>= *rhs.u16();
+            *lhs.u16_mut() >>= rhs.u16();
             lhs
         }),
         Type::U32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u32() >>= *rhs.u32();
+            *lhs.u32_mut() >>= rhs.u32();
             lhs
         }),
         Type::U64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.u64() >>= *rhs.u64();
+            *lhs.u64_mut() >>= rhs.u64();
             lhs
         }),
         Type::I8 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.i8() >>= *rhs.u8();
+            *lhs.i8_mut() >>= rhs.u8();
             lhs
         }),
         Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.i16() >>= *rhs.u16();
+            *lhs.i16_mut() >>= rhs.u16();
             lhs
         }),
         Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.i32() >>= *rhs.u32();
+            *lhs.i32_mut() >>= rhs.u32();
             lhs
         }),
         Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            *lhs.i64() >>= *rhs.u64();
+            *lhs.i64_mut() >>= rhs.u64();
             lhs
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -634,25 +667,25 @@ unsafe fn gen_rotr(
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            lhs.u8().rotate_right(*rhs.u8() as u32).into()
+            lhs.u8_mut().rotate_right(rhs.u8() as u32).into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            lhs.u16().rotate_right(*rhs.u16() as u32).into()
+            lhs.u16_mut().rotate_right(rhs.u16() as u32).into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            lhs.u32().rotate_right(*rhs.u32()).into()
+            lhs.u32_mut().rotate_right(rhs.u32()).into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
             let mut rhs = rhs(ctx);
 
-            lhs.u64().rotate_right(*rhs.u64() as u32).into()
+            lhs.u64_mut().rotate_right(rhs.u64() as u32).into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
     })
@@ -667,23 +700,23 @@ unsafe fn gen_load(
     Ok(match t {
         Type::Bool => Box::new(move |ctx| {
             let mut var = op.execute(ctx);
-            (ctx.mem(*var.u64()).read_u8().unwrap() & 0b1).into()
+            (ctx.mem(*var.u64_mut()).read_u8().unwrap() & 0b1).into()
         }),
         Type::U8 | Type::I8 => Box::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64()).read_u8().unwrap().into()
+            ctx.mem(*var.u64_mut()).read_u8().unwrap().into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64()).read_u16().unwrap().into()
+            ctx.mem(*var.u64_mut()).read_u16().unwrap().into()
         }),
         Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64()).read_u32().unwrap().into()
+            ctx.mem(*var.u64_mut()).read_u32().unwrap().into()
         }),
         Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64()).read_u64().unwrap().into()
+            ctx.mem(*var.u64_mut()).read_u64().unwrap().into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
     })
@@ -720,19 +753,19 @@ unsafe fn gen_sext_cast(
     Ok(match from {
         Type::U8 | Type::U16 | Type::U32 | Type::U64 => op,
         Type::I8 => Box::new(move |ctx| {
-            let v: i64 = (*op.execute(ctx).i8()).into();
+            let v: i64 = (*op.execute(ctx).i8_mut()).into();
             (v & to).into()
         }),
         Type::I16 => Box::new(move |ctx| {
-            let v: i64 = (*op.execute(ctx).i16()).into();
+            let v: i64 = (*op.execute(ctx).i16_mut()).into();
             (v & to).into()
         }),
         Type::I32 => Box::new(move |ctx| {
-            let v: i64 = (*op.execute(ctx).i32()).into();
+            let v: i64 = (*op.execute(ctx).i32_mut()).into();
             (v & to).into()
         }),
         Type::I64 => Box::new(move |ctx| {
-            let v: i64 = *op.execute(ctx).i64();
+            let v: i64 = *op.execute(ctx).i64_mut();
             (v & to).into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -775,7 +808,7 @@ unsafe fn gen_and(
             let mut lhs = lhs.execute(ctx);
             let mut rhs = rhs.execute(ctx);
 
-            *lhs.u64() &= *rhs.u64();
+            *lhs.u64_mut() &= *rhs.u64_mut();
             lhs
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -804,7 +837,7 @@ unsafe fn gen_or(
             let mut lhs = lhs.execute(ctx);
             let mut rhs = rhs.execute(ctx);
 
-            *lhs.u64() |= *rhs.u64();
+            *lhs.u64_mut() |= *rhs.u64_mut();
             lhs
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -835,7 +868,7 @@ unsafe fn gen_xor(
             let mut lhs = lhs.execute(ctx);
             let mut rhs = rhs.execute(ctx);
 
-            *lhs.u64() ^= *rhs.u64();
+            *lhs.u64_mut() ^= *rhs.u64_mut();
             lhs
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -860,7 +893,7 @@ unsafe fn gen_not(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| ((!*op.execute(ctx).u64()) & t.gen_mask()).into()),
+        | Type::I64 => Box::new(move |ctx| ((!*op.execute(ctx).u64_mut()) & t.gen_mask()).into()),
         _ => unreachable!("invalid type: {:?}", t),
     })
 }
@@ -880,7 +913,7 @@ unsafe fn gen_if(
 
     let _t = *t;
     Ok(Box::new(move |ctx| {
-        if *cond.execute(ctx).u64() != 0 {
+        if *cond.execute(ctx).u64_mut() != 0 {
             if_true.execute(ctx)
         } else {
             if_false.execute(ctx)
@@ -901,26 +934,26 @@ unsafe fn gen_cmp_eq(
 
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u8();
-            let rhs = *rhs.execute(ctx).u8();
+            let lhs = *lhs.execute(ctx).u8_mut();
+            let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs == rhs).into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u16();
-            let rhs = *rhs.execute(ctx).u16();
+            let lhs = *lhs.execute(ctx).u16_mut();
+            let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs == rhs).into()
         }),
         Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u32();
-            let rhs = *rhs.execute(ctx).u32();
+            let lhs = *lhs.execute(ctx).u32_mut();
+            let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs == rhs).into()
         }),
         Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u64();
-            let rhs = *rhs.execute(ctx).u64();
+            let lhs = *lhs.execute(ctx).u64_mut();
+            let rhs = *rhs.execute(ctx).u64_mut();
 
             (lhs == rhs).into()
         }),
@@ -941,26 +974,26 @@ unsafe fn gen_cmp_ne(
 
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u8();
-            let rhs = *rhs.execute(ctx).u8();
+            let lhs = *lhs.execute(ctx).u8_mut();
+            let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs != rhs).into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u16();
-            let rhs = *rhs.execute(ctx).u16();
+            let lhs = *lhs.execute(ctx).u16_mut();
+            let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs != rhs).into()
         }),
         Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u32();
-            let rhs = *rhs.execute(ctx).u32();
+            let lhs = *lhs.execute(ctx).u32_mut();
+            let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs != rhs).into()
         }),
         Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u64();
-            let rhs = *rhs.execute(ctx).u64();
+            let lhs = *lhs.execute(ctx).u64_mut();
+            let rhs = *rhs.execute(ctx).u64_mut();
 
             (lhs != rhs).into()
         }),
@@ -981,26 +1014,26 @@ unsafe fn gen_cmp_gt(
 
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u8();
-            let rhs = *rhs.execute(ctx).u8();
+            let lhs = *lhs.execute(ctx).u8_mut();
+            let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs > rhs).into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u16();
-            let rhs = *rhs.execute(ctx).u16();
+            let lhs = *lhs.execute(ctx).u16_mut();
+            let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs > rhs).into()
         }),
         Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u32();
-            let rhs = *rhs.execute(ctx).u32();
+            let lhs = *lhs.execute(ctx).u32_mut();
+            let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs > rhs).into()
         }),
         Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u64();
-            let rhs = *rhs.execute(ctx).u64();
+            let lhs = *lhs.execute(ctx).u64_mut();
+            let rhs = *rhs.execute(ctx).u64_mut();
 
             (lhs > rhs).into()
         }),
@@ -1021,26 +1054,26 @@ unsafe fn gen_cmp_lt(
 
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u8();
-            let rhs = *rhs.execute(ctx).u8();
+            let lhs = *lhs.execute(ctx).u8_mut();
+            let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs < rhs).into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u16();
-            let rhs = *rhs.execute(ctx).u16();
+            let lhs = *lhs.execute(ctx).u16_mut();
+            let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs < rhs).into()
         }),
         Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u32();
-            let rhs = *rhs.execute(ctx).u32();
+            let lhs = *lhs.execute(ctx).u32_mut();
+            let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs < rhs).into()
         }),
         Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
-            let lhs = *lhs.execute(ctx).u64();
-            let rhs = *rhs.execute(ctx).u64();
+            let lhs = *lhs.execute(ctx).u64_mut();
+            let rhs = *rhs.execute(ctx).u64_mut();
 
             (lhs < rhs).into()
         }),

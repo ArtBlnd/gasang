@@ -101,17 +101,17 @@ impl Cpu {
 
     pub fn dump(&self) {
         for reg in self.gpr_registers.iter() {
-            print!("{}: 0x{:x} ", reg.1.name(), reg.1.get());
+            print!("{}: 0x{:x} ", reg.1.name(), reg.1.u64());
         }
         println!();
 
         for reg in self.fpr_registers.iter() {
-            print!("{}: {} ", reg.1.name(), reg.1.get());
+            print!("{}: {} ", reg.1.name(), reg.1.u64());
         }
         println!();
 
         for reg in self.sys_registers.iter() {
-            print!("{}: 0x{:x} ", reg.1.name(), reg.1.get());
+            print!("{}: 0x{:x} ", reg.1.name(), reg.1.u64());
         }
         println!();
 
@@ -145,7 +145,7 @@ fn new_aarch64_elf(image: &[u8]) -> Cpu {
 
         if seg.p_type == elf::abi::PT_TLS {
             let reg_id = cpu.reg_by_name("tpidr_el0").unwrap();
-            cpu.sys_mut(reg_id).set(addr);
+            *cpu.sys_mut(reg_id).u64_mut() = addr;
         }
 
         let readable = seg.p_flags & PF_R != 0;
@@ -198,7 +198,7 @@ fn init_base_aarch64_cpu() -> Cpu {
     const REG_SIZE: u64 = 1024 * 1024 * 4;
 
     let mut sp_reg = GprRegister::new("sp", 8);
-    sp_reg.set(REG_ADDR);
+    *sp_reg.u64_mut() = REG_ADDR;
     cpu.mmu().mmap(REG_ADDR - REG_SIZE, REG_SIZE, true, true, false);
     let id = cpu.gpr_registers.insert(sp_reg);
     cpu.reg_name_map.insert("sp".to_string(), RegId(id as u8));

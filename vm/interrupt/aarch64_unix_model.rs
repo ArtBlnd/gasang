@@ -4,13 +4,13 @@ use crate::Cpu;
 pub struct AArch64UnixInterruptModel;
 impl InterruptModel for AArch64UnixInterruptModel {
     unsafe fn syscall(&self, _: u64, vm: &mut Cpu) {
-        let nr = vm.gpr(vm.reg_by_name("x8").unwrap()).get();
-        let arg0 = vm.gpr(vm.reg_by_name("x0").unwrap()).get();
-        let arg1 = vm.gpr(vm.reg_by_name("x1").unwrap()).get();
-        let arg2 = vm.gpr(vm.reg_by_name("x2").unwrap()).get();
-        let arg3 = vm.gpr(vm.reg_by_name("x3").unwrap()).get();
-        let arg4 = vm.gpr(vm.reg_by_name("x4").unwrap()).get();
-        let arg5 = vm.gpr(vm.reg_by_name("x5").unwrap()).get();
+        let nr = vm.gpr(vm.reg_by_name("x8").unwrap()).u64();
+        let arg0 = vm.gpr(vm.reg_by_name("x0").unwrap()).u64();
+        let arg1 = vm.gpr(vm.reg_by_name("x1").unwrap()).u64();
+        let arg2 = vm.gpr(vm.reg_by_name("x2").unwrap()).u64();
+        let arg3 = vm.gpr(vm.reg_by_name("x3").unwrap()).u64();
+        let arg4 = vm.gpr(vm.reg_by_name("x4").unwrap()).u64();
+        let arg5 = vm.gpr(vm.reg_by_name("x5").unwrap()).u64();
 
         handle_syscall(nr, [arg0, arg1, arg2, arg3, arg4, arg5], vm)
     }
@@ -49,7 +49,7 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
             let ret = vm.gpr_mut(ret);
 
             // We only have one user emulated on this machine.
-            ret.set(0);
+            *ret.u64_mut() = 0;
         }
 
         // getuid
@@ -58,7 +58,7 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
             let ret = vm.gpr_mut(ret);
 
             // We only have one user emulated on this machine.
-            ret.set(0);
+            *ret.u64_mut() = 0;
         }
 
         0xb0 => {
@@ -66,7 +66,7 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
             let ret = vm.gpr_mut(ret);
 
             // We only have one group emulated on this machine.
-            ret.set(0);
+            *ret.u64_mut() = 0;
         }
 
         // getegid
@@ -75,7 +75,7 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
             let ret = vm.gpr_mut(ret);
 
             // We only have one group emulated on this machine.
-            ret.set(0);
+            *ret.u64_mut() = 0;
         }
 
         // brk
@@ -83,10 +83,7 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
             let ret = vm.reg_by_name("x0").unwrap();
             let ret = vm.gpr_mut(ret);
 
-            todo!();
-
-            // return zero.
-            ret.set(0);
+            *ret.u64_mut() = 0;
         }
         _ => unimplemented!("unknown interrupt! {}", nr),
     }
