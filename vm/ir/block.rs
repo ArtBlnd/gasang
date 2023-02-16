@@ -9,6 +9,7 @@ pub enum BlockDestination {
     Ip,
     Gpr(Type, RegId),
     Fpr(Type, RegId),
+    Sys(Type, RegId),
     FprSlot(Type, RegId, u8),
     Memory(Type, u64),
     MemoryRelI64(Type, RegId, i64),
@@ -43,6 +44,7 @@ impl IrBlock {
             BlockDestination::Ip => Some(&Type::U64),
             BlockDestination::Gpr(ty, _) => Some(ty),
             BlockDestination::Fpr(ty, _) => Some(ty),
+            BlockDestination::Sys(ty, _) => Some(ty),
             BlockDestination::FprSlot(ty, _, _) => Some(ty),
             BlockDestination::Memory(ty, _) => Some(ty),
             BlockDestination::MemoryRelI64(ty, _, _) => Some(ty),
@@ -51,6 +53,7 @@ impl IrBlock {
             BlockDestination::None => None,
             BlockDestination::SystemCall => Some(&Type::U64),
             BlockDestination::Exit => None,
+            _ => unreachable!(),
         };
 
         if let Some(dest_type) = dest_type {

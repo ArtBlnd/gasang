@@ -4,8 +4,7 @@ use crate::register::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-
-use elf::abi::{PF_R, PF_W, PF_X, SHF_WRITE, SHF_EXECINSTR};
+use elf::abi::{PF_R, PF_W, PF_X, SHF_EXECINSTR, SHF_WRITE};
 use elf::endian::AnyEndian;
 use slab::Slab;
 
@@ -80,6 +79,7 @@ impl Cpu {
     }
 
     pub fn set_ip(&mut self, eip: u64) {
+        //println!("<<<<<{eip:x}>>>>>");
         self.ip = eip;
     }
 
@@ -106,7 +106,7 @@ impl Cpu {
         println!();
 
         for reg in self.fpr_registers.iter() {
-            print!("{}: {} ", reg.1.name(), reg.1.u64());
+            print!("{}: 0x{:x} ", reg.1.name(), reg.1.u64());
         }
         println!();
 
@@ -116,7 +116,7 @@ impl Cpu {
         println!();
 
         println!("ip: 0x{:016x}", self.ip);
-        println!("flag: 0x{:016x}", self.flag());
+        println!("flag: 0x{:064b}", self.flag());
     }
 }
 
@@ -140,7 +140,10 @@ fn new_aarch64_elf(image: &[u8]) -> Cpu {
 
         cpu.mmu.mmap(addr, size, true, true, false);
         unsafe {
-            cpu.mmu.frame(addr).write(data).expect("Failed VM Initialize");
+            cpu.mmu
+                .frame(addr)
+                .write(data)
+                .expect("Failed VM Initialize");
         }
 
         if seg.p_type == elf::abi::PT_TLS {
@@ -168,7 +171,7 @@ fn new_aarch64_elf(image: &[u8]) -> Cpu {
 
         cpu.mmu.mmap(addr, size, true, writable, executable)
     }
-    
+
     cpu.ip = file.ehdr.e_entry;
     cpu
 }
@@ -185,26 +188,32 @@ fn init_base_aarch64_cpu() -> Cpu {
     };
 
     for i in 0..31 {
-        let id = cpu.gpr_registers.insert(GprRegister::new(format!("x{}", i), 8));
+        let id = cpu
+            .gpr_registers
+            .insert(GprRegister::new(format!("x{}", i), 8));
         cpu.reg_name_map.insert(format!("x{}", i), RegId(id as u8));
     }
 
     for i in 0..31 {
-        let id = cpu.fpr_registers.insert(FprRegister::new(format!("v{}", i), 16));
+        let id = cpu
+            .fpr_registers
+            .insert(FprRegister::new(format!("v{}", i), 16));
         cpu.reg_name_map.insert(format!("v{}", i), RegId(id as u8));
     }
 
-    const REG_ADDR: u64 = 0x7ffffffffff7000;
+    const REG_ADDR: u64 = 0x7ffffffffff8000;
     const REG_SIZE: u64 = 1024 * 1024 * 4;
 
     let mut sp_reg = GprRegister::new("sp", 8);
     *sp_reg.u64_mut() = REG_ADDR;
-    cpu.mmu().mmap(REG_ADDR - REG_SIZE, REG_SIZE, true, true, false);
+    cpu.mmu()
+        .mmap(REG_ADDR - REG_SIZE, REG_SIZE, true, true, false);
     let id = cpu.gpr_registers.insert(sp_reg);
     cpu.reg_name_map.insert("sp".to_string(), RegId(id as u8));
 
     let id = cpu.sys_registers.insert(SysRegister::new("tpidr_el0", 8));
-    cpu.reg_name_map.insert("tpidr_el0".to_string(), RegId(id as u8));
+    cpu.reg_name_map
+        .insert("tpidr_el0".to_string(), RegId(id as u8));
 
     cpu
 }

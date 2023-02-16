@@ -53,14 +53,12 @@ unsafe fn compile_ir(
         Ir::Value(Operand::Gpr(t, reg)) => {
             let reg = *reg;
             let t = *t;
-            return Ok(Box::new(move |ctx| {
-                match t {
-                    Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
-                    Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
-                    Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
-                    Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
-                    _ => unreachable!("Invalid type"),
-                }
+            return Ok(Box::new(move |ctx| match t {
+                Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
+                Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
+                Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
+                Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+                _ => unreachable!("Invalid type"),
             }));
         }
         Ir::LShr(t, op1, Operand::Immediate(t1, val)) => {
@@ -160,45 +158,39 @@ unsafe fn compile_op(
         Operand::Gpr(t, reg) => {
             let reg = *reg;
             let t = *t;
-            Box::new(move |ctx| {
-                match t {
-                    Type::U8 | Type::I8 => Value::from_u8(ctx.gpr(reg).u8()),
-                    Type::U16 | Type::I16 => Value::from_u16(ctx.gpr(reg).u16()),
-                    Type::U32 | Type::I32 => Value::from_u32(ctx.gpr(reg).u32()),
-                    Type::U64 | Type::I64 => Value::from_u64(ctx.gpr(reg).u64()),
-                    _ => unreachable!("Invalid type"),
-                }
+            Box::new(move |ctx| match t {
+                Type::U8 | Type::I8 => Value::from_u8(ctx.gpr(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.gpr(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.gpr(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.gpr(reg).u64()),
+                _ => unreachable!("Invalid type"),
             })
         }
         Operand::Fpr(t, reg) => {
             let reg = *reg;
             let t = *t;
-            Box::new(move |ctx| {
-                match t {
-                    Type::U8 | Type::I8 => Value::from_u8(ctx.fpr(reg).u8()),
-                    Type::U16 | Type::I16 => Value::from_u16(ctx.fpr(reg).u16()),
-                    Type::U32 | Type::I32 => Value::from_u32(ctx.fpr(reg).u32()),
-                    Type::U64 | Type::I64 => Value::from_u64(ctx.fpr(reg).u64()),
-                    Type::Vec(VecType::U64 | VecType::I64, 2) => {
-                        let mut ret = Value::new(16);
-                        *ret.u64x2_mut() = ctx.fpr(reg).u64x2();
-                        ret
-                    }
-                    _ => unreachable!("Invalid type"),
+            Box::new(move |ctx| match t {
+                Type::U8 | Type::I8 => Value::from_u8(ctx.fpr(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.fpr(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.fpr(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.fpr(reg).u64()),
+                Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                    let mut ret = Value::new(16);
+                    *ret.u64x2_mut() = ctx.fpr(reg).u64x2();
+                    ret
                 }
+                _ => unreachable!("Invalid type"),
             })
         }
         Operand::Sys(t, reg) => {
             let reg = *reg;
             let t = *t;
-            Box::new(move |ctx| {
-                match t {
-                    Type::U8 | Type::I8 => Value::from_u8(ctx.sys(reg).u8()),
-                    Type::U16 | Type::I16 => Value::from_u16(ctx.sys(reg).u16()),
-                    Type::U32 | Type::I32 => Value::from_u32(ctx.sys(reg).u32()),
-                    Type::U64 | Type::I64 => Value::from_u64(ctx.sys(reg).u64()),
-                    _ => unreachable!("Invalid type"),
-                }
+            Box::new(move |ctx| match t {
+                Type::U8 | Type::I8 => Value::from_u8(ctx.sys(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.sys(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.sys(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.sys(reg).u64()),
+                _ => unreachable!("Invalid type"),
             })
         }
         Operand::Immediate(t, imm) => {

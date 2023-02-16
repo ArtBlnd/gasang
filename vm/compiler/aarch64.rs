@@ -8,21 +8,27 @@ use crate::register::RegId;
 use machineinstr::aarch64::*;
 
 pub struct AArch64Compiler {
-    register_info: HashMap<String, RegId>
+    register_info: HashMap<String, RegId>,
 }
 
 impl AArch64Compiler {
     pub fn new(reg_info: HashMap<String, RegId>) -> Self {
         Self {
-            register_info: reg_info
+            register_info: reg_info,
         }
     }
     pub fn gpr(&self, index: u8) -> RegId {
-        self.register_info.get(&format!("x{}", index)).unwrap().clone()
+        self.register_info
+            .get(&format!("x{}", index))
+            .unwrap()
+            .clone()
     }
 
     pub fn fpr(&self, index: u8) -> RegId {
-        self.register_info.get(&format!("v{}", index)).unwrap().clone()
+        self.register_info
+            .get(&format!("v{}", index))
+            .unwrap()
+            .clone()
     }
 
     pub fn stack_reg(&self) -> RegId {
@@ -46,6 +52,8 @@ impl Compiler for AArch64Compiler {
             }
             AArch64Instr::MovnVar32(operand) => gen_movn(self, operand, Type::U32),
             AArch64Instr::MovnVar64(operand) => gen_movn(self, operand, Type::U64),
+            AArch64Instr::MovkVar32(operand) => gen_movk(self, operand, Type::U32),
+            AArch64Instr::MovkVar64(operand) => gen_movk(self, operand, Type::U64),
             AArch64Instr::Adr(operand) => gen_adr(self, operand),
             AArch64Instr::Adrp(operand) => gen_adrp(self, operand),
             AArch64Instr::OrrShiftedReg64(operand) => gen_orr_shifted_reg(self, operand, Type::U64),
@@ -72,7 +80,12 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Stur32(operand) => gen_stur(self, operand, Type::U32),
             AArch64Instr::Stur64(operand) => gen_stur(self, operand, Type::U64),
             AArch64Instr::SturSimdFP64(operand) => gen_stur_simd_fp(self, operand, Type::U64),
-            AArch64Instr::SturSimdFP128(operand) => gen_stur_simd_fp(self, operand, Type::Vec(VecType::U64, 2)),
+            AArch64Instr::SturSimdFP128(operand) => {
+                gen_stur_simd_fp(self, operand, Type::Vec(VecType::U64, 2))
+            }
+            AArch64Instr::StpSimdFpVar128(operand) => {
+                gen_stp_simd_fp(self, operand, Type::Vec(VecType::U64, 2))
+            }
 
             // Advanced SIMD and FP
             AArch64Instr::DupGeneral(operand) => gen_dup_general(self, operand),
@@ -132,6 +145,7 @@ impl Compiler for AArch64Compiler {
 
             // Speical instructions
             AArch64Instr::Mrs(operand) => gen_mrs(self, operand),
+            AArch64Instr::MsrReg(operand) => gen_msr_reg(self, operand),
             AArch64Instr::Nop | AArch64Instr::Wfi => {
                 let mut block = IrBlock::new(4);
 
@@ -194,8 +208,12 @@ fn gen_adrp(compiler: &AArch64Compiler, operand: PcRelAddressing) -> IrBlock {
 
 fn gen_orr_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
-    let rm = compiler.gpr(operand.rm);
     let rd = compiler.gpr(operand.rd);
+    let rm = if operand.rm == 31 {
+        Operand::Immediate(ty, 0)
+    } else {
+        Operand::Gpr(ty, compiler.gpr(operand.rm))
+    };
 
     let shift_type = decode_shift(operand.shift);
 
@@ -208,7 +226,8 @@ fn gen_orr_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty:
     let op2 = Operand::ir(shift_reg(rm, shift_type, operand.imm6 as u64, ty));
 
     let ir = Ir::Or(ty, op1, op2);
-    let ds = BlockDestination::Gpr(ty, rd);
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, rd);
 
     block.append(ir, ds);
 
@@ -241,7 +260,8 @@ fn gen_ldr_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
             Operand::imm(Type::U64, pre_offs as u64),
         )),
     );
-    let ds = BlockDestination::Gpr(ir.get_type(), dst);
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, dst);
 
     block.append(ir, ds);
 
@@ -287,7 +307,7 @@ fn gen_str_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
             Operand::gpr(Type::U64, rn),
             Operand::imm(Type::I64, offset as u64),
         );
-        let ds = BlockDestination::Gpr(ir.get_type(), rn);
+        let ds = BlockDestination::Gpr(Type::U64, rn);
 
         block.append(ir, ds);
     }
@@ -301,7 +321,7 @@ fn gen_ldr_lit_var64(compiler: &AArch64Compiler, operand: Imm19Rt) -> IrBlock {
     let offset = sign_extend((operand.imm19 << 2) as i64, 21);
 
     let ir = Ir::Load(Type::U64, Operand::ir(gen_ip_relative(offset)));
-    let ds = BlockDestination::Gpr(ir.get_type(), compiler.gpr(operand.rt));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rt));
 
     block.append(ir, ds);
 
@@ -324,14 +344,25 @@ fn gen_stp_var(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) 
 
     let offset_temp = if !post_index { offset } else { 0 };
 
-    let data1 = compiler.gpr(operand.rt);
-    let data2 = compiler.gpr(operand.rt2);
+    let data1 = if operand.rt == 31 {
+        Operand::Immediate(ty, 0)
+    }
+    else {
+        Operand::Gpr(ty, compiler.gpr(operand.rt))
+    };
 
-    let ir = Ir::Value(Operand::Gpr(ty, data1));
+    let data2 = if operand.rt2 == 31 {
+        Operand::Immediate(ty, 0)
+    }
+    else {
+        Operand::Gpr(ty, compiler.gpr(operand.rt2))
+    };
+
+    let ir = Ir::Value(data1);
     let ds = BlockDestination::MemoryRelI64(ty, dst, offset_temp);
     block.append(ir, ds);
 
-    let ir = Ir::Value(Operand::Gpr(ty, data2));
+    let ir = Ir::Value(data2);
     let ds = BlockDestination::MemoryRelI64(ty, dst, offset_temp + 8);
     block.append(ir, ds);
 
@@ -359,8 +390,8 @@ fn gen_add_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
     };
 
     let imm = match operand.sh {
-        0b00 => operand.imm12 as u64,
-        0b01 => (operand.imm12 as u64) << 12,
+        0b0 => operand.imm12 as u64,
+        0b1 => (operand.imm12 as u64) << 12,
         _ => unreachable!(),
     };
 
@@ -384,7 +415,7 @@ fn gen_add_shifted_reg64(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd) -
     let rd = compiler.gpr(operand.rd);
 
     let sh = shift_reg(
-        rm,
+        Operand::Gpr(Type::U64, rm),
         decode_shift(operand.shift),
         operand.imm6 as u64,
         Type::U64,
@@ -404,7 +435,6 @@ fn gen_add_shifted_reg64(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd) -
 fn gen_sub_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let rd = compiler.gpr(operand.rd);
     let rn = if operand.rn == 31 {
         compiler.stack_reg()
     } else {
@@ -422,7 +452,12 @@ fn gen_sub_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
         Operand::gpr(Type::U64, rn),
         Operand::imm(Type::U64, imm),
     );
-    let ds = BlockDestination::Gpr(ir.get_type(), rd);
+
+    let ds = if operand.rd == 31 {
+        BlockDestination::None
+    } else {
+        BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd))
+    };
 
     block.append(ir, ds);
 
@@ -436,7 +471,7 @@ fn gen_sub_shifted_reg_64(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd) 
     let rm = compiler.gpr(operand.rm);
 
     let sh = shift_reg(
-        rm,
+        Operand::Gpr(Type::U64, rm),
         decode_shift(operand.shift),
         operand.imm6 as u64,
         Type::U64,
@@ -450,7 +485,7 @@ fn gen_sub_shifted_reg_64(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd) 
 
     let ir = Ir::Sub(Type::U64, rn, Operand::Ir(Box::new(sh)));
 
-    let ds = BlockDestination::Gpr(ir.get_type(), rd);
+    let ds = BlockDestination::Gpr(Type::U64, rd);
 
     block.append(ir, ds);
 
@@ -463,13 +498,14 @@ fn gen_subs_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty
     let rn = compiler.gpr(operand.rn);
     let rm = compiler.gpr(operand.rm);
 
-    let sh = shift_reg(rm, decode_shift(operand.shift), operand.imm6 as u64, ty);
+    let sh = shift_reg(Operand::Gpr(Type::U64, rm), decode_shift(operand.shift), operand.imm6 as u64, ty);
     let ir = Ir::Subc(ty, Operand::gpr(ty, rn), Operand::Ir(Box::new(sh)));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
 
     let ds = if operand.rd == 31 {
         BlockDestination::None
     } else {
-        BlockDestination::Gpr(ir.get_type(), compiler.gpr(operand.rd))
+        BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd))
     };
 
     block.append(ir, ds);
@@ -493,11 +529,12 @@ fn gen_subs_imm(compiler: &AArch64Compiler, operand: ShImm12RnRd, ty: Type) -> I
     };
 
     let ir = Ir::Subc(ty, Operand::gpr(ty, rn), Operand::imm(ty, imm));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
     // If rd is 31, its alias is CMP(immediate).
     let ds = if operand.rd == 0b11111 {
         BlockDestination::None
     } else {
-        BlockDestination::Gpr(ty, compiler.gpr(operand.rd))
+        BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd))
     };
 
     block.append(ir, ds);
@@ -512,7 +549,7 @@ fn gen_ands_imm64(compiler: &AArch64Compiler, operand: LogicalImm) -> IrBlock {
     let rn = Operand::gpr(Type::U64, compiler.gpr(operand.rn));
 
     let ir = Ir::And(Type::U64, rn, Operand::imm(Type::U64, imm));
-    let ds = BlockDestination::Gpr(ir.get_type(), compiler.gpr(operand.rd));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
     block.append(ir.clone(), ds);
 
     let ds = BlockDestination::None;
@@ -567,7 +604,7 @@ fn gen_br(compiler: &AArch64Compiler, operand: UncondBranchReg) -> IrBlock {
 fn gen_b_cond(_compiler: &AArch64Compiler, operand: Imm19Cond) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let offset = operand.imm19 << 2;
+    let offset = sign_extend((operand.imm19 << 2) as i64, 21);
     let ir = Ir::If(
         Type::U64,
         condition_holds(operand.cond),
@@ -674,7 +711,8 @@ fn gen_csel32(compiler: &AArch64Compiler, operand: RmCondRnRd) -> IrBlock {
     let rd = compiler.gpr(operand.rd);
 
     let ir = Ir::If(Type::U32, condition_holds(operand.cond), rn, rm);
-    let ds = BlockDestination::Gpr(ir.get_type(), rd);
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, rd);
 
     block.append(ir, ds);
 
@@ -723,7 +761,8 @@ fn gen_ubfm(compiler: &AArch64Compiler, operand: Bitfield, ty: Type) -> IrBlock 
         Operand::Immediate(ty, wmask),
     );
     let ir = Ir::And(ty, Operand::ir(bot), Operand::Immediate(ty, tmask));
-    let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
 
     block.append(ir, ds);
 
@@ -751,7 +790,8 @@ fn gen_sbfm(compiler: &AArch64Compiler, operand: Bitfield, ty: Type) -> IrBlock 
     let rhs = Ir::And(ty, Operand::ir(bot), Operand::Immediate(ty, tmask));
 
     let ir = Ir::Or(ty, Operand::ir(lhs), Operand::ir(rhs));
-    let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
 
     block.append(ir, ds);
 
@@ -781,8 +821,8 @@ fn gen_ldrb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
             Operand::imm(Type::U64, pre_offs as u64),
         )),
     );
-    let ir = Ir::ZextCast(Type::U32, Operand::ir(ir));
-    let ds = BlockDestination::Gpr(Type::U32, dst);
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, dst);
 
     block.append(ir, ds);
 
@@ -859,8 +899,8 @@ fn gen_ldrh_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
         )),
     );
 
-    let ir = Ir::ZextCast(Type::U32, Operand::ir(ir));
-    let ds = BlockDestination::Gpr(Type::U32, compiler.gpr(operand.rt));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rt));
 
     block.append(ir, ds);
 
@@ -878,7 +918,9 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
         operand.crm,
         operand.op2,
     ) {
-        (0b11, 0b011, 0b1101, 0b0000, 0b0010) => Operand::Sys(Type::U64, compiler.reg_by_name("tpidr_el0")), // tpidr_el0, get current thread.
+        (0b11, 0b011, 0b1101, 0b0000, 0b0010) => {
+            Operand::Sys(Type::U64, compiler.reg_by_name("tpidr_el0"))
+        } // tpidr_el0, get current thread.
         (0b11, 0b011, 0b0000, 0b0000, 0b0111) => {
             let implementer = 0; // Reserved for software use
             let variant = 0;
@@ -894,7 +936,34 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
     };
 
     let ir = Ir::Value(op);
-    let ds = BlockDestination::Gpr(ir.get_type(), compiler.gpr(operand.rt));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rt));
+
+    block.append(ir, ds);
+
+    block
+}
+
+
+fn gen_msr_reg(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    // TODO: emulate system registers
+    let dest = match (
+        operand.o0 + 2,
+        operand.op1,
+        operand.crn,
+        operand.crm,
+        operand.op2,
+    ) {
+        (0b11, 0b011, 0b1101, 0b0000, 0b0010) => {
+            compiler.reg_by_name("tpidr_el0")
+        } // tpidr_el0, get current thread.
+    
+        _ => unimplemented!("MSR: {:x?}", operand),
+    };
+
+    let ir = Ir::Value(Operand::Gpr(Type::U64, compiler.gpr(operand.rt)));
+    let ds = BlockDestination::Sys(Type::U64, dest);
 
     block.append(ir, ds);
 
@@ -924,8 +993,8 @@ fn gen_ldr_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset, ty: T
             Operand::ir(offset),
         )),
     );
-    let ir = Ir::ZextCast(ty, Operand::ir(ir));
-    let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rt));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rt));
 
     block.append(ir, ds);
 
@@ -951,7 +1020,11 @@ fn gen_blr(compiler: &AArch64Compiler, operand: UncondBranchReg) -> IrBlock {
 fn gen_ldp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (_wback, post_index) = decode_o_for_ld_st_pair_offset(operand.o);
+    let (mut wback, post_index) = decode_o_for_ld_st_pair_offset(operand.o);
+
+    if wback && (operand.rt == operand.rn || operand.rt2 == operand.rn) && operand.rn != 31 {
+        wback = false;
+    }
 
     let scale = 2 + (operand.opc >> 1);
     let signed = operand.opc & 0b1 != 0;
@@ -964,12 +1037,12 @@ fn gen_ldp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> I
         compiler.gpr(operand.rn)
     };
 
-    let offset = if !post_index { offset } else { 0 };
+    let offset_temp = if !post_index { offset } else { 0 };
 
     let address = Ir::Add(
         Type::U64,
         Operand::Gpr(Type::U64, src),
-        Operand::Immediate(Type::I64, offset as u64),
+        Operand::Immediate(Type::I64, offset_temp as u64),
     );
 
     let ir = Ir::Load(ty, Operand::ir(address.clone()));
@@ -979,7 +1052,7 @@ fn gen_ldp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> I
         ir
     };
 
-    let ds = BlockDestination::Gpr(ir.get_type(), compiler.gpr(operand.rt));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rt));
     block.append(ir, ds);
 
     let ir = Ir::Load(
@@ -995,8 +1068,15 @@ fn gen_ldp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> I
     } else {
         ir
     };
-    let ds = BlockDestination::Gpr(ir.get_type(), compiler.gpr(operand.rt2));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rt2));
     block.append(ir, ds);
+
+    if wback {
+        let ir = Ir::Add(Type::U64, Operand::gpr(Type::U64, src), Operand::imm(Type::I64, offset as u64));
+        let ds = BlockDestination::Gpr(Type::U64, src);
+
+        block.append(ir, ds);
+    }
 
     block
 }
@@ -1008,7 +1088,7 @@ fn gen_ands_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty
 
     let src = Operand::Gpr(ty, compiler.gpr(operand.rn));
     let operand2 = shift_reg(
-        compiler.gpr(operand.rm),
+        Operand::Gpr(ty, compiler.gpr(operand.rm)),
         shift_type,
         operand.imm6 as u64,
         ty,
@@ -1017,11 +1097,12 @@ fn gen_ands_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty
     let ir = Ir::And(ty, src, Operand::ir(operand2));
 
     if operand.rd != 31 {
-        let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+        let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
         block.append(ir.clone(), ds);
     }
 
     let ir = Ir::Addc(ty, Operand::ir(ir), Operand::imm(ty, 0)); // Only for flag setting
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
     let ds = BlockDestination::None;
     block.append(ir, ds);
 
@@ -1041,9 +1122,10 @@ fn gen_and_imm(compiler: &AArch64Compiler, operand: LogicalImm, ty: Type) -> IrB
 
     let src = Operand::Gpr(ty, compiler.gpr(operand.rn));
     let ir = Ir::And(ty, src, Operand::Immediate(ty, imm));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
 
     let ds = BlockDestination::Gpr(
-        ty,
+        Type::U64,
         if operand.rd == 31 {
             compiler.stack_reg()
         } else {
@@ -1127,7 +1209,8 @@ fn gen_movn(compiler: &AArch64Compiler, operand: HwImm16Rd, ty: Type) -> IrBlock
     let res = !((operand.imm16 as u64) << pos);
 
     let ir = Ir::Value(Operand::Immediate(ty, res));
-    let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
 
     block.append(ir, ds);
 
@@ -1147,7 +1230,13 @@ fn gen_strb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
 
     let offset_temp = if !post_index { offset } else { 0 };
 
-    let ir = Ir::Value(Operand::Gpr(Type::U8, compiler.gpr(operand.rt)));
+    let rt = if operand.rt == 31 {
+        Operand::imm(Type::U8, 0)
+    } else {
+        Operand::Gpr(Type::U8, compiler.gpr(operand.rt))
+    };
+
+    let ir = Ir::Value(rt);
     let ds = BlockDestination::MemoryRelI64(Type::U8, dst, offset_temp);
     block.append(ir, ds);
 
@@ -1201,13 +1290,14 @@ fn gen_orr_imm(compiler: &AArch64Compiler, operand: LogicalImm, ty: Type) -> IrB
     };
 
     let ir = Ir::Or(ty, rn, Operand::imm(ty, imm));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
 
     if operand.rd == 31 {
         let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
         let ds = BlockDestination::Gpr(Type::U64, compiler.stack_reg());
         block.append(ir, ds);
     } else {
-        let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+        let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
         block.append(ir, ds);
     };
 
@@ -1226,7 +1316,8 @@ fn gen_madd(compiler: &AArch64Compiler, operand: DataProc3Src, ty: Type) -> IrBl
     };
 
     let ir = Ir::Add(ty, op3, Operand::ir(Ir::Mul(ty, op1, op2)));
-    let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
     block.append(ir, ds);
 
     block
@@ -1284,14 +1375,14 @@ fn gen_and_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty:
 
     let op1 = compiler.gpr(operand.rn);
     let op2 = shift_reg(
-        compiler.gpr(operand.rm),
+        Operand::Gpr(ty, compiler.gpr(operand.rm)),
         shift_type,
         operand.imm6 as u64,
         ty,
     );
 
     let ir = Ir::And(ty, Operand::gpr(ty, op1), Operand::ir(op2));
-    let ds = BlockDestination::Gpr(ty, compiler.gpr(operand.rd));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
 
     block.append(ir, ds);
 
@@ -1304,7 +1395,7 @@ fn gen_dup_general(compiler: &AArch64Compiler, operand: AdvancedSimdCopy) -> IrB
     let size = operand.imm5.trailing_zeros();
     assert!(size <= 3);
     let esize = 8 << size;
-    let datasize = if operand.q == 1 {128} else {64};
+    let datasize = if operand.q == 1 { 128 } else { 64 };
     let elements = datasize / esize;
 
     let t = Type::uscalar_from_size(esize / 8);
@@ -1334,5 +1425,64 @@ fn gen_stur_simd_fp(compiler: &AArch64Compiler, operand: LdStRegUnscaledImm, ty:
 
     block.append(ir, ds);
 
+    block
+}
+
+fn gen_stp_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let (wback, post_index) = decode_o_for_ld_st_pair_offset(operand.o);
+    let scale = 2 + operand.opc;
+    let offset = sign_extend(operand.imm7 as i64, 7) << scale;
+
+    let dst = if operand.rn == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rn)
+    };
+
+    let offset_temp = if !post_index { offset } else { 0 };
+
+    let ir = Ir::Value(Operand::Fpr(ty, compiler.fpr(operand.rt)));
+    let ds = BlockDestination::MemoryRelI64(ty, dst, offset_temp);
+
+    block.append(ir, ds);
+
+    let ir = Ir::Value(Operand::Fpr(ty, compiler.fpr(operand.rt2)));
+    let ds = BlockDestination::MemoryRelI64(ty, dst, offset_temp + ty.size() as i64);
+
+    block.append(ir, ds);
+
+    if wback {
+        let ir = Ir::Add(
+            Type::U64,
+            Operand::Gpr(Type::U64, dst),
+            Operand::Immediate(Type::I64, offset as u64),
+        );
+        let ds = BlockDestination::Gpr(Type::U64, dst);
+
+        block.append(ir, ds);
+    }
+
+    block
+}
+
+fn gen_movk(compiler: &AArch64Compiler, operand: HwImm16Rd, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let rd = compiler.gpr(operand.rd);
+
+    let pos = operand.hw << 4;
+    let mask = !(ones(pos as u64) << pos);
+    let masked = Ir::And(ty, Operand::Gpr(ty, rd), Operand::Immediate(ty, mask));
+    let ir = Ir::Or(
+        ty,
+        Operand::ir(masked),
+        Operand::Immediate(ty, (operand.imm16 as u64) << pos),
+    );
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, rd);
+
+    block.append(ir, ds);
     block
 }

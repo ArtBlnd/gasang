@@ -85,6 +85,14 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
 
             *ret.u64_mut() = 0;
         }
+
+        // set_tid_address
+        0x60 => {
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            *ret.u64_mut() = 0;
+        }
         _ => unimplemented!("unknown interrupt! {}", nr),
     }
 }

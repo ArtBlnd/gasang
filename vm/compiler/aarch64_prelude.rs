@@ -169,8 +169,7 @@ pub fn overflow_flag() -> Operand {
     )))
 }
 
-pub fn shift_reg(reg: RegId, shift_type: ShiftType, amount: u64, t: Type) -> Ir {
-    let reg = Operand::gpr(t, reg);
+pub fn shift_reg(reg: Operand, shift_type: ShiftType, amount: u64, t: Type) -> Ir {
     let amount = Operand::imm(t, amount);
 
     match shift_type {

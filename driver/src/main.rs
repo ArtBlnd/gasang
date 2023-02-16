@@ -1,10 +1,10 @@
 use machineinstr::aarch64::AArch64InstrParserRule;
 
-use vm::Cpu;
 use vm::codegen::flag_policy::AArch64FlagPolicy;
 use vm::codegen::interpret::InterpretCodegen;
 use vm::compiler::aarch64::AArch64Compiler;
 use vm::engine::Engine;
+use vm::Cpu;
 
 use vm::interrupt::AArch64UnixInterruptModel;
 
@@ -24,7 +24,7 @@ fn main() {
         compiler,
         AArch64InstrParserRule,
         AArch64UnixInterruptModel,
-        InterpretCodegen::new(AArch64FlagPolicy)
+        InterpretCodegen::new(AArch64FlagPolicy),
     );
 
     unsafe {

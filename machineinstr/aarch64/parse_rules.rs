@@ -4548,7 +4548,7 @@ fn parse_ldapr_stlr_unscaled_imm(raw_instr: u32) -> AArch64Instr {
                     rt: rt.value,
                 };
 
-                match (size.value, opc.value,) {
+                match (size.value, opc.value) {
                     (0b00, 0b00) => AArch64Instr::Stlurb(data),
                     (0b00, 0b01) => AArch64Instr::Ldapurb(data),
                     (0b00, 0b10) => AArch64Instr::LdapursbVar64(data),

@@ -1,5 +1,5 @@
-use crate::Cpu;
 use crate::value::Value;
+use crate::Cpu;
 
 pub trait CompiledCode: for<'a> Fn(&'a Cpu) -> Value {
     unsafe fn execute(&self, vm: &Cpu) -> Value;

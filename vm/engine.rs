@@ -47,6 +47,7 @@ where
             Ok(Err(err)) => return Err(err),
             Ok(Ok(_)) => unreachable!(),
         }
+        vm_state.dump();
 
         std::process::exit(-1);
     }
@@ -58,8 +59,16 @@ where
 
         let mut compiled = codegen_ir_blocks(ep_block, &self.codegen);
 
+        static mut STEP: bool = false;
+
         loop {
+            assert!(!compiled.is_empty());
             for code in compiled {
+                //if vm_state.ip() == 0x402410 || STEP {
+                //    STEP = true;
+                //    vm_state.dump();
+                //    std::io::stdin().read_line(&mut String::new());
+                //}
                 code.execute(vm_state, &self.interrupt_model);
             }
 

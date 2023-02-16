@@ -4,7 +4,6 @@ use std::slice;
 
 use crate::ir::Type;
 
-
 #[derive(Debug, Clone)]
 pub struct Value(SmallVec<[u64; 2]>);
 
@@ -81,11 +80,7 @@ impl Value {
 
     pub fn new(len: usize) -> Self {
         let len = usize::max(len, 16);
-        let len = if len % 8 == 0 {
-            len / 8
-        } else {
-            len / 8 + 1
-        };
+        let len = if len % 8 == 0 { len / 8 } else { len / 8 + 1 };
 
         let mut vec = SmallVec::with_capacity(len);
         vec.resize_with(len, || 0);

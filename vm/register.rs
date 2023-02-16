@@ -1,4 +1,7 @@
-use std::{fmt::{Debug, Display, Formatter, Result as FmtResult}, ops::{DerefMut, Deref}};
+use std::{
+    fmt::{Debug, Display, Formatter, Result as FmtResult},
+    ops::{Deref, DerefMut},
+};
 
 use crate::value::Value;
 
@@ -88,7 +91,6 @@ impl DerefMut for FprRegister {
         &mut self.value
     }
 }
-
 
 pub struct SysRegister {
     name: String,

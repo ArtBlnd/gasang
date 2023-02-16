@@ -2,8 +2,8 @@ use crate::codegen::*;
 use crate::interrupt::InterruptModel;
 use crate::ir::{BlockDestination, Type, VecType};
 use crate::register::RegId;
-use crate::Cpu;
 use crate::value::Value;
+use crate::Cpu;
 
 pub trait CompiledBlockDestinationTrait {
     unsafe fn reflect(&self, val: Value, vm: &mut Cpu, interrupt_mode: &dyn InterruptModel);
@@ -24,6 +24,7 @@ where
         BlockDestination::Ip => Box::new(SetIp),
         BlockDestination::Gpr(ty, reg_id) => Box::new(SetGpr(ty, reg_id)),
         BlockDestination::Fpr(ty, reg_id) => Box::new(SetFpr(ty, reg_id)),
+        BlockDestination::Sys(ty, reg_id) => Box::new(SetSys(ty, reg_id)),
         BlockDestination::FprSlot(ty, reg_id, slot) => Box::new(SetFprSlot(ty, reg_id, slot)),
         BlockDestination::Memory(ty, addr) => Box::new(SetMemory(ty, addr)),
         BlockDestination::MemoryRelI64(ty, reg_id, offset) => {
@@ -88,6 +89,20 @@ impl CompiledBlockDestinationTrait for SetFpr {
     }
 }
 
+struct SetSys(Type, RegId);
+impl CompiledBlockDestinationTrait for SetSys {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+        let sys = vm.sys_mut(self.1);
+        match self.0 {
+            Type::U8 | Type::I8 => *sys.u8_mut() = *val.u8_mut(),
+            Type::U16 | Type::I16 => *sys.u16_mut() = *val.u16_mut(),
+            Type::U32 | Type::I32 => *sys.u32_mut() = *val.u32_mut(),
+            Type::U64 | Type::I64 => *sys.u64_mut() = *val.u64_mut(),
+            _ => unreachable!(),
+        }
+    }
+}
+
 struct SetMemory(Type, u64);
 impl CompiledBlockDestinationTrait for SetMemory {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
@@ -96,7 +111,9 @@ impl CompiledBlockDestinationTrait for SetMemory {
             Type::U16 | Type::I16 => vm.mem(self.1).write_u16(*val.u16_mut()),
             Type::U32 | Type::I32 | Type::F32 => vm.mem(self.1).write_u32(*val.u32_mut()),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(self.1).write_u64(*val.u64_mut()),
-            Type::Vec(VecType::U64 | VecType::I64, 2) => vm.mem(self.1).write(&val.u8_slice_ref()[..16]),
+            Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                vm.mem(self.1).write(&val.u8_slice_ref()[..16])
+            }
             _ => unreachable!(),
         }
         .unwrap();
@@ -109,12 +126,15 @@ impl CompiledBlockDestinationTrait for SetMemoryI64 {
         let (addr, of) = vm.gpr(self.1).u64().overflowing_add_signed(self.2);
         assert_eq!(of, false);
 
+
         match self.0 {
             Type::U8 | Type::I8 => vm.mem(addr).write_u8(*val.u8_mut()),
             Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16_mut()),
             Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32_mut()),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64_mut()),
-            Type::Vec(VecType::U64 | VecType::I64, 2) => vm.mem(addr).write(&val.u8_slice_ref()[..16]),
+            Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                vm.mem(addr).write(&val.u8_slice_ref()[..16])
+            }
             _ => unreachable!(),
         }
         .unwrap();
@@ -125,12 +145,15 @@ struct StoreMemoryIr(Type, Box<dyn CompiledCode>);
 impl CompiledBlockDestinationTrait for StoreMemoryIr {
     unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
         let addr = unsafe { *self.1.execute(vm).u64_mut() };
+
         match self.0 {
             Type::U8 | Type::I8 => vm.mem(addr).write_u8(*val.u8_mut()),
             Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16_mut()),
             Type::U32 | Type::I32 | Type::F32 => vm.mem(addr).write_u32(*val.u32_mut()),
             Type::U64 | Type::I64 | Type::F64 => vm.mem(addr).write_u64(*val.u64_mut()),
-            Type::Vec(VecType::U64 | VecType::I64, 2) => vm.mem(addr).write(&val.u8_slice_ref()[..16]),
+            Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                vm.mem(addr).write(&val.u8_slice_ref()[..16])
+            }
             _ => unreachable!(),
         }
         .unwrap();

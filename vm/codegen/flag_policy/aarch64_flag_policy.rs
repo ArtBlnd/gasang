@@ -14,16 +14,8 @@ impl FlagPolicy for AArch64FlagPolicy {
                 let sa = a as i8;
                 let sb = b as i8;
 
-                let carry_in = if self.carry(vm) { 1 } else { 0 };
-
-                let (ua, mut c) = ua.overflowing_add(carry_in);
-                let (sa, mut v) = sa.overflowing_add_unsigned(carry_in);
-
-                let (uresult, c2) = ua.overflowing_add(ub);
-                let (sresult, v2) = sa.overflowing_add(sb);
-
-                c |= c2;
-                v |= v2;
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
 
                 let n = sresult < 0;
                 let z = uresult == 0;
@@ -36,16 +28,8 @@ impl FlagPolicy for AArch64FlagPolicy {
                 let sa = a as i16;
                 let sb = b as i16;
 
-                let carry_in = if self.carry(vm) { 1 } else { 0 };
-
-                let (ua, mut c) = ua.overflowing_add(carry_in);
-                let (sa, mut v) = sa.overflowing_add_unsigned(carry_in);
-
-                let (uresult, c2) = ua.overflowing_add(ub);
-                let (sresult, v2) = sa.overflowing_add(sb);
-
-                c |= c2;
-                v |= v2;
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
 
                 let n = sresult < 0;
                 let z = uresult == 0;
@@ -58,16 +42,8 @@ impl FlagPolicy for AArch64FlagPolicy {
                 let sa = a as i32;
                 let sb = b as i32;
 
-                let carry_in = if self.carry(vm) { 1 } else { 0 };
-
-                let (ua, mut c) = ua.overflowing_add(carry_in);
-                let (sa, mut v) = sa.overflowing_add_unsigned(carry_in);
-
-                let (uresult, c2) = ua.overflowing_add(ub);
-                let (sresult, v2) = sa.overflowing_add(sb);
-
-                c |= c2;
-                v |= v2;
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
 
                 let n = sresult < 0;
                 let z = uresult == 0;
@@ -80,16 +56,8 @@ impl FlagPolicy for AArch64FlagPolicy {
                 let sa = a as i64;
                 let sb = b as i64;
 
-                let carry_in = if self.carry(vm) { 1 } else { 0 };
-
-                let (ua, mut c) = ua.overflowing_add(carry_in);
-                let (sa, mut v) = sa.overflowing_add_unsigned(carry_in);
-
-                let (uresult, c2) = ua.overflowing_add(ub);
-                let (sresult, v2) = sa.overflowing_add(sb);
-
-                c |= c2;
-                v |= v2;
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
 
                 let n = sresult < 0;
                 let z = uresult == 0;
@@ -103,11 +71,82 @@ impl FlagPolicy for AArch64FlagPolicy {
         };
 
         let (n, z, c, v): (u64, u64, u64, u64) = (n.into(), z.into(), c.into(), v.into());
+        vm.del_flag(0xf000_0000_0000_0000);
         vm.add_flag(n << 63 | z << 62 | c << 61 | v << 60)
     }
 
     fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &Cpu) {
-        self.add_carry(ty, a, (-(b as i64)) as u64, vm)
+        let b = -(b as i64) as u64;
+        let (n, z, mut c, v) = match ty {
+            Type::U8 | Type::I8 => {
+                let ua = a as u8;
+                let ub = b as u8;
+                let sa = a as i8;
+                let sb = b as i8;
+
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
+
+                let n = sresult < 0;
+                let z = uresult == 0;
+
+                (n, z, c, v)
+            }
+            Type::U16 | Type::I16 => {
+                let ua = a as u16;
+                let ub = b as u16;
+                let sa = a as i16;
+                let sb = b as i16;
+
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
+
+                let n = sresult < 0;
+                let z = uresult == 0;
+
+                (n, z, c, v)
+            }
+            Type::U32 | Type::I32 => {
+                let ua = a as u32;
+                let ub = b as u32;
+                let sa = a as i32;
+                let sb = b as i32;
+
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
+
+                let n = sresult < 0;
+                let z = uresult == 0;
+
+                (n, z, c, v)
+            }
+            Type::U64 | Type::I64 => {
+                let ua = a;
+                let ub = b;
+                let sa = a as i64;
+                let sb = b as i64;
+
+                let (uresult, c) = ua.overflowing_add(ub);
+                let (sresult, v) = sa.overflowing_add(sb);
+
+                let n = sresult < 0;
+                let z = uresult == 0;
+
+                (n, z, c, v)
+            }
+            Type::F32 | Type::F64 => unimplemented!("Float type is not supported!"),
+            Type::Void => panic!("Void type is not supported!"),
+            Type::Bool => panic!("Bool type is not supported!"),
+            _ => panic!("Unknown type!"),
+        };
+
+        if a == 0 && b == 0{
+            c = true;
+        }
+
+        let (n, z, c, v): (u64, u64, u64, u64) = (n.into(), z.into(), c.into(), v.into());
+        vm.del_flag(0xf000_0000_0000_0000);
+        vm.add_flag(n << 63 | z << 62 | c << 61 | v << 60)
     }
 
     fn carry(&self, vm: &Cpu) -> bool {
