@@ -319,27 +319,51 @@ unsafe fn gen_mul(
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
+        Type::U8 => Box::new(move |ctx| {
             let lhs = lhs(ctx).u8();
             let rhs = rhs(ctx).u8();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
+        Type::U16 => Box::new(move |ctx| {
             let lhs = lhs(ctx).u16();
             let rhs = rhs(ctx).u16();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
+        Type::U32 => Box::new(move |ctx| {
             let lhs = lhs(ctx).u32();
             let rhs = rhs(ctx).u32();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
+        Type::U64=> Box::new(move |ctx| {
             let lhs = lhs(ctx).u64();
             let rhs = rhs(ctx).u64();
+
+            lhs.overflowing_mul(rhs).0.into()
+        }),
+        Type::I8 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).i8();
+            let rhs = rhs(ctx).i8();
+
+            lhs.overflowing_mul(rhs).0.into()
+        }),
+        Type::I16 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).i16();
+            let rhs = rhs(ctx).i16();
+
+            lhs.overflowing_mul(rhs).0.into()
+        }),
+        Type::I32 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).i32();
+            let rhs = rhs(ctx).i32();
+
+            lhs.overflowing_mul(rhs).0.into()
+        }),
+        Type::I64 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).i64();
+            let rhs = rhs(ctx).i64();
 
             lhs.overflowing_mul(rhs).0.into()
         }),

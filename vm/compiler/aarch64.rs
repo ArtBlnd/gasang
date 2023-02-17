@@ -67,6 +67,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::LdrbImm(operand) => gen_ldrb_imm(self, operand),
             AArch64Instr::LdrReg32(operand) => gen_ldr_reg(self, operand, Type::U32),
             AArch64Instr::LdrReg64(operand) => gen_ldr_reg(self, operand, Type::U64),
+            AArch64Instr::LdrbRegShiftedReg(operand) => gen_ldrb_reg_shifted_reg(self, operand),
             AArch64Instr::LdpVar64(operand) => gen_ldp(self, operand, Type::U64),
 
             AArch64Instr::StrImm32(operand) => gen_str_imm(self, operand, Type::U32),
@@ -92,9 +93,12 @@ impl Compiler for AArch64Compiler {
 
             // Arithmetic instructions
             AArch64Instr::AddImm64(operand) => gen_add_imm64(self, operand),
+            AArch64Instr::AddsImm64(operand) => gen_adds_imm(self, operand, Type::U64),
+            AArch64Instr::AddsImm32(operand) => gen_adds_imm(self, operand, Type::U32),
             AArch64Instr::AddShiftedReg64(operand) => gen_add_shifted_reg64(self, operand),
             AArch64Instr::AddExtReg64(operand) => gen_add_ext_reg64(self, operand),
-            AArch64Instr::SubImm64(operand) => gen_sub_imm64(self, operand),
+            AArch64Instr::SubImm64(operand) => gen_sub_imm(self, operand, Type::U64),
+            AArch64Instr::SubImm32(operand) => gen_sub_imm(self, operand, Type::U32),
             AArch64Instr::SubShiftedReg64(operand) => gen_sub_shifted_reg_64(self, operand),
             AArch64Instr::SubsShiftedReg32(operand) => {
                 gen_subs_shifted_reg(self, operand, Type::U32)
@@ -106,6 +110,8 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::SubsImm32(operand) => gen_subs_imm(self, operand, Type::U32),
             AArch64Instr::Madd32(operand) => gen_madd(self, operand, Type::U32),
             AArch64Instr::Madd64(operand) => gen_madd(self, operand, Type::U64),
+            AArch64Instr::SdivVar32(operand) => gen_div(self, operand, Type::I32),
+            AArch64Instr::Msub32(operand) => gen_msub(self, operand, Type::U32),
 
             // bitwise isntructions
             AArch64Instr::Ubfm64(operand) => gen_ubfm(self, operand, Type::U64),
@@ -432,7 +438,7 @@ fn gen_add_shifted_reg64(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd) -
     block
 }
 
-fn gen_sub_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
+fn gen_sub_imm(compiler: &AArch64Compiler, operand: ShImm12RnRd, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
     let rn = if operand.rn == 31 {
@@ -448,10 +454,11 @@ fn gen_sub_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
     };
 
     let ir = Ir::Sub(
-        Type::U64,
-        Operand::gpr(Type::U64, rn),
-        Operand::imm(Type::U64, imm),
+        ty,
+        Operand::gpr(ty, rn),
+        Operand::imm(ty, imm),
     );
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
 
     let ds = if operand.rd == 31 {
         BlockDestination::None
@@ -1484,5 +1491,87 @@ fn gen_movk(compiler: &AArch64Compiler, operand: HwImm16Rd, ty: Type) -> IrBlock
     let ds = BlockDestination::Gpr(Type::U64, rd);
 
     block.append(ir, ds);
+    block
+}
+
+//==================================================================================
+
+fn gen_div(compiler: &AArch64Compiler, operand: DataProc2Src, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let op1 = Operand::gpr(ty, compiler.gpr(operand.rn));
+    let op2 = Operand::gpr(ty, compiler.gpr(operand.rm));
+
+    let ir = Ir::Div(ty, op1, op2);
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_msub(compiler: &AArch64Compiler, operand: DataProc3Src, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let op1 = Operand::gpr(ty, compiler.gpr(operand.rn));
+    let op2 = Operand::gpr(ty, compiler.gpr(operand.rm));
+    let op3 = Operand::gpr(ty, compiler.gpr(operand.ra));
+
+    let ir = Ir::Sub(ty, op3, Operand::ir(Ir::Mul(ty, op1, op2)));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_adds_imm(compiler: &AArch64Compiler, operand: ShImm12RnRd, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let imm = if operand.sh == 0 {
+        operand.imm12 as u64
+    } else {
+        (operand.imm12 as u64) << 12
+    };
+
+    let rn = if operand.rn == 31 {
+        Operand::gpr(ty, compiler.stack_reg())
+    } else {
+        Operand::gpr(ty, compiler.gpr(operand.rn))
+    };
+
+    let ir = Ir::Addc(ty, rn, Operand::Immediate(ty, imm));
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
+    let ds = if operand.rd == 31 {
+        BlockDestination::None
+    } else {
+        BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd))
+    };
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_ldrb_reg_shifted_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let rn = if operand.rn == 31 {
+        Operand::Gpr(Type::U64, compiler.stack_reg())
+    } else {
+        Operand::Gpr(Type::U64, compiler.gpr(operand.rn))
+    };
+
+
+    let ext_type = decode_reg_extend(operand.option);
+    let offs = extend_reg(compiler.gpr(operand.rm), ext_type, operand.s, 8);
+
+    let ir = Ir::ZextCast(Type::U32, Operand::ir(Ir::Load(Type::U8, Operand::ir(Ir::Add(Type::U64, rn, Operand::ir(offs))))));
+    let ds = BlockDestination::Gpr(Type::U32, compiler.gpr(operand.rt));
+
+    block.append(ir, ds);
+
     block
 }
