@@ -54,6 +54,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::MovnVar64(operand) => gen_movn(self, operand, Type::U64),
             AArch64Instr::MovkVar32(operand) => gen_movk(self, operand, Type::U32),
             AArch64Instr::MovkVar64(operand) => gen_movk(self, operand, Type::U64),
+            AArch64Instr::MoviVectorVar64(operand) => gen_movi(self, operand),
             AArch64Instr::Adr(operand) => gen_adr(self, operand),
             AArch64Instr::Adrp(operand) => gen_adrp(self, operand),
             AArch64Instr::OrrShiftedReg64(operand) => gen_orr_shifted_reg(self, operand, Type::U64),
@@ -87,6 +88,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::StpSimdFpVar128(operand) => {
                 gen_stp_simd_fp(self, operand, Type::Vec(VecType::U64, 2))
             }
+            AArch64Instr::StrImmSimdFP128(operand) => gen_str_imm_simd_fp(self, operand, Type::Vec(VecType::U64, 2)),
 
             // Advanced SIMD and FP
             AArch64Instr::DupGeneral(operand) => gen_dup_general(self, operand),
@@ -240,10 +242,10 @@ fn gen_orr_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty:
     block
 }
 
-fn gen_ldr_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> IrBlock {
+fn gen_ldr_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (mut wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand);
+    let (mut wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
     let pre_offs = if post_index { 0 } else { offset };
 
     if wback && operand.rn == operand.rt && operand.rn != 31 {
@@ -285,10 +287,10 @@ fn gen_ldr_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> 
     block
 }
 
-fn gen_str_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt, ty: Type) -> IrBlock {
+fn gen_str_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand);
+    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
     let pre_offs = if post_index { 0 } else { offset };
 
     let rn = if operand.rn == 31 {
@@ -388,7 +390,12 @@ fn gen_stp_var(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) 
 fn gen_add_imm64(compiler: &AArch64Compiler, operand: ShImm12RnRd) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let rd = compiler.gpr(operand.rd);
+    let rd = if operand.rd == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rd)
+    };
+
     let rn = if operand.rn == 31 {
         compiler.stack_reg()
     } else {
@@ -805,10 +812,10 @@ fn gen_sbfm(compiler: &AArch64Compiler, operand: Bitfield, ty: Type) -> IrBlock 
     block
 }
 
-fn gen_ldrb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
+fn gen_ldrb_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand);
+    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
 
     let pre_offs = if post_index { 0 } else { offset };
 
@@ -884,10 +891,10 @@ fn gen_add_ext_reg64(compiler: &AArch64Compiler, operand: AddSubtractExtReg) -> 
     block
 }
 
-fn gen_ldrh_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
+fn gen_ldrh_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (_wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand);
+    let (_wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
 
     let src = if operand.rn == 31 {
         compiler.stack_reg()
@@ -1224,10 +1231,10 @@ fn gen_movn(compiler: &AArch64Compiler, operand: HwImm16Rd, ty: Type) -> IrBlock
     block
 }
 
-fn gen_strb_imm(compiler: &AArch64Compiler, operand: SizeImm12RnRt) -> IrBlock {
+fn gen_strb_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand);
+    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
 
     let dst = if operand.rn == 31 {
         compiler.stack_reg()
@@ -1572,6 +1579,83 @@ fn gen_ldrb_reg_shifted_reg(compiler: &AArch64Compiler, operand: LoadStoreRegReg
     let ds = BlockDestination::Gpr(Type::U32, compiler.gpr(operand.rt));
 
     block.append(ir, ds);
+
+    block
+}
+
+fn gen_movi(compiler: &AArch64Compiler, operand: AdvSimdModifiedImm) -> IrBlock {
+    use utility::parse_pattern;
+
+    let mut block = IrBlock::new(4);
+
+    let cmode_op = operand.cmode << 1 | operand.op;
+    let ty = if operand.q == 0b1 { Type::Vec(VecType::U64, 2) } else { Type::U64 };
+    let datasize = ty.size();
+    
+    let operation = match cmode_op {
+        _ if parse_pattern("0xx00").test(operand.cmode as u32) => ImmediateOp::MOVI,
+        _ if parse_pattern("0xx01").test(operand.cmode as u32) => ImmediateOp::MVNI,
+        _ if parse_pattern("0xx10").test(operand.cmode as u32) => ImmediateOp::ORR,
+        _ if parse_pattern("0xx11").test(operand.cmode as u32) => ImmediateOp::BIC,
+        _ if parse_pattern("10x00").test(operand.cmode as u32) => ImmediateOp::MOVI,
+        _ if parse_pattern("10x01").test(operand.cmode as u32) => ImmediateOp::MVNI,
+        _ if parse_pattern("10x10").test(operand.cmode as u32) => ImmediateOp::ORR,
+        _ if parse_pattern("10x11").test(operand.cmode as u32) => ImmediateOp::BIC,
+        _ if parse_pattern("110x0").test(operand.cmode as u32) => ImmediateOp::MOVI,
+        _ if parse_pattern("110x1").test(operand.cmode as u32) => ImmediateOp::MVNI,
+        _ if parse_pattern("1110x").test(operand.cmode as u32) => ImmediateOp::MOVI,
+        0b11110 => ImmediateOp::MOVI,
+        0b11111 => ImmediateOp::MOVI,
+        _ => unreachable!()
+    };
+
+    let abcdefgh = operand.a << 7 | operand.b << 6 | operand.c << 5 | operand.d << 4 | operand.e << 3 | operand.f << 2 | operand.g << 1 | operand.h;
+    let imm64 = adv_simd_exapnd_imm(0b1, operand.cmode, abcdefgh);
+    let imm = replicate(imm64, (datasize / 64) as u64, 64);
+
+    let rd = compiler.fpr(operand.rd);
+
+    let imm = Operand::imm(ty, imm);
+    let operand = Operand::Fpr(ty, rd);
+
+    let ir = match operation {
+        ImmediateOp::MOVI => Ir::Value(imm),
+        ImmediateOp::MVNI => Ir::Not(ty, imm),
+        ImmediateOp::ORR => Ir::Or(ty, operand, imm),
+        ImmediateOp::BIC => Ir::And(ty, operand, Operand::ir(Ir::Not(ty, imm))),
+    };
+
+    let ds = BlockDestination::Fpr(ty, rd);
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_str_imm_simd_fp(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, true);
+
+    let src = if operand.rn == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rn)
+    };
+
+    let offset_temp = if !post_index {offset} else {0};
+
+    let ir = Ir::Value(Operand::Fpr(ty, compiler.fpr(operand.rt)));
+    let ds = BlockDestination::MemoryRelI64(ty, src, offset_temp);
+
+    block.append(ir, ds);
+
+    if wback {
+        let ir = Ir::Add(Type::U64, Operand::Gpr(Type::U64, src), Operand::imm(ty, offset as u64));
+        let ds = BlockDestination::Gpr(Type::U64, src);
+
+        block.append(ir, ds);
+    }
 
     block
 }

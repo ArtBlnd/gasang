@@ -75,15 +75,16 @@ impl CompiledBlockDestinationTrait for SetGpr {
 
 struct SetFpr(Type, RegId);
 impl CompiledBlockDestinationTrait for SetFpr {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
         let fpr = vm.fpr_mut(self.1);
         match self.0 {
-            Type::U8 | Type::I8 => *fpr.u8_mut() = *val.u8_mut(),
-            Type::U16 | Type::I16 => *fpr.u16_mut() = *val.u16_mut(),
-            Type::U32 | Type::I32 => *fpr.u32_mut() = *val.u32_mut(),
-            Type::U64 | Type::I64 => *fpr.u64_mut() = *val.u64_mut(),
-            Type::F32 => *fpr.f32_mut() = *val.f32_mut(),
-            Type::F64 => *fpr.f64_mut() = *val.f64_mut(),
+            Type::U8 | Type::I8 => *fpr.u8_mut() = val.u8(),
+            Type::U16 | Type::I16 => *fpr.u16_mut() = val.u16(),
+            Type::U32 | Type::I32 => *fpr.u32_mut() = val.u32(),
+            Type::U64 | Type::I64 => *fpr.u64_mut() = val.u64(),
+            Type::F32 => *fpr.f32_mut() = val.f32(),
+            Type::F64 => *fpr.f64_mut() = val.f64(),
+            Type::Vec(VecType::U64, 2) => *fpr.u64x2_mut() = val.u64x2(),
             _ => unreachable!(),
         }
     }

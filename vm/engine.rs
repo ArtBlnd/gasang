@@ -40,7 +40,7 @@ where
 
     G::Code: 'static,
 {
-    pub unsafe fn run(&mut self, vm_state: &mut Cpu) -> Result<Infallible, Error> {
+    pub unsafe fn run(&self, vm_state: &mut Cpu) -> Result<Infallible, Error> {
         let this = std::panic::AssertUnwindSafe(|| self.run_inner(vm_state));
         match std::panic::catch_unwind(this) {
             Err(_) => {}
@@ -52,7 +52,7 @@ where
         std::process::exit(-1);
     }
 
-    pub unsafe fn run_inner(&mut self, vm_state: &mut Cpu) -> Result<Infallible, Error> {
+    pub unsafe fn run_inner(&self, vm_state: &mut Cpu) -> Result<Infallible, Error> {
         // get entrypoint memory frame and compile it.
         let ep_frame = vm_state.mem(vm_state.ip());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
@@ -82,7 +82,7 @@ where
     }
 
     unsafe fn compile_until_branch_or_eof(
-        &mut self,
+        &self,
         frame: MemoryFrame,
     ) -> Result<Vec<IrBlock>, CompileError> {
         compile_until_branch_or_eof(frame, &self.parse_rule, &self.compiler)

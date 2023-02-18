@@ -198,7 +198,13 @@ unsafe fn compile_op(
             let t = *t;
             Box::new(move |_| imm.into())
         }
-        Operand::VoidIr(ir) => compile_ir(ir, flag_policy.clone())?,
+        Operand::VoidIr(ir) => {
+            let ir = compile_ir(ir, flag_policy.clone())?;
+            Box::new(move |ctx| {
+                ir(ctx);
+                Value::new(0)
+            })
+        }
         Operand::Ip => Box::new(move |ctx| Value::from_u64(ctx.ip())),
         Operand::Flag => Box::new(move |ctx| Value::from_u64(ctx.flag())),
         Operand::Dbg(s, op) => {
@@ -859,6 +865,15 @@ unsafe fn gen_or(
             let mut rhs = rhs.execute(ctx);
 
             *lhs.u64_mut() |= *rhs.u64_mut();
+            lhs
+        }),
+        Type::Vec(VecType::U64, 2) => Box::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
+
+            lhs.u64x2_mut()[0] |= rhs.u64x2()[0];
+            lhs.u64x2_mut()[1] |= rhs.u64x2()[1];
+
             lhs
         }),
         _ => unreachable!("invalid type: {:?}", t),

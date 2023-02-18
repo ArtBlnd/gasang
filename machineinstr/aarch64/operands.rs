@@ -28,8 +28,9 @@ pub struct ShImm12RnRd {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SizeImm12RnRt {
+pub struct OpcSizeImm12RnRt {
     pub idxt: u8,
+    pub opc: u8,
     pub size: u8,
     pub imm12: u16,
     pub rn: u8,
@@ -258,6 +259,7 @@ pub struct AdvSimdLdStMultiStructuresPostIndexed {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AdvSimdModifiedImm {
     pub q: u8,
+    pub op: u8,
     pub a: u8,
     pub b: u8,
     pub c: u8,

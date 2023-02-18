@@ -32,20 +32,25 @@ pub fn decode_shift(shift: u8) -> ShiftType {
 }
 
 pub const fn decode_operand_for_ld_st_reg_imm(
-    operand: machineinstr::aarch64::SizeImm12RnRt,
+    operand: machineinstr::aarch64::OpcSizeImm12RnRt,
+    is_vec: bool,
 ) -> (bool, bool, u8, i64) {
+    let opc1 = (operand.opc & 0b10) >> 1;
     if operand.idxt == 0b00 {
         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
         let post = extract_bits16(0..2, operand.imm12) == 0b01;
 
-        (true, post, operand.size, sign_extend(imm9, 9))
+        let scale = (if is_vec {4} else {0}) * opc1 + operand.size;
+
+        (true, post, scale, sign_extend(imm9, 9))
     } else {
         //Unsigned offset
+        let scale = (if is_vec {4} else {0}) * opc1 + operand.size;
         (
             false,
             false,
-            operand.size,
-            (operand.imm12 << operand.size) as i64,
+            scale,
+            (operand.imm12 << scale) as i64,
         )
     }
 }
@@ -321,4 +326,69 @@ where
 {
     let mask = (u64::MAX >> range.start.into()) << range.start.into();
     (mask << range.end.into()) >> range.end.into()
+}
+
+pub fn adv_simd_exapnd_imm(op: u8, cmode: u8, imm8: u8) -> u64 {
+    let imm8 = imm8 as u64;
+    let cmode0 = cmode & 0b1;
+
+    match cmode >> 1 {
+        0b000 => replicate(imm8, 2, 32),
+        0b001 => replicate(imm8 << 8, 2, 32),
+        0b010 => replicate(imm8 << 16, 2, 32),
+        0b011 => replicate(imm8 << 24, 2, 32),
+        0b100 => replicate(imm8, 4, 16),
+        0b101 => replicate(imm8 << 8, 4, 16),
+        0b110 if cmode0 == 0 => replicate(imm8 << 8 | ones(8), 2, 32),
+        0b110 if cmode0 == 1 => replicate(imm8 << 16 | ones(16), 2, 32),
+        0b111 => {
+            if cmode0 == 0 && op == 0 {
+                return replicate(imm8, 8, 8);
+            }
+            if cmode0 == 0 && op == 1 {
+                let imm8a = replicate(bit(imm8, 7).into(), 8, 1) << 56;
+                let imm8b = replicate(bit(imm8, 6).into(), 8, 1) << 48;
+                let imm8c = replicate(bit(imm8, 5).into(), 8, 1) << 40;
+                let imm8d = replicate(bit(imm8, 4).into(), 8, 1) << 32;
+                let imm8e = replicate(bit(imm8, 3).into(), 8, 1) << 24;
+                let imm8f = replicate(bit(imm8, 2).into(), 8, 1) << 16;
+                let imm8g = replicate(bit(imm8, 1).into(), 8, 1) << 8;
+                let imm8h = replicate(bit(imm8, 0).into(), 8, 1);
+
+                return imm8a | imm8b | imm8c | imm8d | imm8e | imm8f | imm8g | imm8h;
+            }
+            if cmode0 == 1 && op == 0 {
+                let a = u64::from(bit(imm8, 7)) << 31;
+                let b = u64::from(!bit(imm8, 6)) << 30;
+                let c = replicate(bit(imm8, 6).into(), 5, 1) << 25;
+                let d = imm8 & 0b111111 << 19;
+
+                let imm32 = a | b | c | d;
+                return replicate(imm32, 2, 32);
+            }
+            if cmode0 == 1 && op == 1 {
+                let a = u64::from(bit(imm8, 7)) << 63;
+                let b = u64::from(!bit(imm8, 6)) << 62;
+                let c = replicate(bit(imm8, 6).into(), 8, 1) << 54;
+                let d = imm8 & 0b111111 << 48;
+
+                return a | b | c | d;
+            }
+
+            unreachable!()
+        }
+
+        _ => unreachable!()
+    }
+}
+
+pub const fn bit(val: u64, idx: u8) -> bool {
+    ((val >> idx) & 0b1) == 0b1
+}
+
+pub enum ImmediateOp {
+    MOVI,
+    MVNI,
+    ORR,
+    BIC,
 }

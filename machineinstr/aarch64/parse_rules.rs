@@ -789,8 +789,9 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: u32) -> AArch64Instr {
              imm12: Extract<BitRange<10, 22>, u16>,
              rm: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = SizeImm12RnRt {
+                let data = OpcSizeImm12RnRt {
                     idxt: idxt.value,
+                    opc: opc.value,
                     size: size.value,
                     imm12: imm12.value,
                     rn: rm.value,
@@ -1993,8 +1994,9 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: u32) -> AArch64Instr {
              imm12: Extract<BitRange<10, 22>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = SizeImm12RnRt {
+                let data = OpcSizeImm12RnRt {
                     idxt: idxt.value,
+                    opc: opc.value,
                     size: size.value,
                     imm12: imm12.value,
                     rn: rn.value,
@@ -2055,8 +2057,9 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: u32) -> AArch64Instr {
              imm12: Extract<BitRange<10, 21>, u16>,
              rn: Extract<BitRange<5, 10>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = SizeImm12RnRt {
+                let data = OpcSizeImm12RnRt {
                     idxt: idxt.value,
+                    opc: opc.value,
                     size: size.value,
                     imm12: imm12.value,
                     rn: rn.value,
@@ -2630,6 +2633,7 @@ fn parse_adv_simd_modified_imm(raw_instr: u32) -> AArch64Instr {
              rd: Extract<BitRange<0, 5>, u8>| {
                 let data = AdvSimdModifiedImm {
                     q: q.value,
+                    op: op.value,
                     a: a.value,
                     b: b.value,
                     c: c.value,

@@ -47,6 +47,41 @@ pub const fn extract_bits16(range: Range<usize>, value: u16) -> u16 {
     left_shifted >> (range.start + lshift)
 }
 
+pub fn parse_pattern(pattern: &str) -> Pattern {
+    let mut pattern_result = 0b0;
+    let mut mask_result = 0b0;
+
+    for char in pattern.chars() {
+        let (pat, mask) = match char {
+            'x' => (0, 0),
+            '0' => (0, 1),
+            '1' => (1, 1),
+            '_' | ' ' => {
+                continue;
+            }
+            _ => unreachable!("Bad parse pattern!"),
+        };
+        pattern_result <<= 1;
+        pattern_result |= pat;
+
+        mask_result <<= 1;
+        mask_result |= mask;
+    }
+
+    Pattern { pattern: pattern_result, mask: mask_result }
+}
+
+pub struct Pattern {
+    pattern: u32,
+    mask: u32,
+}
+
+impl Pattern {
+    pub fn test(&self, target: u32) -> bool {
+        (!(target ^ self.pattern) & self.mask) == self.mask
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
