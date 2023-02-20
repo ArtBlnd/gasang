@@ -196,7 +196,13 @@ unsafe fn compile_op(
         Operand::Immediate(t, imm) => {
             let imm = *imm;
             let t = *t;
-            Box::new(move |_| imm.into())
+            Box::new(move |_| match t {
+                Type::U8 | Type::I8 => Value::from_u8(imm as u8),
+                Type::U16 | Type::I16 => Value::from_u16(imm as u16),
+                Type::U32 | Type::I32 => Value::from_u32(imm as u32),
+                Type::U64 | Type::I64 => Value::from_u64(imm as u64),
+                _ => unreachable!("Invalid type"),
+            })
         }
         Operand::VoidIr(ir) => {
             let ir = compile_ir(ir, flag_policy.clone())?;

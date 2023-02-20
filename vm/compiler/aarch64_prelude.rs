@@ -231,12 +231,12 @@ pub const fn ror(x: u64, shift: u64, size: u64) -> u64 {
 }
 
 pub const fn replicate(x: u64, n: u64, size: u64) -> u64 {
-    let mut result = 0b0;
+    let mut result = 0b0u64;
     let mut i = n;
 
     while i > 0 {
-        result |= x;
         result = result.overflowing_shl(size as u32).0;
+        result |= x;
         i -= 1;
     }
 
