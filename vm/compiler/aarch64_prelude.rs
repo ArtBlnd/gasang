@@ -4,6 +4,73 @@ use crate::ir::*;
 use crate::register::RegId;
 use utility::*;
 
+pub enum Pstate {
+    N,
+    Z,
+    C,
+    V,
+    D,
+    A,
+    I,
+    F,
+    SS,
+    IL,
+    EL,
+    NRW,
+    SP,
+    ALLINT,
+    PAN,
+    UAO,
+    TCO,
+    BTYPE,
+    DIT,
+    SSBS,
+    ZA,
+    SM,
+
+    NZCV,
+}
+
+impl Pstate {
+    pub const fn range(&self) -> Range<u64> {
+        match self {
+            Pstate::N => 63..64,
+            Pstate::Z => 62..63,
+            Pstate::C => 61..62,
+            Pstate::V => 60..61,
+            Pstate::D => 59..60,
+            Pstate::A => 58..59,
+            Pstate::I => 57..58,
+            Pstate::F => 56..57,
+            Pstate::SS => 55..56,
+            Pstate::IL => 54..55,
+            Pstate::EL => 52..54,
+            Pstate::NRW => 51..52,
+            Pstate::SP => 50..51,
+            Pstate::ALLINT => 49..50,
+            Pstate::PAN => 48..49,
+            Pstate::UAO => 47..48,
+            Pstate::DIT => 46..47,
+            Pstate::TCO => 45..46,
+            Pstate::ZA => 44..45,
+            Pstate::SM => 43..44,
+            Pstate::SSBS => 42..43,
+            Pstate::BTYPE => 40..42,
+
+            Pstate::NZCV => Pstate::V.range().start..Pstate::N.range().end
+        }
+    }
+
+    pub const fn idx(&self) -> u64 {
+        self.range().start
+    }
+
+    pub const fn mask(&self) -> u64 {
+        let rng = self.range();
+        ones(rng.end - rng.start) << rng.start
+    }
+}
+
 pub const fn sign_extend(value: i64, size: u8) -> i64 {
     let mask = 1 << (size - 1);
     let sign = value & mask;
@@ -40,18 +107,13 @@ pub const fn decode_operand_for_ld_st_reg_imm(
         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
         let post = extract_bits16(0..2, operand.imm12) == 0b01;
 
-        let scale = (if is_vec {4} else {0}) * opc1 + operand.size;
+        let scale = (if is_vec { 4 } else { 0 }) * opc1 + operand.size;
 
         (true, post, scale, sign_extend(imm9, 9))
     } else {
         //Unsigned offset
-        let scale = (if is_vec {4} else {0}) * opc1 + operand.size;
-        (
-            false,
-            false,
-            scale,
-            (operand.imm12 << scale) as i64,
-        )
+        let scale = (if is_vec { 4 } else { 0 }) * opc1 + operand.size;
+        (false, false, scale, (operand.imm12 << scale) as i64)
     }
 }
 
@@ -85,20 +147,26 @@ pub fn condition_holds(cond: u8) -> Operand {
     let cond0 = cond & 1;
 
     let result = match masked_cond {
-        0b000 => cmp_eq_op_imm64(zero_flag(), 1),
-        0b001 => cmp_eq_op_imm64(carry_flag(), 1),
-        0b010 => cmp_eq_op_imm64(negative_flag(), 1),
-        0b011 => cmp_eq_op_imm64(overflow_flag(), 1),
+        0b000 => cmp_eq_op_imm64(Operand::ir(flag(Pstate::Z.range())), 1),
+        0b001 => cmp_eq_op_imm64(Operand::ir(flag(Pstate::C.range())), 1),
+        0b010 => cmp_eq_op_imm64(Operand::ir(flag(Pstate::N.range())), 1),
+        0b011 => cmp_eq_op_imm64(Operand::ir(flag(Pstate::V.range())), 1),
         0b100 => Operand::Ir(Box::new(Ir::And(
             Type::Bool,
-            cmp_eq_op_imm64(carry_flag(), 1),
-            cmp_eq_op_imm64(zero_flag(), 0),
+            cmp_eq_op_imm64(Operand::ir(flag(Pstate::C.range())), 1),
+            cmp_eq_op_imm64(Operand::ir(flag(Pstate::Z.range())), 0),
         ))),
-        0b101 => Operand::Ir(Box::new(Ir::CmpEq(negative_flag(), overflow_flag()))),
+        0b101 => Operand::Ir(Box::new(Ir::CmpEq(
+            Operand::ir(flag(Pstate::N.range())),
+            Operand::ir(flag(Pstate::V.range())),
+        ))),
         0b110 => Operand::Ir(Box::new(Ir::And(
             Type::Bool,
-            Operand::Ir(Box::new(Ir::CmpEq(negative_flag(), overflow_flag()))),
-            cmp_eq_op_imm64(zero_flag(), 0),
+            Operand::Ir(Box::new(Ir::CmpEq(
+                Operand::ir(flag(Pstate::N.range())),
+                Operand::ir(flag(Pstate::V.range())),
+            ))),
+            cmp_eq_op_imm64(Operand::ir(flag(Pstate::Z.range())), 0),
         ))),
         0b111 => Operand::imm(Type::Bool, 0b1u64),
         _ => unreachable!(),
@@ -126,52 +194,16 @@ pub fn cmp_ne_op_imm(op: Operand, immediate: u64) -> Operand {
     Operand::Ir(Box::new(Ir::CmpEq(op, Operand::imm(Type::U64, immediate))))
 }
 
-pub fn negative_flag() -> Operand {
-    let nf = Operand::Ir(Box::new(Ir::And(
+pub fn flag(range: Range<u64>) -> Ir {
+    Ir::And(
         Type::U64,
-        Operand::Flag,
-        Operand::imm(Type::U64, 0x8000_0000_0000_0000),
-    )));
-
-    Operand::ir(Ir::LShr(Type::U64, nf, Operand::imm(Type::U64, 63)))
-}
-
-pub fn zero_flag() -> Operand {
-    let zf = Operand::Ir(Box::new(Ir::And(
-        Type::U64,
-        Operand::Flag,
-        Operand::imm(Type::U64, 0x4000_0000_0000_0000),
-    )));
-
-    Operand::ir(Ir::LShr(Type::U64, zf, Operand::imm(Type::U64, 62)))
-}
-
-pub fn carry_flag() -> Operand {
-    let cf = Operand::Ir(Box::new(Ir::And(
-        Type::U64,
-        Operand::Flag,
-        Operand::imm(Type::U64, 0x2000_0000_0000_0000),
-    )));
-
-    Operand::Ir(Box::new(Ir::LShr(
-        Type::U64,
-        cf,
-        Operand::imm(Type::U64, 61),
-    )))
-}
-
-pub fn overflow_flag() -> Operand {
-    let of = Operand::Ir(Box::new(Ir::And(
-        Type::U64,
-        Operand::Flag,
-        Operand::imm(Type::U64, 0x1000_0000_0000_0000),
-    )));
-
-    Operand::Ir(Box::new(Ir::LShr(
-        Type::U64,
-        of,
-        Operand::imm(Type::U64, 60),
-    )))
+        Operand::ir(Ir::LShr(
+            Type::U64,
+            Operand::Flag,
+            Operand::Immediate(Type::U64, range.start),
+        )),
+        Operand::imm(Type::U64, ones(range.end - range.start)),
+    )
 }
 
 pub fn shift_reg(reg: Operand, shift_type: ShiftType, amount: u64, t: Type) -> Ir {
@@ -378,7 +410,7 @@ pub fn adv_simd_exapnd_imm(op: u8, cmode: u8, imm8: u8) -> u64 {
             unreachable!()
         }
 
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
@@ -391,4 +423,42 @@ pub enum ImmediateOp {
     MVNI,
     ORR,
     BIC,
+}
+
+pub enum PSTATEField {
+    DAIFSet,
+    DAIFClr,
+    PAN,
+    UAO,
+    DIT,
+    SSBS,
+    TCO,
+    SVCRSM,
+    SVCRZA,
+    SVCRSMZA,
+    ALLINT,
+    SP,
+}
+
+pub fn check_transactional_system_acceess(op0: u8, op1: u8, crn: u8, crm: u8, op2: u8, read: u8) -> bool {
+    match (read, op0, op1, crn, crm, op2) {
+        (0b0, 0b00, 0b011, 0b0100, _, _) if parse_pattern("xxxx").test_u8(crm) && parse_pattern("11x").test_u8(op2) => true,
+        (0b0, 0b01, 0b011, 0b0111, 0b0100, 0b001) => true,
+        (0b0, 0b11, 0b011, 0b0100, 0b0010, _) if parse_pattern("00x").test_u8(op2) => true,
+        (0b0, 0b11, 0b011, 0b0100, 0b0100, _) if parse_pattern("00x").test_u8(op2) => true,
+        (0b0, 0b11, 0b000, 0b0100, 0b0110, 0b000) => true,
+        (0b0, 0b11, 0b011, 0b1001, 0b1100, 0b100) => true,
+        (0b1, 0b11, _, _, _, _) if parse_pattern("0xxx").test_u8(crn) => true,
+        (0b1, 0b11, _, _, _, _) if parse_pattern("100x").test_u8(crn) => true,
+        (0b1, 0b11, _, 0b1010, _, _) => true,
+        (0b1, 0b11, 0b000, 0b1100, _, 0b010) if parse_pattern("1x00").test_u8(crm) => true,
+        (0b1, 0b11, 0b000, 0b1100, 0b1011, 0b011) => true,
+        (0b1, 0b11, _, 0b1101, _, _) => true,
+        (0b1, 0b11, _, 0b1110, _, _) => true,
+        (0b0, 0b01, 0b011, 0b0111, 0b0011, 0b111) => true,
+        (0b0, 0b01, 0b011, 0b0111, 0b0011, _) if parse_pattern("10x").test_u8(op2) => true,
+        (_, 0b11, _, _, _, _) if parse_pattern("1x11").test_u8(crn) => panic!("Need to return boolean IMPLEMENTATION_DEFINED"),
+
+        _=> false
+    }
 }

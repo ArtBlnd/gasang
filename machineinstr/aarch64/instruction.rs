@@ -283,10 +283,10 @@ pub enum AArch64Instr {
     Wfet(Rt),
     Wfit(Rt),
 
-    MsrImm(Pstate),
-    Cfinv(Pstate),
-    Xaflag(Pstate),
-    Axflag(Pstate),
+    MsrImm(PstateOp),
+    Cfinv(PstateOp),
+    Xaflag(PstateOp),
+    Axflag(PstateOp),
 
     Tstart(Rt),
     Ttest(Rt),

@@ -41,8 +41,16 @@ impl Operand {
         Operand::Gpr(t, reg)
     }
 
+    pub const fn fpr(t: Type, reg: RegId) -> Self {
+        Operand::Fpr(t, reg)
+    }
+
     pub const fn imm(t: Type, imm: u64) -> Self {
         Operand::Immediate(t, imm)
+    }
+
+    pub const fn sys(t: Type, reg: RegId) -> Self {
+        Operand::Sys(t, reg)
     }
 
     pub fn dbg(msg: impl AsRef<str>, operand: Operand) -> Self {

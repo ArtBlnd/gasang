@@ -68,7 +68,10 @@ pub fn parse_pattern(pattern: &str) -> Pattern {
         mask_result |= mask;
     }
 
-    Pattern { pattern: pattern_result, mask: mask_result }
+    Pattern {
+        pattern: pattern_result,
+        mask: mask_result,
+    }
 }
 
 pub struct Pattern {
@@ -77,7 +80,12 @@ pub struct Pattern {
 }
 
 impl Pattern {
-    pub fn test(&self, target: u32) -> bool {
+    pub fn test_u32(&self, target: u32) -> bool {
+        (!(target ^ self.pattern) & self.mask) == self.mask
+    }
+
+    pub fn test_u8(&self, target: u8) -> bool {
+        let target = target as u32;
         (!(target ^ self.pattern) & self.mask) == self.mask
     }
 }

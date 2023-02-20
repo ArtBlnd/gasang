@@ -1,6 +1,7 @@
 use crate::codegen::flag_policy::FlagPolicy;
 use crate::ir::Type;
 use crate::Cpu;
+use crate::compiler::aarch64_prelude::Pstate;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AArch64FlagPolicy;
@@ -71,8 +72,8 @@ impl FlagPolicy for AArch64FlagPolicy {
         };
 
         let (n, z, c, v): (u64, u64, u64, u64) = (n.into(), z.into(), c.into(), v.into());
-        vm.del_flag(0xf000_0000_0000_0000);
-        vm.add_flag(n << 63 | z << 62 | c << 61 | v << 60)
+        vm.del_flag(Pstate::NZCV.mask());
+        vm.add_flag(n << Pstate::N.idx() | z << Pstate::Z.idx() | c << Pstate::C.idx() | v << Pstate::V.idx())
     }
 
     fn sub_carry(&self, ty: Type, a: u64, b: u64, vm: &Cpu) {
@@ -140,13 +141,13 @@ impl FlagPolicy for AArch64FlagPolicy {
             _ => panic!("Unknown type!"),
         };
 
-        if a == 0 && b == 0{
+        if a == 0 && b == 0 {
             c = true;
         }
 
         let (n, z, c, v): (u64, u64, u64, u64) = (n.into(), z.into(), c.into(), v.into());
-        vm.del_flag(0xf000_0000_0000_0000);
-        vm.add_flag(n << 63 | z << 62 | c << 61 | v << 60)
+        vm.del_flag(Pstate::NZCV.mask());
+        vm.add_flag(n << Pstate::N.idx() | z << Pstate::Z.idx() | c << Pstate::C.idx() | v << Pstate::V.idx())
     }
 
     fn carry(&self, vm: &Cpu) -> bool {

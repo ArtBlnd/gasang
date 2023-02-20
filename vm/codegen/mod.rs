@@ -13,7 +13,7 @@ pub use code::*;
 
 pub mod cranelift;
 pub mod flag_policy;
-pub mod interpret;
+pub mod rustjit;
 
 use crate::ir::Ir;
 

@@ -343,7 +343,7 @@ unsafe fn gen_mul(
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::U64=> Box::new(move |ctx| {
+        Type::U64 => Box::new(move |ctx| {
             let lhs = lhs(ctx).u64();
             let rhs = rhs(ctx).u64();
 

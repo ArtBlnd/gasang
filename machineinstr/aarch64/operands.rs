@@ -396,7 +396,7 @@ pub struct Rn {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Pstate {
+pub struct PstateOp {
     pub op1: u8,
     pub crm: u8,
     pub op2: u8,

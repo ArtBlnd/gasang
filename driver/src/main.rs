@@ -1,7 +1,7 @@
 use machineinstr::aarch64::AArch64InstrParserRule;
 
 use vm::codegen::flag_policy::AArch64FlagPolicy;
-use vm::codegen::interpret::InterpretCodegen;
+use vm::codegen::rustjit::InterpretCodegen;
 use vm::compiler::aarch64::AArch64Compiler;
 use vm::engine::Engine;
 use vm::Cpu;

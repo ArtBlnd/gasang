@@ -4196,7 +4196,7 @@ fn parse_pstate(raw_instr: u32) -> AArch64Instr {
              crm: Extract<BitRange<8, 12>, u8>,
              op2: Extract<BitRange<5, 8>, u8>,
              rt: Extract<BitRange<0, 5>, u8>| {
-                let data = Pstate {
+                let data = PstateOp {
                     op1: op1.value,
                     crm: crm.value,
                     op2: op2.value,

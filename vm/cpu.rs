@@ -215,5 +215,13 @@ fn init_base_aarch64_cpu() -> Cpu {
     cpu.reg_name_map
         .insert("tpidr_el0".to_string(), RegId(id as u8));
 
+    let id = cpu.sys_registers.insert(SysRegister::new("vbar_el1", 8));
+    cpu.reg_name_map
+        .insert("vbar_el1".to_string(), RegId(id as u8));
+
+    let id = cpu.sys_registers.insert(SysRegister::new("cpacr_el1", 8));
+    cpu.reg_name_map
+        .insert("cpacr_el1".to_string(), RegId(id as u8));
+
     cpu
 }

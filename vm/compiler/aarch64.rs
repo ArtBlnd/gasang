@@ -154,6 +154,7 @@ impl Compiler for AArch64Compiler {
             // Speical instructions
             AArch64Instr::Mrs(operand) => gen_mrs(self, operand),
             AArch64Instr::MsrReg(operand) => gen_msr_reg(self, operand),
+            AArch64Instr::MsrImm(operand) => gen_msr_imm(self, operand),
             AArch64Instr::Nop | AArch64Instr::Wfi => {
                 let mut block = IrBlock::new(4);
 
@@ -699,7 +700,7 @@ fn gen_ccmp_imm(compiler: &AArch64Compiler, operand: CondCmpImm, ty: Type) -> Ir
             Operand::Flag,
             Operand::ir(Ir::BitCast(Type::U64, subc)),
         )),
-        Operand::ir(replace_bits(Operand::Flag, operand.nzcv as u64, 60..64)),
+        Operand::ir(replace_bits(Operand::Flag, operand.nzcv as u64, Pstate::NZCV.range())),
     );
     let ds = BlockDestination::Flags;
 
@@ -932,10 +933,10 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
         operand.crm,
         operand.op2,
     ) {
-        (0b11, 0b011, 0b1101, 0b0000, 0b0010) => {
+        (0b11, 0b011, 0b1101, 0b0000, 0b010) => {
             Operand::Sys(Type::U64, compiler.reg_by_name("tpidr_el0"))
         } // tpidr_el0, get current thread.
-        (0b11, 0b011, 0b0000, 0b0000, 0b0111) => {
+        (0b11, 0b011, 0b0000, 0b0000, 0b111) => {
             let implementer = 0; // Reserved for software use
             let variant = 0;
             let architecture = 0b1111; // Architectural features are individually identified in the ID_* registers, see 'ID registers'.
@@ -944,9 +945,17 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
 
             let ret =
                 implementer << 24 | variant << 20 | architecture << 16 | partnum << 4 | revision;
-            Operand::Immediate(Type::U64, ret)
+            Operand::imm(Type::U64, ret)
         }
-        _ => unimplemented!("MRS: {:x?}", operand),
+        (0b11, 0b000, 0b0100, 0b0010, 0b010) => { // Get current exception level.
+            // We are using exception level one.
+            let current_exception_level = 1;
+            Operand::imm(Type::U64, current_exception_level << 2)
+        }
+        (0b11, 0b000, 0b1100, 0b0000, 0b000) => {
+            Operand::Sys(Type::U64, compiler.reg_by_name("vbar_el1"))
+        }
+        _ => unimplemented!("MRS: {:?}", operand),
     };
 
     let ir = Ir::Value(op);
@@ -969,9 +978,15 @@ fn gen_msr_reg(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
         operand.crm,
         operand.op2,
     ) {
-        (0b11, 0b011, 0b1101, 0b0000, 0b0010) => {
+        (0b11, 0b011, 0b1101, 0b0000, 00010) => {
             compiler.reg_by_name("tpidr_el0")
         } // tpidr_el0, get current thread.
+        (0b11, 0b000, 0b1100, 0b0000, 0b000) => {
+            compiler.reg_by_name("vbar_el1")
+        }
+        (0b11, 0b000, 0b0001, 0b0000, 0b010) => {
+            compiler.reg_by_name("cpacr_el1")
+        }
     
         _ => unimplemented!("MSR: {:x?}", operand),
     };
@@ -1593,17 +1608,17 @@ fn gen_movi(compiler: &AArch64Compiler, operand: AdvSimdModifiedImm) -> IrBlock 
     let datasize = ty.size();
     
     let operation = match cmode_op {
-        _ if parse_pattern("0xx00").test(operand.cmode as u32) => ImmediateOp::MOVI,
-        _ if parse_pattern("0xx01").test(operand.cmode as u32) => ImmediateOp::MVNI,
-        _ if parse_pattern("0xx10").test(operand.cmode as u32) => ImmediateOp::ORR,
-        _ if parse_pattern("0xx11").test(operand.cmode as u32) => ImmediateOp::BIC,
-        _ if parse_pattern("10x00").test(operand.cmode as u32) => ImmediateOp::MOVI,
-        _ if parse_pattern("10x01").test(operand.cmode as u32) => ImmediateOp::MVNI,
-        _ if parse_pattern("10x10").test(operand.cmode as u32) => ImmediateOp::ORR,
-        _ if parse_pattern("10x11").test(operand.cmode as u32) => ImmediateOp::BIC,
-        _ if parse_pattern("110x0").test(operand.cmode as u32) => ImmediateOp::MOVI,
-        _ if parse_pattern("110x1").test(operand.cmode as u32) => ImmediateOp::MVNI,
-        _ if parse_pattern("1110x").test(operand.cmode as u32) => ImmediateOp::MOVI,
+        _ if parse_pattern("0xx00").test_u8(operand.cmode) => ImmediateOp::MOVI,
+        _ if parse_pattern("0xx01").test_u8(operand.cmode) => ImmediateOp::MVNI,
+        _ if parse_pattern("0xx10").test_u8(operand.cmode) => ImmediateOp::ORR,
+        _ if parse_pattern("0xx11").test_u8(operand.cmode) => ImmediateOp::BIC,
+        _ if parse_pattern("10x00").test_u8(operand.cmode) => ImmediateOp::MOVI,
+        _ if parse_pattern("10x01").test_u8(operand.cmode) => ImmediateOp::MVNI,
+        _ if parse_pattern("10x10").test_u8(operand.cmode) => ImmediateOp::ORR,
+        _ if parse_pattern("10x11").test_u8(operand.cmode) => ImmediateOp::BIC,
+        _ if parse_pattern("110x0").test_u8(operand.cmode) => ImmediateOp::MOVI,
+        _ if parse_pattern("110x1").test_u8(operand.cmode) => ImmediateOp::MVNI,
+        _ if parse_pattern("1110x").test_u8(operand.cmode) => ImmediateOp::MOVI,
         0b11110 => ImmediateOp::MOVI,
         0b11111 => ImmediateOp::MOVI,
         _ => unreachable!()
@@ -1657,5 +1672,10 @@ fn gen_str_imm_simd_fp(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty
         block.append(ir, ds);
     }
 
+    block
+}
+
+fn gen_msr_imm(compiler: &AArch64Compiler, operand: PstateOp) -> IrBlock {
+    let mut block = IrBlock::new(4);
     block
 }

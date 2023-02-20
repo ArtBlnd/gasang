@@ -127,7 +127,6 @@ impl CompiledBlockDestinationTrait for SetMemoryI64 {
         let (addr, of) = vm.gpr(self.1).u64().overflowing_add_signed(self.2);
         assert_eq!(of, false);
 
-
         match self.0 {
             Type::U8 | Type::I8 => vm.mem(addr).write_u8(*val.u8_mut()),
             Type::U16 | Type::I16 => vm.mem(addr).write_u16(*val.u16_mut()),
