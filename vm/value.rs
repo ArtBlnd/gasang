@@ -4,7 +4,7 @@ use std::slice;
 
 use crate::ir::Type;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Value(SmallVec<[u64; 2]>);
 
 impl Value {

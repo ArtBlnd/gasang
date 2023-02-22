@@ -57,7 +57,7 @@ impl Pstate {
             Pstate::SSBS => 42..43,
             Pstate::BTYPE => 40..42,
 
-            Pstate::NZCV => Pstate::V.range().start..Pstate::N.range().end
+            Pstate::NZCV => Pstate::V.range().start..Pstate::N.range().end,
         }
     }
 
@@ -100,19 +100,19 @@ pub fn decode_shift(shift: u8) -> ShiftType {
 
 pub const fn decode_operand_for_ld_st_reg_imm(
     operand: machineinstr::aarch64::OpcSizeImm12RnRt,
-    is_vec: bool,
+    is_simd_fp: bool,
 ) -> (bool, bool, u8, i64) {
     let opc1 = (operand.opc & 0b10) >> 1;
     if operand.idxt == 0b00 {
         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
         let post = extract_bits16(0..2, operand.imm12) == 0b01;
 
-        let scale = (if is_vec { 4 } else { 0 }) * opc1 + operand.size;
+        let scale = (if is_simd_fp { 4 } else { 0 }) * opc1 + operand.size;
 
         (true, post, scale, sign_extend(imm9, 9))
     } else {
         //Unsigned offset
-        let scale = (if is_vec { 4 } else { 0 }) * opc1 + operand.size;
+        let scale = (if is_simd_fp { 4 } else { 0 }) * opc1 + operand.size;
         (false, false, scale, (operand.imm12 << scale) as i64)
     }
 }
@@ -206,9 +206,7 @@ pub fn flag(range: Range<u64>) -> Ir {
     )
 }
 
-pub fn shift_reg(reg: Operand, shift_type: ShiftType, amount: u64, t: Type) -> Ir {
-    let amount = Operand::imm(t, amount);
-
+pub fn shift_reg(reg: Operand, shift_type: ShiftType, amount: Operand, t: Type) -> Ir {
     match shift_type {
         ShiftType::LSL => Ir::LShl(t, reg, amount),
         ShiftType::LSR => Ir::LShr(t, reg, amount),
@@ -354,10 +352,9 @@ pub fn replace_bits(val: Operand, imm: u64, range: Range<u64>) -> Ir {
 
 pub fn gen_mask64<T>(range: Range<T>) -> u64
 where
-    T: Into<usize> + Copy,
+    T: Into<u64> + Copy,
 {
-    let mask = (u64::MAX >> range.start.into()) << range.start.into();
-    (mask << range.end.into()) >> range.end.into()
+    ones(range.end.into() - range.start.into()) << range.start.into()
 }
 
 pub fn adv_simd_exapnd_imm(op: u8, cmode: u8, imm8: u8) -> u64 {
@@ -440,9 +437,20 @@ pub enum PSTATEField {
     SP,
 }
 
-pub fn check_transactional_system_acceess(op0: u8, op1: u8, crn: u8, crm: u8, op2: u8, read: u8) -> bool {
+pub fn check_transactional_system_acceess(
+    op0: u8,
+    op1: u8,
+    crn: u8,
+    crm: u8,
+    op2: u8,
+    read: u8,
+) -> bool {
     match (read, op0, op1, crn, crm, op2) {
-        (0b0, 0b00, 0b011, 0b0100, _, _) if parse_pattern("xxxx").test_u8(crm) && parse_pattern("11x").test_u8(op2) => true,
+        (0b0, 0b00, 0b011, 0b0100, _, _)
+            if parse_pattern("xxxx").test_u8(crm) && parse_pattern("11x").test_u8(op2) =>
+        {
+            true
+        }
         (0b0, 0b01, 0b011, 0b0111, 0b0100, 0b001) => true,
         (0b0, 0b11, 0b011, 0b0100, 0b0010, _) if parse_pattern("00x").test_u8(op2) => true,
         (0b0, 0b11, 0b011, 0b0100, 0b0100, _) if parse_pattern("00x").test_u8(op2) => true,
@@ -457,8 +465,10 @@ pub fn check_transactional_system_acceess(op0: u8, op1: u8, crn: u8, crm: u8, op
         (0b1, 0b11, _, 0b1110, _, _) => true,
         (0b0, 0b01, 0b011, 0b0111, 0b0011, 0b111) => true,
         (0b0, 0b01, 0b011, 0b0111, 0b0011, _) if parse_pattern("10x").test_u8(op2) => true,
-        (_, 0b11, _, _, _, _) if parse_pattern("1x11").test_u8(crn) => panic!("Need to return boolean IMPLEMENTATION_DEFINED"),
+        (_, 0b11, _, _, _, _) if parse_pattern("1x11").test_u8(crn) => {
+            panic!("Need to return boolean IMPLEMENTATION_DEFINED")
+        }
 
-        _=> false
+        _ => false,
     }
 }

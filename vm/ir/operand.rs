@@ -1,7 +1,9 @@
 use crate::ir::{Ir, Type};
 use crate::register::RegId;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+use crate::value::Value;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Operand {
     Ir(Box<Ir>),
     VoidIr(Box<Ir>),
@@ -9,6 +11,7 @@ pub enum Operand {
     Sys(Type, RegId),
     Fpr(Type, RegId),
     Immediate(Type, u64),
+    ImmediateValue(Type, Value),
     Ip,
     Flag,
     Dbg(String, Box<Operand>),
@@ -23,6 +26,7 @@ impl Operand {
             Operand::Fpr(t, _) => *t,
             Operand::Sys(t, _) => *t,
             Operand::Immediate(t, _) => *t,
+            Operand::ImmediateValue(t, _) => *t,
             Operand::Ip => Type::U64,
             Operand::Flag => Type::U64,
             Operand::Dbg(_, operand) => operand.get_type(),
@@ -47,6 +51,10 @@ impl Operand {
 
     pub const fn imm(t: Type, imm: u64) -> Self {
         Operand::Immediate(t, imm)
+    }
+
+    pub const fn imm_value(t: Type, value: Value) -> Self {
+        Operand::ImmediateValue(t, value)
     }
 
     pub const fn sys(t: Type, reg: RegId) -> Self {

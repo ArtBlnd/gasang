@@ -24,7 +24,9 @@ pub enum BlockDestination {
 pub struct IrBlock {
     items: SmallVec<[IrBlockItem; 2]>,
     original_size: usize,
-    restore_flag: bool,
+
+    is_restore_flag: bool,
+    is_atomic: bool,
 }
 
 impl IrBlock {
@@ -32,7 +34,8 @@ impl IrBlock {
         Self {
             items: SmallVec::new(),
             original_size,
-            restore_flag: false,
+            is_restore_flag: false,
+            is_atomic: false,
         }
     }
 
@@ -71,11 +74,15 @@ impl IrBlock {
     }
 
     pub fn restore_flag(&self) -> bool {
-        self.restore_flag
+        self.is_restore_flag
     }
 
     pub fn set_restore_flag(&mut self) {
-        self.restore_flag = true;
+        self.is_restore_flag = true;
+    }
+
+    pub fn set_atomic(&mut self) {
+        self.is_atomic = true;
     }
 
     pub fn original_size(&self) -> usize {

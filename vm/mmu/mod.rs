@@ -10,7 +10,7 @@ use crate::error::MMUError;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock};
 
-const PAGE_SIZE: u64 = 65536;
+pub const PAGE_SIZE: u64 = 4096 * 16;
 
 // Memory Management Unit
 //

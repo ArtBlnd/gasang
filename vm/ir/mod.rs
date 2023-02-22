@@ -5,12 +5,13 @@ pub use operand::*;
 mod ty;
 pub use ty::*;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ir {
     Add(Type, Operand, Operand),
     Sub(Type, Operand, Operand),
     Mul(Type, Operand, Operand),
     Div(Type, Operand, Operand),
+    Mod(Type, Operand, Operand),
 
     Addc(Type, Operand, Operand),
     Subc(Type, Operand, Operand),
@@ -47,6 +48,7 @@ impl Ir {
             Ir::Sub(t, _, _) => *t,
             Ir::Mul(t, _, _) => *t,
             Ir::Div(t, _, _) => *t,
+            Ir::Mod(t, _, _) => *t,
 
             Ir::Addc(t, _, _) => *t,
             Ir::Subc(t, _, _) => *t,

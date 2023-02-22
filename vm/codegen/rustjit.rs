@@ -119,6 +119,7 @@ unsafe fn compile_ir(
         Ir::Sub(t, op1, op2) => gen_sub(t, op1, op2, flag_policy),
         Ir::Mul(t, op1, op2) => gen_mul(t, op1, op2, flag_policy),
         Ir::Div(t, op1, op2) => gen_div(t, op1, op2, flag_policy),
+        Ir::Mod(t, op1, op2) => gen_mod(t, op1, op2, flag_policy),
         Ir::Addc(t, op1, op2) => gen_addc(t, op1, op2, flag_policy),
         Ir::Subc(t, op1, op2) => gen_subc(t, op1, op2, flag_policy),
 
@@ -194,13 +195,29 @@ unsafe fn compile_op(
             })
         }
         Operand::Immediate(t, imm) => {
-            let imm = *imm;
+            let imm = *imm & t.gen_mask();
             let t = *t;
             Box::new(move |_| match t {
                 Type::U8 | Type::I8 => Value::from_u8(imm as u8),
                 Type::U16 | Type::I16 => Value::from_u16(imm as u16),
                 Type::U32 | Type::I32 => Value::from_u32(imm as u32),
                 Type::U64 | Type::I64 => Value::from_u64(imm as u64),
+                _ => unreachable!("Invalid type"),
+            })
+        }
+        Operand::ImmediateValue(t, imm) => {
+            let imm = imm.clone();
+            let t = *t;
+            Box::new(move |_| match t {
+                Type::U8 | Type::I8 => Value::from_u8(imm.u8()),
+                Type::U16 | Type::I16 => Value::from_u16(imm.u16()),
+                Type::U32 | Type::I32 => Value::from_u32(imm.u32()),
+                Type::U64 | Type::I64 => Value::from_u64(imm.u64()),
+                Type::Vec(VecType::U64, 2) => {
+                    let mut ret = Value::new(16);
+                    *ret.u64x2_mut() = imm.u64x2();
+                    ret
+                }
                 _ => unreachable!("Invalid type"),
             })
         }
@@ -217,7 +234,7 @@ unsafe fn compile_op(
             let op = compile_op(op, flag_policy.clone())?;
             let s = s.to_string();
             Box::new(move |ctx| {
-                let mut val = op(ctx);
+                let val = op(ctx);
                 println!("{s}, {:x}", val.u64());
                 val.into()
             })
@@ -416,6 +433,44 @@ unsafe fn gen_div(
             let rhs = rhs(ctx).u64();
 
             lhs.overflowing_div(rhs).0.into()
+        }),
+        _ => unreachable!("invalid type: {:?}", t),
+    })
+}
+
+unsafe fn gen_mod(
+    t: &Type,
+    op1: &Operand,
+    op2: &Operand,
+    flag_policy: Arc<dyn FlagPolicy>,
+) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    let lhs = compile_op(op1, flag_policy.clone())?;
+    let rhs = compile_op(op2, flag_policy.clone())?;
+
+    Ok(match t {
+        Type::U8 | Type::I8 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).u8();
+            let rhs = rhs(ctx).u8();
+
+            (lhs % rhs).into()
+        }),
+        Type::U16 | Type::I16 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).u16();
+            let rhs = rhs(ctx).u16();
+
+            (lhs % rhs).into()
+        }),
+        Type::U32 | Type::I32 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).u32();
+            let rhs = rhs(ctx).u32();
+
+            (lhs % rhs).into()
+        }),
+        Type::U64 | Type::I64 => Box::new(move |ctx| {
+            let lhs = lhs(ctx).u64();
+            let rhs = rhs(ctx).u64();
+
+            (lhs % rhs).into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
     })
@@ -750,6 +805,17 @@ unsafe fn gen_load(
         Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
             let mut var = op.execute(ctx);
             ctx.mem(*var.u64_mut()).read_u64().unwrap().into()
+        }),
+        Type::Vec(VecType::U64, 2) => Box::new(move |ctx| {
+            let mut var = op.execute(ctx);
+            let mut mem = ctx.mem(*var.u64_mut());
+
+            let mut value = Value::new(16);
+            value.u64x2_mut()[0] = mem.read_u64().unwrap();
+            mem.consume(8);
+            value.u64x2_mut()[1] = mem.read_u64().unwrap();
+
+            value
         }),
         _ => unreachable!("invalid type: {:?}", t),
     })

@@ -1,4 +1,5 @@
 use crate::interrupt::InterruptModel;
+use crate::mmu::PAGE_SIZE;
 use crate::Cpu;
 
 pub struct AArch64UnixInterruptModel;
@@ -104,6 +105,44 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
 
         // sigaltstack. We don't support stack overflow signals.
         0x84 => {
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            *ret.u64_mut() = 0;
+        }
+
+        // mmap
+        0xde => {
+            let addr = args[0];
+            let len = args[1];
+            let prot = args[2];
+            let flags = args[3];
+            let fd = args[4];
+            let offset = args[5];
+            println!(
+                "mmap: addr: {:#x} len: {:#x} prot: {:#x} flags: {:#x} fd: {:#x} offset: {:#x}",
+                addr, len, prot, flags, fd, offset
+            );
+
+            let addr = 0x8000_0000_0000_0000;
+            vm.mmu().mmap(addr, PAGE_SIZE, true, true, true);
+
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            *ret.u64_mut() = addr;
+        }
+
+        // rt_sigaction
+        0x86 => {
+            let ret = vm.reg_by_name("x0").unwrap();
+            let ret = vm.gpr_mut(ret);
+
+            *ret.u64_mut() = 0;
+        }
+
+        // rt_sigprocmask
+        0x87 => {
             let ret = vm.reg_by_name("x0").unwrap();
             let ret = vm.gpr_mut(ret);
 
