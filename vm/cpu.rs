@@ -79,7 +79,7 @@ impl Cpu {
     }
 
     pub fn set_ip(&mut self, eip: u64) {
-        println!("{eip}");
+        println!("{eip:x}");
         self.ip = eip;
     }
 
@@ -222,7 +222,7 @@ fn new_aarch64_unknown_linux(image: &[u8]) -> Cpu {
     ];
 
     let stack = cpu.reg_by_name("sp").unwrap();
-    *cpu.gpr_mut(stack).u64_mut() = 0xfffffffffbf0;
+    *cpu.gpr_mut(stack).u64_mut() = 0xfffffffffbf0 - 32;
 
     unsafe {
         cpu.mmu.frame(0xfffffffffbf0).write(buf).unwrap();
@@ -257,7 +257,7 @@ fn init_base_aarch64_cpu() -> Cpu {
         cpu.reg_name_map.insert(format!("v{}", i), RegId(id as u8));
     }
 
-    const REG_ADDR: u64 = 0x1000000000000;
+    const REG_ADDR: u64 = 0x1000000000000 - 32;
     const REG_SIZE: u64 = 1024 * 1024 * 4;
 
     let mut sp_reg = GprRegister::new("sp", 8);

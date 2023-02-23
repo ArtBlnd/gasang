@@ -499,7 +499,7 @@ fn gen_sub_imm(compiler: &AArch64Compiler, operand: ShImm12RnRd, ty: Type) -> Ir
     let ir = Ir::ZextCast(Type::U64, Operand::ir(ir));
 
     let ds = if operand.rd == 31 {
-        BlockDestination::None
+        BlockDestination::Gpr(Type::U64, compiler.stack_reg())
     } else {
         BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd))
     };
@@ -945,7 +945,11 @@ fn gen_add_ext_reg64(compiler: &AArch64Compiler, operand: AddSubtractExtReg) -> 
 fn gen_ldrh_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (_wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
+    let (mut wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
+
+    if wback && operand.rn == operand.rt && operand.rn != 31 {
+        wback = false;
+    }
 
     let src = if operand.rn == 31 {
         compiler.stack_reg()
@@ -968,6 +972,13 @@ fn gen_ldrh_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBloc
     let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rt));
 
     block.append(ir, ds);
+
+    if wback {
+        let ir = Ir::Add(Type::U64, Operand::gpr(Type::U64, src), Operand::Immediate(Type::U64, offset as u64));
+        let ds = BlockDestination::Gpr(Type::U64, src);
+
+        block.append(ir, ds);
+    }
 
     block
 }
