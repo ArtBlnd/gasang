@@ -82,6 +82,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::LdpSimdFpVar128(operand) => {
                 gen_ldp_simd_fp(self, operand, Type::Vec(VecType::U64, 2))
             }
+            AArch64Instr::LdrRegSimdFP(operand) => gen_ldr_reg_simd_fp(self, operand),
 
             AArch64Instr::StrImm32(operand) => gen_str_imm(self, operand, Type::U32),
             AArch64Instr::StrImm64(operand) => gen_str_imm(self, operand, Type::U64),
@@ -104,6 +105,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::StrImmSimdFP128(operand) => {
                 gen_str_imm_simd_fp(self, operand, Type::Vec(VecType::U64, 2))
             }
+            AArch64Instr::StrRegSimdFP(operand) => gen_str_reg_simd_fp(self, operand),
             AArch64Instr::StlxrVar32(operand) => gen_stlxr(self, operand, Type::U32),
 
             // Advanced SIMD and FP
@@ -177,6 +179,7 @@ impl Compiler for AArch64Compiler {
             // Conditional Instructions
             AArch64Instr::CcmpImmVar32(operand) => gen_ccmp_imm(self, operand, Type::U32),
             AArch64Instr::CcmpImmVar64(operand) => gen_ccmp_imm(self, operand, Type::U64),
+            AArch64Instr::CcmpRegVar64(operand) => gen_ccmp_reg(self, operand, Type::U64),
             AArch64Instr::CcmnImmVar64(operand) => gen_ccmn_imm(self, operand, Type::U64),
             AArch64Instr::Csel32(operand) => gen_csel32(self, operand),
 
@@ -2072,6 +2075,90 @@ fn gen_subs_ext_reg(compiler: &AArch64Compiler, operand: AddSubtractExtReg, ty: 
     } else {
         BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd))
     };
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_ldr_reg_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let ext_type = decode_reg_extend(operand.option);
+    let scale = bit(operand.opc as u64, 1) as u8 * 4 + operand.size;
+    let shift = if operand.s == 1 { scale } else { 0 };
+    let ty = Type::uscalar_from_size(1 << scale);
+
+    let offset = extend_reg(compiler.gpr(operand.rm), ext_type, shift, 8);
+
+    let addr = if operand.rn == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rn)
+    };
+    let addr = Ir::Add(Type::U64, Operand::gpr(Type::U64, addr), Operand::ir(offset));
+
+    let ir = Ir::Load(ty, Operand::ir(addr));
+    let ds = BlockDestination::Fpr(ty, compiler.fpr(operand.rt));
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_str_reg_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let ext_type = decode_reg_extend(operand.option);
+    let scale = bit(operand.opc as u64, 1) as u8 * 4 + operand.size;
+    let shift = if operand.s == 1 { scale } else { 0 };
+    let ty = Type::uscalar_from_size(1 << scale);
+
+    let offset = extend_reg(compiler.gpr(operand.rm), ext_type, shift, 8);
+
+    let addr = if operand.rn == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rn)
+    };
+    let addr = Ir::Add(Type::U64, Operand::gpr(Type::U64, addr), Operand::ir(offset));
+
+    let ir = Ir::Value(Operand::fpr(ty, compiler.fpr(operand.rt)));
+    let ds = BlockDestination::MemoryIr(addr);
+
+    block.append(ir, ds);
+
+    block
+}
+
+
+fn gen_ccmp_reg(compiler: &AArch64Compiler, operand: CondCmpReg, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let rn = compiler.gpr(operand.rn);
+    let rm = compiler.gpr(operand.rm);
+
+    let subc = Operand::void_ir(Ir::Subc(
+        ty,
+        Operand::gpr(ty, rn),
+        Operand::gpr(ty, rm),
+    ));
+
+    let ir = Ir::If(
+        Type::U64,
+        condition_holds(operand.cond),
+        Operand::ir(Ir::Or(
+            Type::U64,
+            Operand::ir(Ir::BitCast(Type::U64, subc)),
+            Operand::Flag,
+        )),
+        Operand::ir(replace_bits(
+            Operand::Flag,
+            operand.nzcv as u64,
+            Pstate::NZCV.range(),
+        )),
+    );
+    let ds = BlockDestination::Flags;
 
     block.append(ir, ds);
 

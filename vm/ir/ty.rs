@@ -98,6 +98,7 @@ impl Type {
             2 => Type::U16,
             4 => Type::U32,
             8 => Type::U64,
+            16 => Type::Vec(VecType::U64, 2),
             _ => unreachable!("Invalid size: {}", size),
         }
     }
