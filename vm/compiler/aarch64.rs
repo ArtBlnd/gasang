@@ -65,7 +65,9 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::LdrImm32(operand) => gen_ldr_imm(self, operand, Type::U32),
             AArch64Instr::LdrImm64(operand) => gen_ldr_imm(self, operand, Type::U64),
             AArch64Instr::LdrImmSimdFP64(operand) => gen_ldr_imm_simd_fp(self, operand, Type::U64),
-            AArch64Instr::LdrImmSimdFP128(operand) => gen_ldr_imm_simd_fp(self, operand, Type::Vec(VecType::U64, 2)),
+            AArch64Instr::LdrImmSimdFP128(operand) => {
+                gen_ldr_imm_simd_fp(self, operand, Type::Vec(VecType::U64, 2))
+            }
             AArch64Instr::LdrLitVar64(operand) => gen_ldr_lit_var64(self, operand),
             AArch64Instr::LdrhImm(operand) => gen_ldrh_imm(self, operand),
             AArch64Instr::LdrbImm(operand) => gen_ldrb_imm(self, operand),
@@ -77,7 +79,9 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::LdrshReg32(operand) => gen_ldrsh_reg(self, operand, Type::U32),
             AArch64Instr::LdaxrVar32(operand) => gen_ldaxr(self, operand, Type::U32),
             AArch64Instr::LdarVar64(operand) => gen_ldar(self, operand, Type::U64),
-            AArch64Instr::LdpSimdFpVar128(operand) => gen_ldp_simd_fp(self, operand, Type::Vec(VecType::U64, 2)),
+            AArch64Instr::LdpSimdFpVar128(operand) => {
+                gen_ldp_simd_fp(self, operand, Type::Vec(VecType::U64, 2))
+            }
 
             AArch64Instr::StrImm32(operand) => gen_str_imm(self, operand, Type::U32),
             AArch64Instr::StrImm64(operand) => gen_str_imm(self, operand, Type::U64),
@@ -124,12 +128,16 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::SubsShiftedReg64(operand) => {
                 gen_subs_shifted_reg(self, operand, Type::U64)
             }
+            AArch64Instr::SubsExtReg64(operand) => gen_subs_ext_reg(self, operand, Type::U64),
             AArch64Instr::SubsImm64(operand) => gen_subs_imm(self, operand, Type::U64),
             AArch64Instr::SubsImm32(operand) => gen_subs_imm(self, operand, Type::U32),
             AArch64Instr::Madd32(operand) => gen_madd(self, operand, Type::U32),
             AArch64Instr::Madd64(operand) => gen_madd(self, operand, Type::U64),
-            AArch64Instr::SdivVar32(operand) => gen_div(self, operand, Type::I32),
             AArch64Instr::Msub32(operand) => gen_msub(self, operand, Type::U32),
+            AArch64Instr::SdivVar32(operand) => gen_div(self, operand, Type::I32),
+            AArch64Instr::SdivVar64(operand) => gen_div(self, operand, Type::I64),
+            AArch64Instr::UdivVar32(operand) => gen_div(self, operand, Type::U32),
+            AArch64Instr::UdivVar64(operand) => gen_div(self, operand, Type::U64),
 
             // bitwise isntructions
             AArch64Instr::Ubfm32(operand) => gen_ubfm(self, operand, Type::U32),
@@ -179,7 +187,6 @@ impl Compiler for AArch64Compiler {
             // Speical instructions
             AArch64Instr::Mrs(operand) => gen_mrs(self, operand),
             AArch64Instr::MsrReg(operand) => gen_msr_reg(self, operand),
-            AArch64Instr::MsrImm(operand) => gen_msr_imm(self, operand),
             AArch64Instr::Nop | AArch64Instr::Wfi | AArch64Instr::Dmb(_) => {
                 let mut block = IrBlock::new(4);
 
@@ -532,8 +539,7 @@ fn gen_subs_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty
 
     let rn = if operand.rn == 31 {
         Operand::imm(ty, 0)
-    }
-    else {
+    } else {
         Operand::gpr(ty, compiler.gpr(operand.rn))
     };
     let rm = compiler.gpr(operand.rm);
@@ -1995,7 +2001,6 @@ fn gen_ldar(compiler: &AArch64Compiler, operand: RsRt2RnRt, ty: Type) -> IrBlock
     block
 }
 
-
 fn gen_ldp_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
@@ -2010,7 +2015,11 @@ fn gen_ldp_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Ty
     let offset = sign_extend(operand.imm7 as i64, 7) << scale;
 
     let addr = if !post_index {
-        Operand::ir(Ir::Add(Type::U64, Operand::Gpr(Type::U64, src), Operand::imm(Type::I64, offset as u64)))
+        Operand::ir(Ir::Add(
+            Type::U64,
+            Operand::Gpr(Type::U64, src),
+            Operand::imm(Type::I64, offset as u64),
+        ))
     } else {
         Operand::Gpr(Type::U64, src)
     };
@@ -2019,8 +2028,12 @@ fn gen_ldp_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Ty
     let ds = BlockDestination::Fpr(ty, compiler.fpr(operand.rt));
     block.append(ir, ds);
 
-    let addr =  Operand::ir(Ir::Add(Type::U64, addr, Operand::imm(Type::I64, ty.size() as u64)));
-    
+    let addr = Operand::ir(Ir::Add(
+        Type::U64,
+        addr,
+        Operand::imm(Type::I64, ty.size() as u64),
+    ));
+
     let ir = Ir::Load(ty, addr);
     let ds = BlockDestination::Fpr(ty, compiler.fpr(operand.rt2));
     block.append(ir, ds);
@@ -2038,7 +2051,29 @@ fn gen_ldp_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegPair, ty: Ty
 
     block
 }
-fn gen_msr_imm(compiler: &AArch64Compiler, operand: PstateOp) -> IrBlock {
+
+fn gen_subs_ext_reg(compiler: &AArch64Compiler, operand: AddSubtractExtReg, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
+
+    let ext_type = decode_reg_extend(operand.option);
+    let op1 = if operand.rn == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rn)
+    };
+    let op1 = Operand::gpr(ty, op1);
+
+    let op2 = extend_reg(compiler.gpr(operand.rm), ext_type, operand.imm3 as u8, ty.size() as u8);
+    let op2 = Operand::ir(op2);
+
+    let ir = Ir::Subc(ty, op1, op2);
+    let ds = if operand.rd == 31 {
+        BlockDestination::None
+    } else {
+        BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd))
+    };
+
+    block.append(ir, ds);
+
     block
 }

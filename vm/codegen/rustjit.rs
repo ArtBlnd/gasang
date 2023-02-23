@@ -811,9 +811,7 @@ unsafe fn gen_load(
             let mut mem = ctx.mem(*var.u64_mut());
 
             let mut value = Value::new(16);
-            value.u64x2_mut()[0] = mem.read_u64().unwrap();
-            mem.consume(8);
-            value.u64x2_mut()[1] = mem.read_u64().unwrap();
+            mem.read(value.u8_slice_mut()).unwrap();
 
             value
         }),

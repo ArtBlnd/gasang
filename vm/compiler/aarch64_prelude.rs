@@ -2,6 +2,8 @@ use std::ops::Range;
 
 use crate::ir::*;
 use crate::register::RegId;
+
+use machineinstr::aarch64::OpcSizeImm12RnRt;
 use utility::*;
 
 pub enum Pstate {
@@ -99,7 +101,7 @@ pub fn decode_shift(shift: u8) -> ShiftType {
 }
 
 pub const fn decode_operand_for_ld_st_reg_imm(
-    operand: machineinstr::aarch64::OpcSizeImm12RnRt,
+    operand: OpcSizeImm12RnRt,
     is_simd_fp: bool,
 ) -> (bool, bool, u8, i64) {
     let opc1 = (operand.opc & 0b10) >> 1;

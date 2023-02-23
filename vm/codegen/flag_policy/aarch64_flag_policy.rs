@@ -152,8 +152,6 @@ impl FlagPolicy for AArch64FlagPolicy {
 
         let (n, z, c, v): (u64, u64, u64, u64) = (n.into(), z.into(), c.into(), v.into());
 
-        println!("nzcv: {n} {z} {c} {v}");
-
         vm.del_flag(Pstate::NZCV.mask());
         vm.add_flag(
             n << Pstate::N.idx()

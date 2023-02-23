@@ -119,10 +119,6 @@ pub unsafe fn handle_syscall(nr: u64, args: [u64; 6], vm: &mut Cpu) {
             let flags = args[3];
             let fd = args[4];
             let offset = args[5];
-            println!(
-                "mmap: addr: {:#x} len: {:#x} prot: {:#x} flags: {:#x} fd: {:#x} offset: {:#x}",
-                addr, len, prot, flags, fd, offset
-            );
 
             let addr = 0x8000_0000_0000_0000;
             vm.mmu().mmap(addr, PAGE_SIZE, true, true, true);
