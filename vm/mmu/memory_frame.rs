@@ -34,7 +34,7 @@ impl MemoryFrame {
                 } => {
                     // Check if the page is readable
                     if !readable {
-                        return Err(MMUError::AccessViolation);
+                        return Err(MMUError::AccessViolation(addr));
                     }
 
                     let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
@@ -64,7 +64,7 @@ impl MemoryFrame {
                 } => {
                     // Check if the page is writable
                     if !writable {
-                        return Err(MMUError::AccessViolation);
+                        return Err(MMUError::AccessViolation(addr));
                     }
 
                     let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };

@@ -8,8 +8,8 @@ pub enum MMUError {
     #[error("Page already mapped")]
     PageAlreadyMapped,
 
-    #[error("Access violation")]
-    AccessViolation,
+    #[error("Access violation: {0:016x}")]
+    AccessViolation(u64),
 
     #[error("Page fault: {0:016x}")]
     PageFault(u64),
