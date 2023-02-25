@@ -16,7 +16,6 @@ pub enum BlockDestination {
     MemoryRelU64(Type, RegId, u64),
     MemoryIr(Ir),
     None,
-    SystemCall,
     Exit,
 }
 
@@ -54,7 +53,6 @@ impl IrBlock {
             BlockDestination::MemoryRelU64(ty, _, _) => Some(ty),
             BlockDestination::MemoryIr(_) => None,
             BlockDestination::None => None,
-            BlockDestination::SystemCall => Some(&Type::U64),
             BlockDestination::Exit => None,
             _ => unreachable!(),
         };

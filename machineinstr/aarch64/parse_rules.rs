@@ -1040,13 +1040,13 @@ fn parse_cond_sel(raw_instr: u32) -> AArch64Instr {
 
                 match (sf_op_s.value, op2.value) {
                     (0b000, 0b00) => AArch64Instr::Csel32(data),
-                    (0b000, 0b01) => AArch64Instr::Csel32(data),
-                    (0b010, 0b00) => AArch64Instr::Csel32(data),
-                    (0b010, 0b01) => AArch64Instr::Csel32(data),
-                    (0b100, 0b00) => AArch64Instr::Csel32(data),
-                    (0b100, 0b01) => AArch64Instr::Csel32(data),
-                    (0b110, 0b00) => AArch64Instr::Csel32(data),
-                    (0b110, 0b01) => AArch64Instr::Csel32(data),
+                    (0b000, 0b01) => AArch64Instr::Csinc32(data),
+                    (0b010, 0b00) => AArch64Instr::Csinv32(data),
+                    (0b010, 0b01) => AArch64Instr::Csneg32(data),
+                    (0b100, 0b00) => AArch64Instr::Csel64(data),
+                    (0b100, 0b01) => AArch64Instr::Csinc64(data),
+                    (0b110, 0b00) => AArch64Instr::Csinv64(data),
+                    (0b110, 0b01) => AArch64Instr::Csneg64(data),
                     _ => todo!("Unknown instruction {:032b}", raw_instr),
                 }
             },

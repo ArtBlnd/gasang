@@ -4,7 +4,6 @@ use crate::codegen::{codegen_block_dest, Codegen, CompiledBlock, Executable};
 use crate::compiler::Compiler;
 use crate::cpu::Cpu;
 use crate::error::{CompileError, Error};
-use crate::interrupt::InterruptModel;
 use crate::ir::{BlockDestination, IrBlock};
 use crate::mmu::MemoryFrame;
 
@@ -12,30 +11,27 @@ use machineinstr::{MachineInstParser, MachineInstrParserRule};
 
 use utility::BitReader;
 
-pub struct Engine<C, R, M, G> {
+pub struct Engine<C, R, G> {
     compiler: C,
     parse_rule: R,
-    interrupt_model: M,
 
     codegen: G,
 }
 
-impl<C, R, M, G> Engine<C, R, M, G> {
-    pub fn new(compiler: C, parse_rule: R, interrupt_model: M, codegen: G) -> Self {
+impl<C, R, G> Engine<C, R, G> {
+    pub fn new(compiler: C, parse_rule: R, codegen: G) -> Self {
         Self {
             compiler,
             parse_rule,
-            interrupt_model,
             codegen,
         }
     }
 }
 
-impl<C, R, M, G> Engine<C, R, M, G>
+impl<C, R, G> Engine<C, R, G>
 where
     C: Compiler,
     R: MachineInstrParserRule<MachineInstr = C::Item>,
-    M: InterruptModel,
     G: Codegen,
 
     G::Code: 'static,
@@ -62,6 +58,8 @@ where
         static mut STEP: bool = true;
 
         loop {
+            vm_state.dump();
+
             assert!(!compiled.is_empty());
             for code in compiled {
                 // if STEP {
@@ -70,10 +68,8 @@ where
                 //    std::io::stdin().read_line(&mut String::new());
                 // }
 
-                code.execute(vm_state, &self.interrupt_model);
+                code.execute(vm_state);
             }
-
-            vm_state.dump();
 
             let next_frame = vm_state.mem(vm_state.ip());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
@@ -145,13 +141,7 @@ where
         let last_dest = block.items().last().unwrap().dest().clone();
         results.push(block);
 
-        if let BlockDestination::Ip = last_dest {
-            break;
-        }
-
-        if let BlockDestination::Exit = last_dest {
-            break;
-        }
+        break;
     }
 
     Ok(results)

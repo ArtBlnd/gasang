@@ -6,8 +6,6 @@ use vm::compiler::aarch64::AArch64Compiler;
 use vm::engine::Engine;
 use vm::Cpu;
 
-use vm::interrupt::AArch64UnixInterruptModel;
-
 use std::path::PathBuf;
 
 fn main() {
@@ -17,13 +15,12 @@ fn main() {
 
     let image = std::fs::read(PathBuf::from(filename)).unwrap();
 
-    let mut cpu = Cpu::new(vm::cpu::Architecture::AArch64Elf, &image);
+    let mut cpu = Cpu::new(vm::cpu::Architecture::AArch64Bin, &image);
     let compiler = AArch64Compiler::new(cpu.get_register_info());
 
-    let mut engine = Engine::new(
+    let engine = Engine::new(
         compiler,
         AArch64InstrParserRule,
-        AArch64UnixInterruptModel,
         InterpretCodegen::new(AArch64FlagPolicy),
     );
 

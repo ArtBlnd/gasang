@@ -1,12 +1,11 @@
 use crate::codegen::*;
-use crate::interrupt::InterruptModel;
 use crate::ir::{BlockDestination, Type, VecType};
 use crate::register::RegId;
 use crate::value::Value;
 use crate::Cpu;
 
 pub trait CompiledBlockDestinationTrait {
-    unsafe fn reflect(&self, val: Value, vm: &mut Cpu, interrupt_mode: &dyn InterruptModel);
+    unsafe fn reflect(&self, val: Value, vm: &mut Cpu);
     fn is_dest_ip_or_exit(&self) -> bool {
         false
     }
@@ -37,21 +36,20 @@ where
             Box::new(StoreMemoryIr(ty, compiled_ir))
         }
         BlockDestination::None => Box::new(NoneDest),
-        BlockDestination::SystemCall => Box::new(SystemCall),
         BlockDestination::Exit => Box::new(Exit),
     }
 }
 
 struct SetFlags;
 impl CompiledBlockDestinationTrait for SetFlags {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         vm.set_flag(*val.u64_mut());
     }
 }
 
 struct SetIp;
 impl CompiledBlockDestinationTrait for SetIp {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         vm.set_ip(*val.u64_mut());
     }
 
@@ -61,7 +59,7 @@ impl CompiledBlockDestinationTrait for SetIp {
 }
 struct SetGpr(Type, RegId);
 impl CompiledBlockDestinationTrait for SetGpr {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         let gpr = vm.gpr_mut(self.1);
         match self.0 {
             Type::U8 | Type::I8 => *gpr.u8_mut() = *val.u8_mut(),
@@ -75,7 +73,7 @@ impl CompiledBlockDestinationTrait for SetGpr {
 
 struct SetFpr(Type, RegId);
 impl CompiledBlockDestinationTrait for SetFpr {
-    unsafe fn reflect(&self, val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, val: Value, vm: &mut Cpu) {
         let fpr = vm.fpr_mut(self.1);
         match self.0 {
             Type::U8 | Type::I8 => *fpr.u8_mut() = val.u8(),
@@ -92,7 +90,7 @@ impl CompiledBlockDestinationTrait for SetFpr {
 
 struct SetSys(Type, RegId);
 impl CompiledBlockDestinationTrait for SetSys {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         let sys = vm.sys_mut(self.1);
         match self.0 {
             Type::U8 | Type::I8 => *sys.u8_mut() = *val.u8_mut(),
@@ -106,7 +104,7 @@ impl CompiledBlockDestinationTrait for SetSys {
 
 struct SetMemory(Type, u64);
 impl CompiledBlockDestinationTrait for SetMemory {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         match self.0 {
             Type::U8 | Type::I8 => vm.mem(self.1).write_u8(*val.u8_mut()),
             Type::U16 | Type::I16 => vm.mem(self.1).write_u16(*val.u16_mut()),
@@ -123,7 +121,7 @@ impl CompiledBlockDestinationTrait for SetMemory {
 
 struct SetMemoryI64(Type, RegId, i64);
 impl CompiledBlockDestinationTrait for SetMemoryI64 {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         let (addr, of) = vm.gpr(self.1).u64().overflowing_add_signed(self.2);
         assert_eq!(of, false);
 
@@ -143,7 +141,7 @@ impl CompiledBlockDestinationTrait for SetMemoryI64 {
 
 struct StoreMemoryIr(Type, Box<dyn CompiledCode>);
 impl CompiledBlockDestinationTrait for StoreMemoryIr {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         let addr = unsafe { *self.1.execute(vm).u64_mut() };
 
         match self.0 {
@@ -162,19 +160,12 @@ impl CompiledBlockDestinationTrait for StoreMemoryIr {
 
 struct NoneDest;
 impl CompiledBlockDestinationTrait for NoneDest {
-    unsafe fn reflect(&self, _: Value, _: &mut Cpu, _: &dyn InterruptModel) {}
-}
-
-struct SystemCall;
-impl CompiledBlockDestinationTrait for SystemCall {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, interrupt_model: &dyn InterruptModel) {
-        interrupt_model.syscall(*val.u64_mut(), vm)
-    }
+    unsafe fn reflect(&self, _: Value, _: &mut Cpu) {}
 }
 
 struct Exit;
 impl CompiledBlockDestinationTrait for Exit {
-    unsafe fn reflect(&self, _: Value, _: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, _: Value, _: &mut Cpu) {
         panic!("exit");
     }
 
@@ -185,7 +176,7 @@ impl CompiledBlockDestinationTrait for Exit {
 
 struct SetFprSlot(Type, RegId, u8);
 impl CompiledBlockDestinationTrait for SetFprSlot {
-    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu, _: &dyn InterruptModel) {
+    unsafe fn reflect(&self, mut val: Value, vm: &mut Cpu) {
         let fpr = vm.fpr_mut(self.1);
 
         match self.0 {

@@ -218,7 +218,7 @@ pub fn shift_reg(reg: Operand, shift_type: ShiftType, amount: Operand, t: Type) 
 }
 
 pub const fn highest_set_bit(x: u64) -> u64 {
-    63 - x.leading_zeros() as u64
+    (63 - x.leading_zeros()) as u64
 }
 
 pub const fn ones(n: u64) -> u64 {
@@ -226,13 +226,20 @@ pub const fn ones(n: u64) -> u64 {
 }
 
 pub const fn ror(x: u64, shift: u64, size: u64) -> u64 {
-    let m = shift % size;
-    x >> m | ((x.overflowing_shl((size - m) as u32).0) & ones(shift))
+    let shift = shift % size;
+    let mask = replicate(1, shift, 1);
+    let shifted = x.overflowing_shr(shift as u32).0;
+    let rotated = x.overflowing_shl((size - shift) as u32).0;
+    (shifted & mask) | rotated
 }
 
 pub const fn replicate(x: u64, n: u64, size: u64) -> u64 {
     let mut result = 0b0u64;
     let mut i = n;
+
+    if n <= 1 {
+        return x;
+    }
 
     while i > 0 {
         result = result.overflowing_shl(size as u32).0;
@@ -257,7 +264,7 @@ pub fn replicate_reg64(val: RegId, n: u8) -> Ir {
     )
 }
 
-pub const fn decode_bit_masks(immn: u8, imms: u8, immr: u8, immediate: bool, m: u8) -> (u64, u64) {
+pub fn decode_bit_masks(immn: u8, imms: u8, immr: u8, immediate: bool, m: u8) -> (u64, u64) {
     let len = highest_set_bit(((immn << 6) as u16 | extract_bits16(0..6, !imms as u16)) as u64);
     assert!(len >= 1, "UNDEFINED");
     assert!(m >= (1 << len), "UNDEFINED");
@@ -279,8 +286,10 @@ pub const fn decode_bit_masks(immn: u8, imms: u8, immr: u8, immediate: bool, m: 
     let welem = ones(s as u64 + 1);
     let telem = ones(d as u64 + 1);
 
-    let wmask = replicate(ror(welem, r as u64, esize), m as u64, esize);
-    let tmask = replicate(telem, m as u64, esize);
+    let ror = ror(welem, r as u64, esize);
+
+    let wmask = replicate(ror, (m / (s + 1)) as u64, esize);
+    let tmask = replicate(telem, (m / (r + 1)) as u64, esize);
 
     (wmask, tmask)
 }

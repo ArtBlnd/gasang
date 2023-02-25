@@ -1,5 +1,4 @@
 use crate::codegen::{CompiledBlockDestination, CompiledCode, Executable};
-use crate::interrupt::InterruptModel;
 use crate::ir::BlockDestination;
 use crate::Cpu;
 
@@ -41,12 +40,12 @@ impl<C> Executable for CompiledBlock<C>
 where
     C: CompiledCode,
 {
-    unsafe fn execute(&self, vm: &mut Cpu, interrupt_mode: &dyn InterruptModel) {
+    unsafe fn execute(&self, vm: &mut Cpu) {
         for code in &self.code {
             let CompiledBlockItem { code, dest } = code;
 
             let val = code.execute(vm);
-            dest.reflect(val, vm, interrupt_mode);
+            dest.reflect(val, vm);
             if dest.is_dest_ip_or_exit() {
                 return;
             }
