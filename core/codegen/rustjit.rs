@@ -201,7 +201,7 @@ unsafe fn compile_op(
                 Type::U8 | Type::I8 => Value::from_u8(imm as u8),
                 Type::U16 | Type::I16 => Value::from_u16(imm as u16),
                 Type::U32 | Type::I32 => Value::from_u32(imm as u32),
-                Type::U64 | Type::I64 => Value::from_u64(imm as u64),
+                Type::U64 | Type::I64 => Value::from_u64(imm),
                 _ => unreachable!("Invalid type"),
             })
         }
@@ -236,7 +236,7 @@ unsafe fn compile_op(
             Box::new(move |ctx| {
                 let val = op(ctx);
                 println!("{s}, {:x}", val.u64());
-                val.into()
+                val
             })
         }
     })
@@ -593,28 +593,28 @@ unsafe fn gen_lshl(
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u8_mut() <<= rhs.u8();
             lhs
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u16_mut() <<= rhs.u16();
             lhs
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u32_mut() <<= rhs.u32();
             lhs
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u64_mut() <<= rhs.u64();
             lhs
@@ -635,28 +635,28 @@ unsafe fn gen_lshr(
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u8_mut() >>= rhs.u8();
             lhs
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u16_mut() >>= rhs.u16();
             lhs
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u32_mut() >>= rhs.u32();
             lhs
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u64_mut() >>= rhs.u64();
             lhs
@@ -680,56 +680,56 @@ unsafe fn gen_ashr(
     Ok(match t {
         Type::U8 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u8_mut() >>= rhs.u8();
             lhs
         }),
         Type::U16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u16_mut() >>= rhs.u16();
             lhs
         }),
         Type::U32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u32_mut() >>= rhs.u32();
             lhs
         }),
         Type::U64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.u64_mut() >>= rhs.u64();
             lhs
         }),
         Type::I8 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.i8_mut() >>= rhs.u8();
             lhs
         }),
         Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.i16_mut() >>= rhs.u16();
             lhs
         }),
         Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.i32_mut() >>= rhs.u32();
             lhs
         }),
         Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             *lhs.i64_mut() >>= rhs.u64();
             lhs
@@ -753,25 +753,25 @@ unsafe fn gen_rotr(
     Ok(match t {
         Type::U8 | Type::I8 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             lhs.u8_mut().rotate_right(rhs.u8() as u32).into()
         }),
         Type::U16 | Type::I16 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             lhs.u16_mut().rotate_right(rhs.u16() as u32).into()
         }),
         Type::U32 | Type::I32 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             lhs.u32_mut().rotate_right(rhs.u32()).into()
         }),
         Type::U64 | Type::I64 => Box::new(move |ctx| {
             let mut lhs = lhs(ctx);
-            let mut rhs = rhs(ctx);
+            let rhs = rhs(ctx);
 
             lhs.u64_mut().rotate_right(rhs.u64() as u32).into()
         }),

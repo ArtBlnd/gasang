@@ -19,25 +19,19 @@ impl AArch64Compiler {
         }
     }
     pub fn gpr(&self, index: u8) -> RegId {
-        self.register_info
-            .get(&format!("x{}", index))
-            .unwrap()
-            .clone()
+        *self.register_info.get(&format!("x{}", index)).unwrap()
     }
 
     pub fn fpr(&self, index: u8) -> RegId {
-        self.register_info
-            .get(&format!("v{}", index))
-            .unwrap()
-            .clone()
+        *self.register_info.get(&format!("v{}", index)).unwrap()
     }
 
     pub fn stack_reg(&self) -> RegId {
-        self.register_info.get("sp").unwrap().clone()
+        *self.register_info.get("sp").unwrap()
     }
 
     pub fn reg_by_name(&self, name: impl AsRef<str>) -> RegId {
-        self.register_info.get(name.as_ref()).unwrap().clone()
+        *self.register_info.get(name.as_ref()).unwrap()
     }
 }
 
@@ -678,7 +672,7 @@ fn gen_b_cond(_compiler: &AArch64Compiler, operand: Imm19Cond) -> IrBlock {
     let ir = Ir::If(
         Type::U64,
         condition_holds(operand.cond),
-        Operand::ir(gen_ip_relative(offset as i64)),
+        Operand::ir(gen_ip_relative(offset)),
         Operand::ir(gen_ip_relative(4)),
     );
     let ds = BlockDestination::Ip;
@@ -793,7 +787,7 @@ fn gen_csel(compiler: &AArch64Compiler, operand: RmCondRnRd, ty: Type) -> IrBloc
     block
 }
 
-fn gen_svc(_compiler: &AArch64Compiler, operand: ExceptionGen) -> IrBlock {
+fn gen_svc(_compiler: &AArch64Compiler, _operand: ExceptionGen) -> IrBlock {
     todo!()
 }
 
@@ -1720,7 +1714,7 @@ fn gen_movi(compiler: &AArch64Compiler, operand: AdvSimdModifiedImm) -> IrBlock 
         | operand.h;
     let imm64 = adv_simd_exapnd_imm(0b1, operand.cmode, abcdefgh);
 
-    let rep_cnt = (datasize / 64) as usize;
+    let rep_cnt = datasize / 64;
     let imm = if rep_cnt == 1 {
         Value::from_u64(imm64)
     } else {
@@ -2089,7 +2083,7 @@ fn gen_subs_ext_reg(compiler: &AArch64Compiler, operand: AddSubtractExtReg, ty: 
     let op2 = extend_reg(
         compiler.gpr(operand.rm),
         ext_type,
-        operand.imm3 as u8,
+        operand.imm3,
         ty.size() as u8,
     );
     let op2 = Operand::ir(op2);

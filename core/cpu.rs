@@ -4,8 +4,6 @@ use crate::register::*;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use elf::abi::{PF_R, PF_W, PF_X, SHF_EXECINSTR, SHF_WRITE};
-use elf::endian::AnyEndian;
 use slab::Slab;
 
 pub struct Cpu {

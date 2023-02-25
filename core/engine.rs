@@ -130,7 +130,7 @@ where
         let block = compiler.compile(instr.op);
         let last_dest = block.items().last().unwrap().dest().clone();
         results.push(block);
-        
+
         if let BlockDestination::Exit | BlockDestination::Ip = last_dest {
             break;
         }

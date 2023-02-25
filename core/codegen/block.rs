@@ -1,5 +1,5 @@
 use crate::codegen::{CompiledBlockDestination, CompiledCode, Executable};
-use crate::ir::BlockDestination;
+
 use crate::Cpu;
 
 use smallvec::SmallVec;
