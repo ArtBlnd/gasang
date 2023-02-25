@@ -44,6 +44,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "core"
+version = "0.1.0"
+dependencies = [
+ "cranelift",
+ "elf",
+ "machineinstr",
+ "num-traits",
+ "slab",
+ "smallvec",
+ "thiserror",
+ "thread_local",
+ "utility",
+]
+
+[[package]]
 name = "cranelift"
 version = "0.92.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -126,10 +141,10 @@ checksum = "72101dd1f441d629735143c41e00b3428f9267738176983ef588ff43382af0a0"
 name = "driver"
 version = "0.1.0"
 dependencies = [
+ "core",
  "elf",
  "machineinstr",
  "tracing",
- "vm",
 ]
 
 [[package]]
@@ -394,21 +409,6 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "virtio"
 version = "0.1.0"
-
-[[package]]
-name = "vm"
-version = "0.1.0"
-dependencies = [
- "cranelift",
- "elf",
- "machineinstr",
- "num-traits",
- "slab",
- "smallvec",
- "thiserror",
- "thread_local",
- "utility",
-]
 
 [[package]]
 name = "wasi"

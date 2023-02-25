@@ -11,5 +11,5 @@ elf = "0.7.1"
 
 machineinstr = { path = "../machineinstr" }
 tracing = "0.1.37"
-vm = { version = "0.1.0", path = "../vm" }
+core = { version = "0.1.0", path = "../core" }
 

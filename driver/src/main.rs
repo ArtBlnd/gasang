@@ -1,10 +1,10 @@
 use machineinstr::aarch64::AArch64InstrParserRule;
 
-use vm::codegen::flag_policy::AArch64FlagPolicy;
-use vm::codegen::rustjit::InterpretCodegen;
-use vm::compiler::aarch64::AArch64Compiler;
-use vm::engine::Engine;
-use vm::Cpu;
+use core::codegen::flag_policy::AArch64FlagPolicy;
+use core::codegen::rustjit::InterpretCodegen;
+use core::compiler::aarch64::AArch64Compiler;
+use core::engine::Engine;
+use core::Cpu;
 
 use std::path::PathBuf;
 
@@ -15,7 +15,7 @@ fn main() {
 
     let image = std::fs::read(PathBuf::from(filename)).unwrap();
 
-    let mut cpu = Cpu::new(vm::cpu::Architecture::AArch64Bin, &image);
+    let mut cpu = Cpu::new(core::cpu::Architecture::AArch64Bin, &image);
     let compiler = AArch64Compiler::new(cpu.get_register_info());
 
     let engine = Engine::new(

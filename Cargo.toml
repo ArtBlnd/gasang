@@ -3,11 +3,7 @@
 members = [
     "machineinstr",
     "driver",
-    "vm",
+    "core",
     "utility",
     "virtio"
-]
-
-exclude = [
-    "examples"
 ]
