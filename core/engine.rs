@@ -55,19 +55,9 @@ where
 
         let mut compiled = codegen_ir_blocks(ep_block, &self.codegen);
 
-        static mut STEP: bool = true;
-
         loop {
-            vm_state.dump();
-
             assert!(!compiled.is_empty());
             for code in compiled {
-                // if STEP {
-                //    STEP = true;
-                //    vm_state.dump();
-                //    std::io::stdin().read_line(&mut String::new());
-                // }
-
                 code.execute(vm_state);
             }
 
@@ -140,8 +130,10 @@ where
         let block = compiler.compile(instr.op);
         let last_dest = block.items().last().unwrap().dest().clone();
         results.push(block);
-
-        break;
+        
+        if let BlockDestination::Exit | BlockDestination::Ip = last_dest {
+            break;
+        }
     }
 
     Ok(results)
