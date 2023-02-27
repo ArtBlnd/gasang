@@ -1,4 +1,4 @@
-use crate::softmmu::HostMemory;
+use crate::softmmu::{HostMemory, PAGE_SIZE};
 
 #[derive(Debug, Clone)]
 pub enum Page {
@@ -47,10 +47,17 @@ impl PageTable {
     }
 
     fn as_offset(addr: u64) -> (usize, usize, usize, usize) {
-        let d3_offset = ((addr & 0xFFF0_0000_0000_0000) >> 52) as usize;
-        let d2_offset = ((addr & 0x000F_FF00_0000_0000) >> 40) as usize;
-        let d1_offset = ((addr & 0x0000_00FF_F000_0000) >> 28) as usize;
-        let pg_offset = ((addr & 0x0000_0000_0FFF_F000) >> 12) as usize;
+        const D3_MASK: u64 = 0xFFF0_0000_0000_0000;
+        const D2_MASK: u64 = 0x000F_FF00_0000_0000;
+        const D1_MASK: u64 = 0x0000_00FF_F000_0000;
+        const PG_MASK: u64 = 0x0000_0000_0FFF_F000;
+        let d3_offset = ((addr & D3_MASK) >> 52) as usize;
+        let d2_offset = ((addr & D2_MASK) >> 40) as usize;
+        let d1_offset = ((addr & D1_MASK) >> 28) as usize;
+        let pg_offset = ((addr & PG_MASK) >> 12) as usize;
+
+        assert_eq!(D3_MASK | D2_MASK | D1_MASK | PG_MASK | (PAGE_SIZE-1), u64::MAX);
+        assert_eq!(D3_MASK & D2_MASK & D1_MASK & PG_MASK & (PAGE_SIZE-1), 0);
 
         (d3_offset, d2_offset, d1_offset, pg_offset)
     }

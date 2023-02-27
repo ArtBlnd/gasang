@@ -74,7 +74,7 @@ where
 
     pub unsafe fn run_inner(&self, ctx: &mut ExecutionContext) -> Result<Infallible, Error> {
         // get entrypoint memory frame and compile it.
-        let ep_frame = ctx.mmu.frame(ctx.cpu.ip());
+        let ep_frame = ctx.mmu.frame(ctx.cpu.pc());
         let ep_block = self.compile_until_branch_or_eof(ep_frame)?;
 
         let mut compiled = codegen_ir_blocks(ep_block, &self.ir_cgen);
@@ -85,7 +85,7 @@ where
                 code.execute(ctx);
             }
 
-            let next_frame = ctx.mmu.frame(ctx.cpu.ip());
+            let next_frame = ctx.mmu.frame(ctx.cpu.pc());
             let next_block = self.compile_until_branch_or_eof(next_frame)?;
 
             compiled = codegen_ir_blocks(next_block, &self.ir_cgen);
@@ -136,7 +136,7 @@ where
         let last_dest = block.items().last().unwrap().dest().clone();
         results.push(block);
 
-        if let BlockDestination::Exit | BlockDestination::Ip = last_dest {
+        if let BlockDestination::Exit | BlockDestination::Pc = last_dest {
             break;
         }
     }

@@ -635,7 +635,7 @@ fn gen_bl_imm(compiler: &AArch64Compiler, operand: Imm26) -> IrBlock {
     let imm = sign_extend((operand.imm26 << 2) as i64, 28);
 
     let ir = gen_ip_relative(imm);
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -648,7 +648,7 @@ fn gen_b_imm(_compiler: &AArch64Compiler, operand: Imm26) -> IrBlock {
     let imm = sign_extend((operand.imm26 << 2) as i64, 28);
 
     let ir = gen_ip_relative(imm);
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -659,7 +659,7 @@ fn gen_br(compiler: &AArch64Compiler, operand: UncondBranchReg) -> IrBlock {
     let mut block = IrBlock::new(4);
 
     let ir = Ir::Value(Operand::gpr(Type::U64, compiler.gpr(operand.rn)));
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -676,7 +676,7 @@ fn gen_b_cond(_compiler: &AArch64Compiler, operand: Imm19Cond) -> IrBlock {
         Operand::ir(gen_ip_relative(offset)),
         Operand::ir(gen_ip_relative(4)),
     );
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -700,7 +700,7 @@ fn gen_cbz(compiler: &AArch64Compiler, operand: Imm19Rt, ty: Type) -> IrBlock {
         Operand::ir(gen_ip_relative(offset)),
         Operand::ir(gen_ip_relative(4)),
     );
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -724,7 +724,7 @@ fn gen_cbnz(compiler: &AArch64Compiler, operand: Imm19Rt, ty: Type) -> IrBlock {
         Operand::ir(gen_ip_relative(4)),
         Operand::ir(gen_ip_relative(offset)),
     );
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -909,7 +909,7 @@ fn gen_ret(compiler: &AArch64Compiler, operand: UncondBranchReg) -> IrBlock {
     let mut block = IrBlock::new(4);
 
     let ir = Ir::Value(Operand::gpr(Type::U64, compiler.gpr(operand.rn)));
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
     block.append(ir, ds);
 
     block
@@ -1100,7 +1100,7 @@ fn gen_blr(compiler: &AArch64Compiler, operand: UncondBranchReg) -> IrBlock {
     block.append(ir, ds);
 
     let ir = Ir::Value(Operand::Gpr(Type::U64, compiler.gpr(operand.rn)));
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -1259,7 +1259,7 @@ fn gen_tbz(compiler: &AArch64Compiler, operand: B5B40Imm14Rt) -> IrBlock {
         Operand::ir(gen_ip_relative(offs)),
         Operand::ir(gen_ip_relative(4)),
     );
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 
@@ -1291,7 +1291,7 @@ fn gen_tbnz(compiler: &AArch64Compiler, operand: B5B40Imm14Rt) -> IrBlock {
         Operand::ir(gen_ip_relative(4)),
         Operand::ir(gen_ip_relative(offs)),
     );
-    let ds = BlockDestination::Ip;
+    let ds = BlockDestination::Pc;
 
     block.append(ir, ds);
 

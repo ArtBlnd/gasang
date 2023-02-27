@@ -12,7 +12,7 @@ pub struct Cpu {
     reg_name_map: HashMap<String, RegId>,
 
     flags: AtomicU64,
-    ip: u64,
+    pc: u64,
 }
 
 impl Clone for Cpu {
@@ -24,7 +24,7 @@ impl Clone for Cpu {
             reg_name_map: self.reg_name_map.clone(),
 
             flags: AtomicU64::new(self.flags.load(Ordering::Relaxed)),
-            ip: self.ip,
+            pc: self.pc,
         }
     }
 }
@@ -32,7 +32,7 @@ impl Clone for Cpu {
 impl Cpu {
     pub fn new(arch: Architecture) -> Self {
         match arch {
-            Architecture::AArch64Bin => new_aarch64_bin(),
+            Architecture::AArch64Bin => init_base_aarch64_cpu(),
         }
     }
 
@@ -50,7 +50,7 @@ impl Cpu {
             reg_name_map,
 
             flags: AtomicU64::new(0),
-            ip: 0,
+            pc: 0,
         }
     }
 
@@ -92,12 +92,12 @@ impl Cpu {
         &mut self.sys_registers[id.0 as usize]
     }
 
-    pub fn ip(&self) -> u64 {
-        self.ip
+    pub fn pc(&self) -> u64 {
+        self.pc
     }
 
-    pub fn set_ip(&mut self, eip: u64) {
-        self.ip = eip;
+    pub fn set_pc(&mut self, pc: u64) {
+        self.pc = pc;
     }
 
     pub fn flag(&self) -> u64 {
@@ -146,19 +146,12 @@ impl Cpu {
     }
 
     pub fn dump_pc(&self) {
-        println!("{:14} 0x{:x}", "pc", self.ip);
+        println!("{:14} 0x{:x}", "pc", self.pc);
     }
 }
 
 pub enum Architecture {
     AArch64Bin,
-}
-
-fn new_aarch64_bin() -> Cpu {
-    let mut cpu = init_base_aarch64_cpu();
-
-    cpu.set_ip(0);
-    cpu
 }
 
 fn init_base_aarch64_cpu() -> Cpu {
@@ -168,7 +161,7 @@ fn init_base_aarch64_cpu() -> Cpu {
         sys_registers: Slab::new(),
         reg_name_map: HashMap::new(),
         flags: AtomicU64::new(0),
-        ip: 0,
+        pc: 0,
     };
 
     for i in 0..31 {

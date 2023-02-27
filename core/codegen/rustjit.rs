@@ -32,23 +32,30 @@ impl Codegen for InterpretCodegen {
     }
 
     fn compile_ir_block(&self, ir_block: &IrBlock) -> Self::ExecBlock {
+        let ip_inc = ir_block.original_size() as u64;
         let compile_results: SmallVec<[(FnExec<Value>, BlockDestination); 2]> = ir_block
             .items()
             .iter()
             .map(|item| (self.compile_ir(item.root()), item.dest().clone()))
             .collect();
 
-        FnExec::new(move |ctx| unsafe { execute(&compile_results, ctx) })
+        FnExec::new(move |ctx| unsafe { execute(&compile_results, ctx, ip_inc) })
     }
 }
 
 unsafe fn execute(
     code: &SmallVec<[(FnExec<Value>, BlockDestination); 2]>,
     ctx: &mut ExecutionContext,
+    ip_inc: u64,
 ) {
+    let mut ip_modified = false;
     for (exec, dest) in code {
         let val = unsafe { exec.execute(ctx) };
-        handle_block_dest(dest.clone(), val, ctx);
+        handle_block_dest(dest.clone(), val, ctx, &mut ip_modified);
+    }
+
+    if !ip_modified {
+        ctx.cpu.set_pc(ctx.cpu.pc() + ip_inc);
     }
 }
 
@@ -56,13 +63,15 @@ unsafe fn handle_block_dest<'a>(
     dest: BlockDestination,
     val: Value,
     ctx: &mut ExecutionContext<'a>,
+    ip_modified: &mut bool,
 ) {
     match dest {
         BlockDestination::Flags => {
             ctx.cpu.set_flag(val.u64());
         }
-        BlockDestination::Ip => {
-            ctx.cpu.set_ip(val.u64());
+        BlockDestination::Pc => {
+            ctx.cpu.set_pc(val.u64());
+            *ip_modified = true;
         }
         BlockDestination::None => { /* do nothing */ }
         BlockDestination::Gpr(ty, reg_id) => {
@@ -191,12 +200,12 @@ where
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::I64, imm)) => {
             let imm = *imm;
             return Ok(FnExec::new(move |ctx| {
-                (ctx.cpu.ip() as i64 + imm as i64).into()
+                (ctx.cpu.pc() as i64 + imm as i64).into()
             }));
         }
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::U64, imm)) => {
             let imm = *imm;
-            return Ok(FnExec::new(move |ctx| (ctx.cpu.ip() + imm).into()));
+            return Ok(FnExec::new(move |ctx| (ctx.cpu.pc() + imm).into()));
         }
         Ir::Value(Operand::Ir(ir)) => return compile_ir(ir, flag_policy.clone()),
         Ir::Value(Operand::Immediate(t, imm)) => {
@@ -381,7 +390,7 @@ where
                 Value::new(0)
             })
         }
-        Operand::Ip => FnExec::new(move |ctx| Value::from_u64(ctx.cpu.ip())),
+        Operand::Ip => FnExec::new(move |ctx| Value::from_u64(ctx.cpu.pc())),
         Operand::Flag => FnExec::new(move |ctx| Value::from_u64(ctx.cpu.flag())),
         Operand::Dbg(s, op) => {
             let op = compile_op(op, flag_policy.clone())?;

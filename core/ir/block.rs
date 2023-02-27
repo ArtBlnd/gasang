@@ -6,7 +6,7 @@ use crate::register::RegId;
 #[derive(Clone, Debug)]
 pub enum BlockDestination {
     Flags,
-    Ip,
+    Pc,
     Gpr(Type, RegId),
     Fpr(Type, RegId),
     Sys(Type, RegId),
@@ -43,7 +43,7 @@ impl IrBlock {
 
         let dest_type = match &dest {
             BlockDestination::Flags => Some(&Type::U64),
-            BlockDestination::Ip => Some(&Type::U64),
+            BlockDestination::Pc => Some(&Type::U64),
             BlockDestination::Gpr(ty, _) => Some(ty),
             BlockDestination::Fpr(ty, _) => Some(ty),
             BlockDestination::Sys(ty, _) => Some(ty),

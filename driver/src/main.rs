@@ -1,14 +1,14 @@
-use machineinstr::MachineInstrParserRule;
 use machineinstr::aarch64::AArch64InstrParserRule;
+use machineinstr::MachineInstrParserRule;
 
 use core::board::Board;
-use core::codegen::Codegen;
 use core::codegen::flag_policy::AArch64FlagPolicy;
 use core::codegen::rustjit::InterpretCodegen;
-use core::compiler::Compiler;
+use core::codegen::Codegen;
 use core::compiler::aarch64::AArch64Compiler;
-use core::Cpu;
+use core::compiler::Compiler;
 use core::softmmu::Mmu;
+use core::Cpu;
 
 use std::convert::Infallible;
 use std::path::PathBuf;
@@ -30,14 +30,23 @@ fn main() {
     unsafe { init_image_and_run(cpu, mmu, comp, cgen, parser_rule, image) };
 }
 
-pub unsafe fn init_image_and_run<C, G, P>(cpu: Cpu, mmu: Mmu, comp: C, cgen: G, mci_parser: P, image: Vec<u8>) -> Infallible
+pub unsafe fn init_image_and_run<C, G, P>(
+    cpu: Cpu,
+    mmu: Mmu,
+    comp: C,
+    cgen: G,
+    mci_parser: P,
+    image: Vec<u8>,
+) -> Infallible
 where
     C: Compiler,
     P: MachineInstrParserRule<MachineInstr = C::Item>,
     G: Codegen,
 {
     mmu.mmap(0x0, image.len() as u64, true, true, true);
-    unsafe { mmu.frame(0x0).write(&image).unwrap(); }
+    unsafe {
+        mmu.frame(0x0).write(&image).unwrap();
+    }
     let board = Board::new(comp, cgen, mci_parser, mmu, cpu);
 
     board.run().unwrap()
