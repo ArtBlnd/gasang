@@ -92,6 +92,7 @@ impl DerefMut for FprRegister {
     }
 }
 
+#[derive(Clone)]
 pub struct SysRegister {
     name: String,
     size: u8,

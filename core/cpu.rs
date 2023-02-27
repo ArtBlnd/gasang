@@ -1,4 +1,3 @@
-use crate::mmu::{MemoryFrame, Mmu};
 use crate::register::*;
 
 use std::collections::HashMap;
@@ -14,14 +13,44 @@ pub struct Cpu {
 
     flags: AtomicU64,
     ip: u64,
+}
 
-    mmu: Mmu,
+impl Clone for Cpu {
+    fn clone(&self) -> Self {
+        Self {
+            gpr_registers: self.gpr_registers.clone(),
+            fpr_registers: self.fpr_registers.clone(),
+            sys_registers: self.sys_registers.clone(),
+            reg_name_map: self.reg_name_map.clone(),
+
+            flags: AtomicU64::new(self.flags.load(Ordering::Relaxed)),
+            ip: self.ip,
+        }
+    }
 }
 
 impl Cpu {
-    pub fn new(arch: Architecture, image: &[u8]) -> Self {
+    pub fn new(arch: Architecture) -> Self {
         match arch {
-            Architecture::AArch64Bin => new_aarch64_bin(image),
+            Architecture::AArch64Bin => new_aarch64_bin(),
+        }
+    }
+
+    pub(crate) fn new_for_test() -> Self {
+        let mut gpr_registers = Slab::new();
+        let mut reg_name_map = HashMap::new();
+
+        let id = gpr_registers.insert(GprRegister::new("x0", 8));
+        reg_name_map.insert(format!("x0"), RegId(id as u8));
+
+        Self {
+            gpr_registers,
+            fpr_registers: Slab::new(),
+            sys_registers: Slab::new(),
+            reg_name_map,
+
+            flags: AtomicU64::new(0),
+            ip: 0,
         }
     }
 
@@ -61,14 +90,6 @@ impl Cpu {
     #[inline]
     pub fn sys_mut(&mut self, id: RegId) -> &mut SysRegister {
         &mut self.sys_registers[id.0 as usize]
-    }
-
-    pub fn mem(&self, addr: u64) -> MemoryFrame {
-        self.mmu.frame(addr)
-    }
-
-    pub fn mmu(&self) -> &Mmu {
-        &self.mmu
     }
 
     pub fn ip(&self) -> u64 {
@@ -133,21 +154,13 @@ pub enum Architecture {
     AArch64Bin,
 }
 
-fn new_aarch64_bin(image: &[u8]) -> Cpu {
+fn new_aarch64_bin() -> Cpu {
     let mut cpu = init_base_aarch64_cpu();
-    let addr = 0x0;
-
-    cpu.mmu.mmap(addr, image.len() as u64, true, true, false);
-    unsafe {
-        cpu.mmu
-            .frame(addr)
-            .write(image)
-            .expect("Failed VM Initialize");
-    }
 
     cpu.set_ip(0);
     cpu
 }
+
 fn init_base_aarch64_cpu() -> Cpu {
     let mut cpu = Cpu {
         gpr_registers: Slab::new(),
@@ -156,7 +169,6 @@ fn init_base_aarch64_cpu() -> Cpu {
         reg_name_map: HashMap::new(),
         flags: AtomicU64::new(0),
         ip: 0,
-        mmu: Mmu::new(),
     };
 
     for i in 0..31 {
@@ -187,6 +199,10 @@ fn init_base_aarch64_cpu() -> Cpu {
     let id = cpu.sys_registers.insert(SysRegister::new("cpacr_el1", 8));
     cpu.reg_name_map
         .insert("cpacr_el1".to_string(), RegId(id as u8));
+
+    let id = cpu.sys_registers.insert(SysRegister::new("mpidr_el1", 8));
+    cpu.reg_name_map
+        .insert("mpidr_el1".to_string(), RegId(id as u8));
 
     cpu
 }

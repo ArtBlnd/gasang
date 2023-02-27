@@ -1,7 +1,7 @@
+mod frame;
+pub use frame::*;
 mod host_memory;
 pub use host_memory::*;
-mod memory_frame;
-pub use memory_frame::*;
 mod page;
 pub use page::*;
 

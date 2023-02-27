@@ -2,23 +2,21 @@ mod cache;
 pub use cache::*;
 mod executable;
 pub use executable::*;
-mod prelude;
-pub use prelude::*;
-mod block_dest;
-pub use block_dest::*;
-mod block;
-pub use block::*;
-mod code;
-pub use code::*;
 
 pub mod cranelift;
 pub mod flag_policy;
 pub mod rustjit;
 
-use crate::ir::Ir;
+use crate::ir::{Ir, IrBlock};
+use crate::value::Value;
 
 pub trait Codegen {
-    type Code: CompiledCode;
+    type Exec: Executable<Output = Value>;
+    type ExecBlock: Executable;
 
-    fn compile(&self, ir: Ir) -> Self::Code;
+    // compile ir into executable object.
+    fn compile_ir(&self, ir: &Ir) -> Self::Exec;
+
+    // compile ir block into executable object.
+    fn compile_ir_block(&self, ir: &IrBlock) -> Self::ExecBlock;
 }

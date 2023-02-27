@@ -5,7 +5,7 @@ pub use operand::*;
 mod ty;
 pub use ty::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ir {
     Add(Type, Operand, Operand),
     Sub(Type, Operand, Operand),

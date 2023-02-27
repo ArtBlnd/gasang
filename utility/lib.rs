@@ -1,10 +1,13 @@
+mod array;
+pub use array::*;
+
 use std::ops::Range;
 
-pub struct BitReader<I> {
+pub struct ByteReader<I> {
     iter: I,
 }
 
-impl<I> BitReader<I>
+impl<I> ByteReader<I>
 where
     I: Iterator<Item = u8>,
 {

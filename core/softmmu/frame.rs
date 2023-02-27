@@ -1,5 +1,5 @@
 use crate::error::MMUError;
-use crate::mmu::{MmuData, Page, PAGE_SIZE};
+use crate::softmmu::{MmuData, Page, PAGE_SIZE};
 
 use std::sync::Arc;
 
@@ -37,7 +37,7 @@ impl MemoryFrame {
                         return Err(MMUError::AccessViolation(addr));
                     }
 
-                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    let mem = unsafe { &mut memory.slice()[page_offs_beg..page_offs_end] };
                     buf[read..read + mem.len()].copy_from_slice(mem);
                     read += mem.len();
                     addr += mem.len() as u64;
@@ -67,7 +67,7 @@ impl MemoryFrame {
                         return Err(MMUError::AccessViolation(addr));
                     }
 
-                    let mem = unsafe { &mut memory.get_slice()[page_offs_beg..page_offs_end] };
+                    let mem = unsafe { &mut memory.slice()[page_offs_beg..page_offs_end] };
                     mem.copy_from_slice(&buf[writ..writ + mem.len()]);
                     writ += mem.len();
                     addr += mem.len() as u64;

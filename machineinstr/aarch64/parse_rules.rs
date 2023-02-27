@@ -3,7 +3,7 @@ use crate::bit_patterns::*;
 use crate::instr::NativeInstr;
 use crate::MachineInstrParserRule;
 
-use utility::{extract_bits32, BitReader};
+use utility::{extract_bits32, ByteReader};
 
 use once_cell::sync::Lazy;
 
@@ -14,7 +14,7 @@ pub struct AArch64InstrParserRule;
 impl MachineInstrParserRule for AArch64InstrParserRule {
     type MachineInstr = AArch64Instr;
 
-    fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<NativeInstr<Self::MachineInstr>>
+    fn parse<I>(&mut self, buf: &mut ByteReader<I>) -> Option<NativeInstr<Self::MachineInstr>>
     where
         I: Iterator<Item = u8>,
     {
@@ -23,7 +23,7 @@ impl MachineInstrParserRule for AArch64InstrParserRule {
     }
 }
 
-fn parse_aarch64_instr<I>(reader: &mut BitReader<I>) -> Option<AArch64Instr>
+fn parse_aarch64_instr<I>(reader: &mut ByteReader<I>) -> Option<AArch64Instr>
 where
     I: Iterator<Item = u8>,
 {

@@ -3,7 +3,7 @@ use crate::register::RegId;
 
 use crate::value::Value;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Operand {
     Ir(Box<Ir>),
     VoidIr(Box<Ir>),

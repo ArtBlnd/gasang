@@ -1,7 +1,9 @@
-use crate::codegen::flag_policy::FlagPolicy;
+use smallvec::SmallVec;
+
+use crate::codegen::flag_policy::{DummyFlagPolicy, FlagPolicy};
 use crate::codegen::*;
 use crate::error::CodegenError;
-use crate::ir::{Ir, Operand, Type, VecType};
+use crate::ir::{BlockDestination, Ir, Operand, Type, VecType};
 use crate::value::Value;
 
 use std::sync::Arc;
@@ -22,42 +24,195 @@ impl InterpretCodegen {
 }
 
 impl Codegen for InterpretCodegen {
-    type Code = Box<dyn CompiledCode>;
+    type Exec = FnExec<Value>;
+    type ExecBlock = FnExec<()>;
 
-    fn compile(&self, ir: Ir) -> Self::Code {
-        unsafe { Box::new(compile_ir(&ir, self.flag_policy.clone()).unwrap()) }
+    fn compile_ir(&self, ir: &Ir) -> Self::Exec {
+        unsafe { compile_ir(&ir, self.flag_policy.clone()).unwrap() }
+    }
+
+    fn compile_ir_block(&self, ir_block: &IrBlock) -> Self::ExecBlock {
+        let compile_results: SmallVec<[(FnExec<Value>, BlockDestination); 2]> = ir_block
+            .items()
+            .iter()
+            .map(|item| (self.compile_ir(item.root()), item.dest().clone()))
+            .collect();
+
+        FnExec::new(move |ctx| unsafe { execute(&compile_results, ctx) })
     }
 }
 
-unsafe fn compile_ir(
-    ir: &Ir,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+unsafe fn execute(
+    code: &SmallVec<[(FnExec<Value>, BlockDestination); 2]>,
+    ctx: &mut ExecutionContext,
+) {
+    for (exec, dest) in code {
+        let val = unsafe { exec.execute(ctx) };
+        handle_block_dest(dest.clone(), val, ctx);
+    }
+}
+
+unsafe fn handle_block_dest<'a>(
+    dest: BlockDestination,
+    val: Value,
+    ctx: &mut ExecutionContext<'a>,
+) {
+    match dest {
+        BlockDestination::Flags => {
+            ctx.cpu.set_flag(val.u64());
+        }
+        BlockDestination::Ip => {
+            ctx.cpu.set_ip(val.u64());
+        }
+        BlockDestination::None => { /* do nothing */ }
+        BlockDestination::Gpr(ty, reg_id) => {
+            let gpr = ctx.cpu.gpr_mut(reg_id);
+
+            match ty {
+                Type::U8 | Type::I8 => *gpr.u8_mut() = val.u8(),
+                Type::U16 | Type::I16 => *gpr.u16_mut() = val.u16(),
+                Type::U32 | Type::I32 => *gpr.u32_mut() = val.u32(),
+                Type::U64 | Type::I64 => *gpr.u64_mut() = val.u64(),
+                _ => unreachable!(),
+            }
+        }
+        BlockDestination::Fpr(ty, reg_id) => {
+            let fpr = ctx.cpu.fpr_mut(reg_id);
+
+            match ty {
+                Type::U8 | Type::I8 => *fpr.u8_mut() = val.u8(),
+                Type::U16 | Type::I16 => *fpr.u16_mut() = val.u16(),
+                Type::U32 | Type::I32 => *fpr.u32_mut() = val.u32(),
+                Type::U64 | Type::I64 => *fpr.u64_mut() = val.u64(),
+                Type::F32 => *fpr.f32_mut() = val.f32(),
+                Type::F64 => *fpr.f64_mut() = val.f64(),
+                Type::Vec(VecType::U64, 2) => *fpr.u64x2_mut() = val.u64x2(),
+                _ => unreachable!(),
+            }
+        }
+        BlockDestination::Sys(ty, reg_id) => {
+            let sys = ctx.cpu.sys_mut(reg_id);
+
+            match ty {
+                Type::U8 | Type::I8 => *sys.u8_mut() = val.u8(),
+                Type::U16 | Type::I16 => *sys.u16_mut() = val.u16(),
+                Type::U32 | Type::I32 => *sys.u32_mut() = val.u32(),
+                Type::U64 | Type::I64 => *sys.u64_mut() = val.u64(),
+                _ => unreachable!(),
+            }
+        }
+        BlockDestination::FprSlot(ty, reg_id, slot_id) => {
+            let fpr = ctx.cpu.fpr_mut(reg_id);
+
+            match ty {
+                Type::U8 | Type::I8 => fpr.u8_slice_mut()[slot_id as usize] = val.u8(),
+                Type::U16 | Type::I16 => fpr.u16_slice_mut()[slot_id as usize] = val.u16(),
+                Type::U32 | Type::I32 => fpr.u32_slice_mut()[slot_id as usize] = val.u32(),
+                Type::U64 | Type::I64 => fpr.u64_slice_mut()[slot_id as usize] = val.u64(),
+                _ => unreachable!(),
+            }
+        }
+        BlockDestination::Exit => {
+            panic!("Exit");
+        }
+        BlockDestination::Memory(ty, addr) => {
+            match ty {
+                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
+                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                }
+                _ => unreachable!(),
+            }
+            .unwrap();
+        }
+        BlockDestination::MemoryRelI64(ty, reg_id, offs) => {
+            let (addr, of) = ctx.cpu.gpr(reg_id).u64().overflowing_add_signed(offs);
+            assert_eq!(of, false);
+
+            match ty {
+                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
+                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                }
+                _ => unreachable!(),
+            }
+            .unwrap();
+        }
+        BlockDestination::MemoryRelU64(ty, reg_id, offs) => {
+            let (addr, of) = ctx.cpu.gpr(reg_id).u64().overflowing_add(offs);
+            assert_eq!(of, false);
+
+            match ty {
+                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
+                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                }
+                _ => unreachable!(),
+            }
+            .unwrap();
+        }
+        BlockDestination::MemoryIr(ir) => {
+            let ty = ir.get_type();
+            let addr = compile_ir(&ir, DummyFlagPolicy).unwrap().execute(ctx).u64();
+
+            match ty {
+                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
+                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::Vec(VecType::U64 | VecType::I64, 2) => {
+                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                }
+                _ => unreachable!(),
+            }
+            .unwrap();
+        }
+    }
+}
+
+unsafe fn compile_ir<T>(ir: &Ir, flag_policy: T) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     // Optimiations
     match ir {
+        Ir::ZextCast(_, Operand::Ir(ir)) => {
+            return Ok(compile_ir(ir, flag_policy.clone())?);
+        }
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::I64, imm)) => {
             let imm = *imm;
-            return Ok(Box::new(move |ctx| (ctx.ip() as i64 + imm as i64).into()));
+            return Ok(FnExec::new(move |ctx| {
+                (ctx.cpu.ip() as i64 + imm as i64).into()
+            }));
         }
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::U64, imm)) => {
             let imm = *imm;
-            return Ok(Box::new(move |ctx| (ctx.ip() + imm).into()));
+            return Ok(FnExec::new(move |ctx| (ctx.cpu.ip() + imm).into()));
         }
         Ir::Value(Operand::Ir(ir)) => return compile_ir(ir, flag_policy.clone()),
         Ir::Value(Operand::Immediate(t, imm)) => {
             let imm = *imm;
             let _t = *t;
 
-            return Ok(Box::new(move |_ctx| imm.into()));
+            return Ok(FnExec::new(move |_ctx| imm.into()));
         }
         Ir::Value(Operand::Gpr(t, reg)) => {
             let reg = *reg;
             let t = *t;
-            return Ok(Box::new(move |ctx| match t {
-                Type::U8 | Type::I8 => (ctx.gpr(reg).u8()).into(),
-                Type::U16 | Type::I16 => (ctx.gpr(reg).u16()).into(),
-                Type::U32 | Type::I32 => (ctx.gpr(reg).u32()).into(),
-                Type::U64 | Type::I64 => (ctx.gpr(reg).u64()).into(),
+            return Ok(FnExec::new(move |ctx| match t {
+                Type::U8 | Type::I8 => (ctx.cpu.gpr(reg).u8()).into(),
+                Type::U16 | Type::I16 => (ctx.cpu.gpr(reg).u16()).into(),
+                Type::U32 | Type::I32 => (ctx.cpu.gpr(reg).u32()).into(),
+                Type::U64 | Type::I64 => (ctx.cpu.gpr(reg).u64()).into(),
                 _ => unreachable!("Invalid type"),
             }));
         }
@@ -67,8 +222,8 @@ unsafe fn compile_ir(
             let val = *val;
             let t = *t;
 
-            return Ok(Box::new(move |ctx| {
-                let mut ret = op1(ctx);
+            return Ok(FnExec::new(move |ctx| {
+                let mut ret = op1.execute(ctx);
                 match t.size() {
                     1 => *ret.u8_mut() >>= val,
                     2 => *ret.u16_mut() >>= val,
@@ -82,7 +237,7 @@ unsafe fn compile_ir(
         }
         Ir::And(Type::U64, Operand::Flag, Operand::Immediate(Type::U64, imm)) => {
             let imm = *imm;
-            return Ok(Box::new(move |ctx| (ctx.flag() & imm).into()));
+            return Ok(FnExec::new(move |ctx| (ctx.cpu.flag() & imm).into()));
         }
         Ir::And(t, Operand::Immediate(t1, imm1), Operand::Immediate(t2, imm2)) => {
             assert!(t1 == t2 && t1 == t, "Type mismatch");
@@ -90,7 +245,7 @@ unsafe fn compile_ir(
             let imm2 = *imm2;
             let _t = *t;
 
-            return Ok(Box::new(move |_ctx| (imm1 & imm2).into()));
+            return Ok(FnExec::new(move |_ctx| (imm1 & imm2).into()));
         }
         Ir::If(t, Operand::Immediate(t1, imm), op1, op2) => {
             assert!(*t1 == Type::Bool, "Type mismatch");
@@ -100,15 +255,13 @@ unsafe fn compile_ir(
             let op1 = compile_op(op1, flag_policy.clone())?;
             let op2 = compile_op(op2, flag_policy.clone())?;
 
-            return Ok(Box::new(
-                move |ctx| {
-                    if imm != 0 {
-                        op1(ctx)
-                    } else {
-                        op2(ctx)
-                    }
-                },
-            ));
+            return Ok(FnExec::new(move |ctx| {
+                if imm != 0 {
+                    op1.execute(ctx)
+                } else {
+                    op2.execute(ctx)
+                }
+            }));
         }
 
         _ => {}
@@ -140,7 +293,7 @@ unsafe fn compile_ir(
         Ir::BitCast(t, op) => gen_bit_cast(t, op, flag_policy),
 
         Ir::Value(op) => compile_op(op, flag_policy.clone()),
-        Ir::Nop => Ok(Box::new(|_| Value::new(0))),
+        Ir::Nop => Ok(FnExec::new(|_| Value::new(0))),
 
         Ir::If(t, cond, if_true, if_false) => gen_if(t, cond, if_true, if_false, flag_policy),
         Ir::CmpEq(op1, op2) => gen_cmp_eq(op1, op2, flag_policy),
@@ -150,34 +303,34 @@ unsafe fn compile_ir(
     }
 }
 
-unsafe fn compile_op(
-    op: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+unsafe fn compile_op<T>(op: &Operand, flag_policy: T) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     Ok(match op {
         Operand::Ir(ir) => compile_ir(ir, flag_policy.clone())?,
         Operand::Gpr(t, reg) => {
             let reg = *reg;
             let t = *t;
-            Box::new(move |ctx| match t {
-                Type::U8 | Type::I8 => Value::from_u8(ctx.gpr(reg).u8()),
-                Type::U16 | Type::I16 => Value::from_u16(ctx.gpr(reg).u16()),
-                Type::U32 | Type::I32 => Value::from_u32(ctx.gpr(reg).u32()),
-                Type::U64 | Type::I64 => Value::from_u64(ctx.gpr(reg).u64()),
+            FnExec::new(move |ctx| match t {
+                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu.gpr(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu.gpr(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu.gpr(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu.gpr(reg).u64()),
                 _ => unreachable!("Invalid type"),
             })
         }
         Operand::Fpr(t, reg) => {
             let reg = *reg;
             let t = *t;
-            Box::new(move |ctx| match t {
-                Type::U8 | Type::I8 => Value::from_u8(ctx.fpr(reg).u8()),
-                Type::U16 | Type::I16 => Value::from_u16(ctx.fpr(reg).u16()),
-                Type::U32 | Type::I32 => Value::from_u32(ctx.fpr(reg).u32()),
-                Type::U64 | Type::I64 => Value::from_u64(ctx.fpr(reg).u64()),
+            FnExec::new(move |ctx| match t {
+                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu.fpr(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu.fpr(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu.fpr(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu.fpr(reg).u64()),
                 Type::Vec(VecType::U64 | VecType::I64, 2) => {
                     let mut ret = Value::new(16);
-                    *ret.u64x2_mut() = ctx.fpr(reg).u64x2();
+                    *ret.u64x2_mut() = ctx.cpu.fpr(reg).u64x2();
                     ret
                 }
                 _ => unreachable!("Invalid type"),
@@ -186,18 +339,18 @@ unsafe fn compile_op(
         Operand::Sys(t, reg) => {
             let reg = *reg;
             let t = *t;
-            Box::new(move |ctx| match t {
-                Type::U8 | Type::I8 => Value::from_u8(ctx.sys(reg).u8()),
-                Type::U16 | Type::I16 => Value::from_u16(ctx.sys(reg).u16()),
-                Type::U32 | Type::I32 => Value::from_u32(ctx.sys(reg).u32()),
-                Type::U64 | Type::I64 => Value::from_u64(ctx.sys(reg).u64()),
+            FnExec::new(move |ctx| match t {
+                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu.sys(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu.sys(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu.sys(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu.sys(reg).u64()),
                 _ => unreachable!("Invalid type"),
             })
         }
         Operand::Immediate(t, imm) => {
             let imm = *imm & t.gen_mask();
             let t = *t;
-            Box::new(move |_| match t {
+            FnExec::new(move |_| match t {
                 Type::U8 | Type::I8 => Value::from_u8(imm as u8),
                 Type::U16 | Type::I16 => Value::from_u16(imm as u16),
                 Type::U32 | Type::I32 => Value::from_u32(imm as u32),
@@ -208,7 +361,7 @@ unsafe fn compile_op(
         Operand::ImmediateValue(t, imm) => {
             let imm = imm.clone();
             let t = *t;
-            Box::new(move |_| match t {
+            FnExec::new(move |_| match t {
                 Type::U8 | Type::I8 => Value::from_u8(imm.u8()),
                 Type::U16 | Type::I16 => Value::from_u16(imm.u16()),
                 Type::U32 | Type::I32 => Value::from_u32(imm.u32()),
@@ -223,18 +376,18 @@ unsafe fn compile_op(
         }
         Operand::VoidIr(ir) => {
             let ir = compile_ir(ir, flag_policy.clone())?;
-            Box::new(move |ctx| {
-                ir(ctx);
+            FnExec::new(move |ctx| {
+                ir.execute(ctx);
                 Value::new(0)
             })
         }
-        Operand::Ip => Box::new(move |ctx| Value::from_u64(ctx.ip())),
-        Operand::Flag => Box::new(move |ctx| Value::from_u64(ctx.flag())),
+        Operand::Ip => FnExec::new(move |ctx| Value::from_u64(ctx.cpu.ip())),
+        Operand::Flag => FnExec::new(move |ctx| Value::from_u64(ctx.cpu.flag())),
         Operand::Dbg(s, op) => {
             let op = compile_op(op, flag_policy.clone())?;
             let s = s.to_string();
-            Box::new(move |ctx| {
-                let val = op(ctx);
+            FnExec::new(move |ctx| {
+                let val = op.execute(ctx);
                 println!("{s}, {:x}", val.u64());
                 val
             })
@@ -242,12 +395,15 @@ unsafe fn compile_op(
     })
 }
 
-unsafe fn gen_add(
+unsafe fn gen_add<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let t1 = op1.get_type();
     let t2 = op2.get_type();
 
@@ -262,27 +418,27 @@ unsafe fn gen_add(
 
     let t = *t;
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u8();
-            let rhs = rhs(ctx).u8();
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u8();
+            let rhs = rhs.execute(ctx).u8();
 
             lhs.overflowing_add(rhs).0.into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u16();
-            let rhs = rhs(ctx).u16();
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u16();
+            let rhs = rhs.execute(ctx).u16();
 
             lhs.overflowing_add(rhs).0.into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u32();
-            let rhs = rhs(ctx).u32();
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u32();
+            let rhs = rhs.execute(ctx).u32();
 
             lhs.overflowing_add(rhs).0.into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u64();
-            let rhs = rhs(ctx).u64();
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u64();
+            let rhs = rhs.execute(ctx).u64();
 
             lhs.overflowing_add(rhs).0.into()
         }),
@@ -290,12 +446,15 @@ unsafe fn gen_add(
     })
 }
 
-unsafe fn gen_sub(
+unsafe fn gen_sub<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let t1 = op1.get_type();
     let t2 = op2.get_type();
 
@@ -310,27 +469,27 @@ unsafe fn gen_sub(
 
     let t = *t;
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u8();
-            let rhs = rhs(ctx).u8();
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u8();
+            let rhs = rhs.execute(ctx).u8();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u16();
-            let rhs = rhs(ctx).u16();
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u16();
+            let rhs = rhs.execute(ctx).u16();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u32();
-            let rhs = rhs(ctx).u32();
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u32();
+            let rhs = rhs.execute(ctx).u32();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u64();
-            let rhs = rhs(ctx).u64();
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u64();
+            let rhs = rhs.execute(ctx).u64();
 
             lhs.overflowing_sub(rhs).0.into()
         }),
@@ -338,61 +497,64 @@ unsafe fn gen_sub(
     })
 }
 
-unsafe fn gen_mul(
+unsafe fn gen_mul<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     Ok(match t {
-        Type::U8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u8();
-            let rhs = rhs(ctx).u8();
+        Type::U8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u8();
+            let rhs = rhs.execute(ctx).u8();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::U16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u16();
-            let rhs = rhs(ctx).u16();
+        Type::U16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u16();
+            let rhs = rhs.execute(ctx).u16();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::U32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u32();
-            let rhs = rhs(ctx).u32();
+        Type::U32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u32();
+            let rhs = rhs.execute(ctx).u32();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::U64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u64();
-            let rhs = rhs(ctx).u64();
+        Type::U64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u64();
+            let rhs = rhs.execute(ctx).u64();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::I8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).i8();
-            let rhs = rhs(ctx).i8();
+        Type::I8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).i8();
+            let rhs = rhs.execute(ctx).i8();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::I16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).i16();
-            let rhs = rhs(ctx).i16();
+        Type::I16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).i16();
+            let rhs = rhs.execute(ctx).i16();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::I32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).i32();
-            let rhs = rhs(ctx).i32();
+        Type::I32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).i32();
+            let rhs = rhs.execute(ctx).i32();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
-        Type::I64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).i64();
-            let rhs = rhs(ctx).i64();
+        Type::I64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).i64();
+            let rhs = rhs.execute(ctx).i64();
 
             lhs.overflowing_mul(rhs).0.into()
         }),
@@ -400,37 +562,40 @@ unsafe fn gen_mul(
     })
 }
 
-unsafe fn gen_div(
+unsafe fn gen_div<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u8();
-            let rhs = rhs(ctx).u8();
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u8();
+            let rhs = rhs.execute(ctx).u8();
 
             lhs.overflowing_div(rhs).0.into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u16();
-            let rhs = rhs(ctx).u16();
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u16();
+            let rhs = rhs.execute(ctx).u16();
 
             lhs.overflowing_div(rhs).0.into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u32();
-            let rhs = rhs(ctx).u32();
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u32();
+            let rhs = rhs.execute(ctx).u32();
 
             lhs.overflowing_div(rhs).0.into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u64();
-            let rhs = rhs(ctx).u64();
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u64();
+            let rhs = rhs.execute(ctx).u64();
 
             lhs.overflowing_div(rhs).0.into()
         }),
@@ -438,37 +603,40 @@ unsafe fn gen_div(
     })
 }
 
-unsafe fn gen_mod(
+unsafe fn gen_mod<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u8();
-            let rhs = rhs(ctx).u8();
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u8();
+            let rhs = rhs.execute(ctx).u8();
 
             (lhs % rhs).into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u16();
-            let rhs = rhs(ctx).u16();
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u16();
+            let rhs = rhs.execute(ctx).u16();
 
             (lhs % rhs).into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u32();
-            let rhs = rhs(ctx).u32();
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u32();
+            let rhs = rhs.execute(ctx).u32();
 
             (lhs % rhs).into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u64();
-            let rhs = rhs(ctx).u64();
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u64();
+            let rhs = rhs.execute(ctx).u64();
 
             (lhs % rhs).into()
         }),
@@ -476,12 +644,15 @@ unsafe fn gen_mod(
     })
 }
 
-unsafe fn gen_addc(
+unsafe fn gen_addc<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let t1 = op1.get_type();
     let t2 = op2.get_type();
 
@@ -496,44 +667,47 @@ unsafe fn gen_addc(
 
     let t = *t;
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u8();
-            let rhs = rhs(ctx).u8();
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u8();
+            let rhs = rhs.execute(ctx).u8();
 
-            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx);
+            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu);
             lhs.overflowing_add(rhs).0.into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u16();
-            let rhs = rhs(ctx).u16();
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u16();
+            let rhs = rhs.execute(ctx).u16();
 
-            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx);
+            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu);
             lhs.overflowing_add(rhs).0.into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u32();
-            let rhs = rhs(ctx).u32();
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u32();
+            let rhs = rhs.execute(ctx).u32();
 
-            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx);
+            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu);
             lhs.overflowing_add(rhs).0.into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u64();
-            let rhs = rhs(ctx).u64();
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u64();
+            let rhs = rhs.execute(ctx).u64();
 
-            flag_policy.add_carry(t, lhs, rhs, ctx);
+            flag_policy.add_carry(t, lhs, rhs, ctx.cpu);
             lhs.overflowing_add(rhs).0.into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
     })
 }
 
-unsafe fn gen_subc(
+unsafe fn gen_subc<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let t1 = op1.get_type();
     let t2 = op2.get_type();
 
@@ -548,73 +722,76 @@ unsafe fn gen_subc(
 
     let t = *t;
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u8();
-            let rhs = rhs(ctx).u8();
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u8();
+            let rhs = rhs.execute(ctx).u8();
 
-            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx);
+            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu);
             lhs.overflowing_sub(rhs).0.into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u16();
-            let rhs = rhs(ctx).u16();
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u16();
+            let rhs = rhs.execute(ctx).u16();
 
-            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx);
+            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu);
             lhs.overflowing_sub(rhs).0.into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u32();
-            let rhs = rhs(ctx).u32();
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u32();
+            let rhs = rhs.execute(ctx).u32();
 
-            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx);
+            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu);
             lhs.overflowing_sub(rhs).0.into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let lhs = lhs(ctx).u64();
-            let rhs = rhs(ctx).u64();
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx).u64();
+            let rhs = rhs.execute(ctx).u64();
 
-            flag_policy.sub_carry(t, lhs, rhs, ctx);
+            flag_policy.sub_carry(t, lhs, rhs, ctx.cpu);
             lhs.overflowing_sub(rhs).0.into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
     })
 }
 
-unsafe fn gen_lshl(
+unsafe fn gen_lshl<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     let t = *t;
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u8_mut() <<= rhs.u8();
             lhs
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u16_mut() <<= rhs.u16();
             lhs
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u32_mut() <<= rhs.u32();
             lhs
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u64_mut() <<= rhs.u64();
             lhs
@@ -623,40 +800,43 @@ unsafe fn gen_lshl(
     })
 }
 
-unsafe fn gen_lshr(
+unsafe fn gen_lshr<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u8_mut() >>= rhs.u8();
             lhs
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u16_mut() >>= rhs.u16();
             lhs
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u32_mut() >>= rhs.u32();
             lhs
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u64_mut() >>= rhs.u64();
             lhs
@@ -665,12 +845,15 @@ unsafe fn gen_lshr(
     })
 }
 
-unsafe fn gen_ashr(
+unsafe fn gen_ashr<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     assert!(op2.get_type().is_scalar());
     assert!(op2.get_type().is_unsigned());
 
@@ -678,58 +861,58 @@ unsafe fn gen_ashr(
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     Ok(match t {
-        Type::U8 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U8 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u8_mut() >>= rhs.u8();
             lhs
         }),
-        Type::U16 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U16 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u16_mut() >>= rhs.u16();
             lhs
         }),
-        Type::U32 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U32 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u32_mut() >>= rhs.u32();
             lhs
         }),
-        Type::U64 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U64 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.u64_mut() >>= rhs.u64();
             lhs
         }),
-        Type::I8 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::I8 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.i8_mut() >>= rhs.u8();
             lhs
         }),
-        Type::I16 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::I16 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.i16_mut() >>= rhs.u16();
             lhs
         }),
-        Type::I32 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::I32 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.i32_mut() >>= rhs.u32();
             lhs
         }),
-        Type::I64 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::I64 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             *lhs.i64_mut() >>= rhs.u64();
             lhs
@@ -738,12 +921,15 @@ unsafe fn gen_ashr(
     })
 }
 
-unsafe fn gen_rotr(
+unsafe fn gen_rotr<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     assert!(op2.get_type().is_scalar());
     assert!(op2.get_type().is_unsigned());
 
@@ -751,27 +937,27 @@ unsafe fn gen_rotr(
     let rhs = compile_op(op2, flag_policy.clone())?;
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             lhs.u8_mut().rotate_right(rhs.u8() as u32).into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             lhs.u16_mut().rotate_right(rhs.u16() as u32).into()
         }),
-        Type::U32 | Type::I32 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U32 | Type::I32 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             lhs.u32_mut().rotate_right(rhs.u32()).into()
         }),
-        Type::U64 | Type::I64 => Box::new(move |ctx| {
-            let mut lhs = lhs(ctx);
-            let rhs = rhs(ctx);
+        Type::U64 | Type::I64 => FnExec::new(move |ctx| {
+            let mut lhs = lhs.execute(ctx);
+            let rhs = rhs.execute(ctx);
 
             lhs.u64_mut().rotate_right(rhs.u64() as u32).into()
         }),
@@ -779,36 +965,35 @@ unsafe fn gen_rotr(
     })
 }
 
-unsafe fn gen_load(
-    t: &Type,
-    op: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+unsafe fn gen_load<T>(t: &Type, op: &Operand, flag_policy: T) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let op = compile_op(op, flag_policy.clone())?;
     Ok(match t {
-        Type::Bool => Box::new(move |ctx| {
+        Type::Bool => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            (ctx.mem(*var.u64_mut()).read_u8().unwrap() & 0b1).into()
+            (ctx.mmu.frame(*var.u64_mut()).read_u8().unwrap() & 0b1).into()
         }),
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64_mut()).read_u8().unwrap().into()
+            ctx.mmu.frame(*var.u64_mut()).read_u8().unwrap().into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64_mut()).read_u16().unwrap().into()
+            ctx.mmu.frame(*var.u64_mut()).read_u16().unwrap().into()
         }),
-        Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
+        Type::U32 | Type::I32 | Type::F32 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64_mut()).read_u32().unwrap().into()
+            ctx.mmu.frame(*var.u64_mut()).read_u32().unwrap().into()
         }),
-        Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
+        Type::U64 | Type::I64 | Type::F64 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mem(*var.u64_mut()).read_u64().unwrap().into()
+            ctx.mmu.frame(*var.u64_mut()).read_u64().unwrap().into()
         }),
-        Type::Vec(VecType::U64, 2) => Box::new(move |ctx| {
+        Type::Vec(VecType::U64, 2) => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            let mut mem = ctx.mem(*var.u64_mut());
+            let mut mem = ctx.mmu.frame(*var.u64_mut());
 
             let mut value = Value::new(16);
             mem.read(value.u8_slice_mut()).unwrap();
@@ -819,11 +1004,14 @@ unsafe fn gen_load(
     })
 }
 
-unsafe fn gen_zext_cast(
+unsafe fn gen_zext_cast<T>(
     t: &Type,
     op: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let op = compile_op(op, flag_policy.clone())?;
     Ok(match t {
         Type::U8
@@ -833,35 +1021,38 @@ unsafe fn gen_zext_cast(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| op.execute(ctx)),
+        | Type::I64 => FnExec::new(move |ctx| op.execute(ctx)),
         _ => unreachable!("invalid type: {:?}", t),
     })
 }
 
-unsafe fn gen_sext_cast(
+unsafe fn gen_sext_cast<T>(
     t: &Type,
     op: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let from = op.get_type();
     let to = t.gen_mask() as i64;
     let op = compile_op(op, flag_policy.clone())?;
 
     Ok(match from {
         Type::U8 | Type::U16 | Type::U32 | Type::U64 => op,
-        Type::I8 => Box::new(move |ctx| {
+        Type::I8 => FnExec::new(move |ctx| {
             let v: i64 = (*op.execute(ctx).i8_mut()).into();
             (v & to).into()
         }),
-        Type::I16 => Box::new(move |ctx| {
+        Type::I16 => FnExec::new(move |ctx| {
             let v: i64 = (*op.execute(ctx).i16_mut()).into();
             (v & to).into()
         }),
-        Type::I32 => Box::new(move |ctx| {
+        Type::I32 => FnExec::new(move |ctx| {
             let v: i64 = (*op.execute(ctx).i32_mut()).into();
             (v & to).into()
         }),
-        Type::I64 => Box::new(move |ctx| {
+        Type::I64 => FnExec::new(move |ctx| {
             let v: i64 = *op.execute(ctx).i64_mut();
             (v & to).into()
         }),
@@ -869,25 +1060,31 @@ unsafe fn gen_sext_cast(
     })
 }
 
-unsafe fn gen_bit_cast(
+unsafe fn gen_bit_cast<T>(
     t: &Type,
     op: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let op = compile_op(op, flag_policy.clone())?;
     let t = *t;
 
-    Ok(Box::new(move |ctx| unsafe {
+    Ok(FnExec::new(move |ctx| unsafe {
         op.execute(ctx).truncate_to(t)
     }))
 }
 
-unsafe fn gen_and(
+unsafe fn gen_and<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
@@ -901,7 +1098,7 @@ unsafe fn gen_and(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| {
+        | Type::I64 => FnExec::new(move |ctx| {
             let mut lhs = lhs.execute(ctx);
             let mut rhs = rhs.execute(ctx);
 
@@ -912,12 +1109,15 @@ unsafe fn gen_and(
     })
 }
 
-unsafe fn gen_or(
+unsafe fn gen_or<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
     let t = *t;
@@ -930,14 +1130,14 @@ unsafe fn gen_or(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| {
+        | Type::I64 => FnExec::new(move |ctx| {
             let mut lhs = lhs.execute(ctx);
             let mut rhs = rhs.execute(ctx);
 
             *lhs.u64_mut() |= *rhs.u64_mut();
             lhs
         }),
-        Type::Vec(VecType::U64, 2) => Box::new(move |ctx| {
+        Type::Vec(VecType::U64, 2) => FnExec::new(move |ctx| {
             let mut lhs = lhs.execute(ctx);
             let rhs = rhs.execute(ctx);
 
@@ -950,12 +1150,15 @@ unsafe fn gen_or(
     })
 }
 
-unsafe fn gen_xor(
+unsafe fn gen_xor<T>(
     t: &Type,
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
@@ -970,7 +1173,7 @@ unsafe fn gen_xor(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| {
+        | Type::I64 => FnExec::new(move |ctx| {
             let mut lhs = lhs.execute(ctx);
             let mut rhs = rhs.execute(ctx);
 
@@ -981,11 +1184,10 @@ unsafe fn gen_xor(
     })
 }
 
-unsafe fn gen_not(
-    t: &Type,
-    op: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+unsafe fn gen_not<T>(t: &Type, op: &Operand, flag_policy: T) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let op = compile_op(op, flag_policy.clone())?;
 
     let t = *t;
@@ -999,18 +1201,23 @@ unsafe fn gen_not(
         | Type::I8
         | Type::I16
         | Type::I32
-        | Type::I64 => Box::new(move |ctx| ((!*op.execute(ctx).u64_mut()) & t.gen_mask()).into()),
+        | Type::I64 => {
+            FnExec::new(move |ctx| ((!*op.execute(ctx).u64_mut()) & t.gen_mask()).into())
+        }
         _ => unreachable!("invalid type: {:?}", t),
     })
 }
 
-unsafe fn gen_if(
+unsafe fn gen_if<T>(
     t: &Type,
     cond: &Operand,
     if_true: &Operand,
     if_false: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     assert_eq!(cond.get_type(), Type::Bool);
 
     let cond = compile_op(cond, flag_policy.clone())?;
@@ -1018,7 +1225,7 @@ unsafe fn gen_if(
     let if_false = compile_op(if_false, flag_policy.clone())?;
 
     let _t = *t;
-    Ok(Box::new(move |ctx| {
+    Ok(FnExec::new(move |ctx| {
         if *cond.execute(ctx).u64_mut() != 0 {
             if_true.execute(ctx)
         } else {
@@ -1027,11 +1234,14 @@ unsafe fn gen_if(
     }))
 }
 
-unsafe fn gen_cmp_eq(
+unsafe fn gen_cmp_eq<T>(
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
@@ -1039,25 +1249,25 @@ unsafe fn gen_cmp_eq(
     assert_eq!(op1.get_type(), op2.get_type());
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u8_mut();
             let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs == rhs).into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u16_mut();
             let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs == rhs).into()
         }),
-        Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
+        Type::U32 | Type::I32 | Type::F32 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u32_mut();
             let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs == rhs).into()
         }),
-        Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
+        Type::U64 | Type::I64 | Type::F64 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u64_mut();
             let rhs = *rhs.execute(ctx).u64_mut();
 
@@ -1067,11 +1277,14 @@ unsafe fn gen_cmp_eq(
     })
 }
 
-unsafe fn gen_cmp_ne(
+unsafe fn gen_cmp_ne<T>(
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
@@ -1079,25 +1292,25 @@ unsafe fn gen_cmp_ne(
     assert_eq!(op1.get_type(), op2.get_type());
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u8_mut();
             let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs != rhs).into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u16_mut();
             let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs != rhs).into()
         }),
-        Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
+        Type::U32 | Type::I32 | Type::F32 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u32_mut();
             let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs != rhs).into()
         }),
-        Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
+        Type::U64 | Type::I64 | Type::F64 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u64_mut();
             let rhs = *rhs.execute(ctx).u64_mut();
 
@@ -1107,11 +1320,14 @@ unsafe fn gen_cmp_ne(
     })
 }
 
-unsafe fn gen_cmp_gt(
+unsafe fn gen_cmp_gt<T>(
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
@@ -1119,25 +1335,25 @@ unsafe fn gen_cmp_gt(
     assert_eq!(op1.get_type(), op2.get_type());
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u8_mut();
             let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs > rhs).into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u16_mut();
             let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs > rhs).into()
         }),
-        Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
+        Type::U32 | Type::I32 | Type::F32 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u32_mut();
             let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs > rhs).into()
         }),
-        Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
+        Type::U64 | Type::I64 | Type::F64 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u64_mut();
             let rhs = *rhs.execute(ctx).u64_mut();
 
@@ -1147,11 +1363,14 @@ unsafe fn gen_cmp_gt(
     })
 }
 
-unsafe fn gen_cmp_lt(
+unsafe fn gen_cmp_lt<T>(
     op1: &Operand,
     op2: &Operand,
-    flag_policy: Arc<dyn FlagPolicy>,
-) -> Result<Box<dyn CompiledCode>, CodegenError> {
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
     let lhs = compile_op(op1, flag_policy.clone())?;
     let rhs = compile_op(op2, flag_policy.clone())?;
 
@@ -1159,25 +1378,25 @@ unsafe fn gen_cmp_lt(
     assert_eq!(op1.get_type(), op2.get_type());
 
     Ok(match t {
-        Type::U8 | Type::I8 => Box::new(move |ctx| {
+        Type::U8 | Type::I8 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u8_mut();
             let rhs = *rhs.execute(ctx).u8_mut();
 
             (lhs < rhs).into()
         }),
-        Type::U16 | Type::I16 => Box::new(move |ctx| {
+        Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u16_mut();
             let rhs = *rhs.execute(ctx).u16_mut();
 
             (lhs < rhs).into()
         }),
-        Type::U32 | Type::I32 | Type::F32 => Box::new(move |ctx| {
+        Type::U32 | Type::I32 | Type::F32 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u32_mut();
             let rhs = *rhs.execute(ctx).u32_mut();
 
             (lhs < rhs).into()
         }),
-        Type::U64 | Type::I64 | Type::F64 => Box::new(move |ctx| {
+        Type::U64 | Type::I64 | Type::F64 => FnExec::new(move |ctx| {
             let lhs = *lhs.execute(ctx).u64_mut();
             let rhs = *rhs.execute(ctx).u64_mut();
 

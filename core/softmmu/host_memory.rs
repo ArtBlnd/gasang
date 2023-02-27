@@ -22,7 +22,7 @@ impl HostMemory {
         }
     }
 
-    pub unsafe fn get_slice(&self) -> &mut [u8] {
+    pub unsafe fn slice(&self) -> &mut [u8] {
         unsafe { &mut *self.memory.get() }
     }
 }

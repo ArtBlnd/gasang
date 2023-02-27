@@ -193,6 +193,7 @@ impl Compiler for AArch64Compiler {
             // Speical instructions
             AArch64Instr::Mrs(operand) => gen_mrs(self, operand),
             AArch64Instr::MsrReg(operand) => gen_msr_reg(self, operand),
+            AArch64Instr::MsrImm(operand) => gen_msr_imm(self, operand),
             AArch64Instr::Nop | AArch64Instr::Wfi | AArch64Instr::Dmb(_) => {
                 let mut block = IrBlock::new(4);
 
@@ -286,7 +287,7 @@ fn gen_orr_shifted_reg(compiler: &AArch64Compiler, operand: ShiftRmImm6RnRd, ty:
 fn gen_ldr_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (mut wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
+    let (mut wback, post_index, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
     let pre_offs = if post_index { 0 } else { offset };
 
     if wback && operand.rn == operand.rt && operand.rn != 31 {
@@ -331,7 +332,7 @@ fn gen_ldr_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) 
 fn gen_str_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
+    let (wback, post_index, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
     let pre_offs = if post_index { 0 } else { offset };
 
     let rn = if operand.rn == 31 {
@@ -862,7 +863,7 @@ fn gen_sbfm(compiler: &AArch64Compiler, operand: Bitfield, ty: Type) -> IrBlock 
 fn gen_ldrb_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
+    let (wback, post_index, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
 
     let pre_offs = if post_index { 0 } else { offset };
 
@@ -944,7 +945,7 @@ fn gen_add_ext_reg64(compiler: &AArch64Compiler, operand: AddSubtractExtReg) -> 
 fn gen_ldrh_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (mut wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
+    let (mut wback, post_index, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
 
     if wback && operand.rn == operand.rt && operand.rn != 31 {
         wback = false;
@@ -997,9 +998,6 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
         operand.crm,
         operand.op2,
     ) {
-        (0b11, 0b011, 0b1101, 0b0000, 0b010) => {
-            Operand::Sys(Type::U64, compiler.reg_by_name("tpidr_el0"))
-        } // tpidr_el0, get current thread.
         (0b11, 0b011, 0b0000, 0b0000, 0b111) => {
             let implementer = 0; // Reserved for software use
             let variant = 0;
@@ -1019,6 +1017,12 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
         }
         (0b11, 0b000, 0b1100, 0b0000, 0b000) => {
             Operand::Sys(Type::U64, compiler.reg_by_name("vbar_el1"))
+        }
+        (0b11, 0b011, 0b1101, 0b0000, 0b010) => {
+            Operand::Sys(Type::U64, compiler.reg_by_name("tpidr_el0"))
+        } // tpidr_el0, get current thread.
+        (0b11, 0b000, 0b0000, 0b0000, 0b101) => {
+            Operand::Sys(Type::U64, compiler.reg_by_name("mpidr_el1"))
         }
         _ => unimplemented!("MRS: {:?}", operand),
     };
@@ -1312,7 +1316,7 @@ fn gen_movn(compiler: &AArch64Compiler, operand: HwImm16Rd, ty: Type) -> IrBlock
 fn gen_strb_imm(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
+    let (wback, post_index, offset) = decode_operand_for_ld_st_reg_imm(operand, false);
 
     let dst = if operand.rn == 31 {
         compiler.stack_reg()
@@ -1748,7 +1752,7 @@ fn gen_movi(compiler: &AArch64Compiler, operand: AdvSimdModifiedImm) -> IrBlock 
 fn gen_str_imm_simd_fp(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, true);
+    let (wback, post_index, offset) = decode_operand_for_ld_st_reg_imm(operand, true);
 
     let src = if operand.rn == 31 {
         compiler.stack_reg()
@@ -1915,7 +1919,7 @@ fn gen_ccmn_imm(compiler: &AArch64Compiler, operand: CondCmpImm, ty: Type) -> Ir
 fn gen_ldr_imm_simd_fp(compiler: &AArch64Compiler, operand: OpcSizeImm12RnRt, ty: Type) -> IrBlock {
     let mut block = IrBlock::new(4);
 
-    let (wback, post_index, _scale, offset) = decode_operand_for_ld_st_reg_imm(operand, true);
+    let (wback, post_index, offset) = decode_operand_for_ld_st_reg_imm(operand, true);
 
     let src = if operand.rn == 31 {
         compiler.stack_reg()
@@ -2281,4 +2285,8 @@ fn gen_csinv(compiler: &AArch64Compiler, operand: RmCondRnRd, ty: Type) -> IrBlo
     block.append(ir, ds);
 
     block
+}
+
+fn gen_msr_imm(compiler: &AArch64Compiler, operand: PstateOp) -> IrBlock {
+    todo!()
 }

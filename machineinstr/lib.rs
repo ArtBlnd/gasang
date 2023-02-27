@@ -12,18 +12,18 @@ use crate::instr::NativeInstr;
 pub trait MachineInstrParserRule: Clone {
     type MachineInstr;
 
-    fn parse<I>(&mut self, buf: &mut BitReader<I>) -> Option<NativeInstr<Self::MachineInstr>>
+    fn parse<I>(&mut self, buf: &mut ByteReader<I>) -> Option<NativeInstr<Self::MachineInstr>>
     where
         I: Iterator<Item = u8>;
 }
 
 pub struct MachineInstParser<I, R> {
-    buf: BitReader<I>,
+    buf: ByteReader<I>,
     rule: R,
 }
 
 impl<I, R> MachineInstParser<I, R> {
-    pub fn new(buf: BitReader<I>, rule: R) -> Self {
+    pub fn new(buf: ByteReader<I>, rule: R) -> Self {
         Self { buf, rule }
     }
 }

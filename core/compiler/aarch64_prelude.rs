@@ -103,19 +103,17 @@ pub fn decode_shift(shift: u8) -> ShiftType {
 pub const fn decode_operand_for_ld_st_reg_imm(
     operand: OpcSizeImm12RnRt,
     is_simd_fp: bool,
-) -> (bool, bool, u8, i64) {
-    let opc1 = (operand.opc & 0b10) >> 1;
+) -> (bool, bool, i64) {
+    let opc1 = bit(operand.opc as u64, 1) as u8;
     if operand.idxt == 0b00 {
         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
         let post = extract_bits16(0..2, operand.imm12) == 0b01;
 
-        let scale = (if is_simd_fp { 4 } else { 0 }) * opc1 + operand.size;
-
-        (true, post, scale, sign_extend(imm9, 9))
+        (true, post, sign_extend(imm9, 9))
     } else {
         //Unsigned offset
         let scale = (if is_simd_fp { 4 } else { 0 }) * opc1 + operand.size;
-        (false, false, scale, (operand.imm12 << scale) as i64)
+        (false, false, (operand.imm12 << scale) as i64)
     }
 }
 
@@ -236,10 +234,6 @@ pub const fn ror(x: u64, shift: u64, size: u64) -> u64 {
 pub const fn replicate(x: u64, n: u64, size: u64) -> u64 {
     let mut result = 0b0u64;
     let mut i = n;
-
-    if n <= 1 {
-        return x;
-    }
 
     while i > 0 {
         result = result.overflowing_shl(size as u32).0;
@@ -481,5 +475,168 @@ pub fn check_transactional_system_acceess(
         }
 
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::codegen::flag_policy::AArch64FlagPolicy;
+    use crate::codegen::rustjit::InterpretCodegen;
+    use crate::codegen::{Codegen, Executable};
+    use crate::cpu::Cpu;
+    use crate::value::Value;
+
+    use super::*;
+
+    #[test]
+    fn test_pstate_range() {
+        let pstate = Pstate::NZCV;
+        assert_eq!(pstate.range(), 60..64);
+
+        assert_eq!(u64::MAX & pstate.mask(), 0b1111 << pstate.idx())
+    }
+
+    #[test]
+    fn test_sign_extend() {
+        for i in i16::MIN..i16::MAX {
+            let rust_sext = i as i64;
+            let val = sign_extend((i as u16) as i64, 16);
+            assert_eq!(rust_sext, val);
+        }
+    }
+
+    // #[test]
+    // fn test_gen_ip_rel() {
+    //     let mut cpu = Cpu::new_for_test();
+    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+
+    //     let diff = 100;
+
+    //     let ir = Ir::Value(Operand::Ip);
+    //     let code = cg.compile_ir(ir);
+    //     let origin_ip = unsafe { code.execute(&mut cpu) };
+
+    //     let ir = gen_ip_relative(diff);
+    //     let code = cg.compile_ir(ir);
+    //     let plus_ip = unsafe { code.execute(&mut cpu) };
+
+    //     assert_eq!(origin_ip.i64() + diff, plus_ip.i64());
+
+    //     let ir = gen_ip_relative(-diff);
+    //     let code = cg.compile_ir(ir);
+    //     let minus_ip = unsafe { code.execute(&mut cpu) };
+
+    //     assert_eq!(origin_ip.i64() - diff, minus_ip.i64());
+    // }
+
+    // #[test]
+    // fn test_condition_holds() {
+    //     let mut cpu = Cpu::new_for_test();
+    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+
+    //     cpu.set_flag(0b1 << Pstate::Z.idx());
+    //     let ir = Ir::Value(condition_holds(0b0000)); // Condition: Zero flag set
+    //     let code = cg.compile_ir(ir);
+    //     let zf = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(zf.u8(), true as u8);
+
+    //     let ir = Ir::Value(condition_holds(0b0001)); // Condition: Zero flag not set
+    //     let code = cg.compile_ir(ir);
+    //     let zf = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(zf.u8(), false as u8);
+
+    //     cpu.set_flag(0b1 << Pstate::C.idx());
+    //     let ir = Ir::Value(condition_holds(0b0010)); // Condition: Carry flag set
+    //     let code = cg.compile_ir(ir);
+    //     let cf = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(cf.u8(), true as u8);
+
+    //     let ir = Ir::Value(condition_holds(0b0011)); // Condition: Carry flag set
+    //     let code = cg.compile_ir(ir);
+    //     let cf = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(cf.u8(), false as u8);
+
+    //     cpu.del_flag(u64::MAX);
+    //     let ir = Ir::Value(condition_holds(0b1110)); // Condition: True
+    //     let code = cg.compile_ir(ir);
+    //     let cf = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(cf.u8(), true as u8);
+
+    //     let ir = Ir::Value(condition_holds(0b1111)); // Condition: True
+    //     let code = cg.compile_ir(ir);
+    //     let cf = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(cf.u8(), true as u8);
+    // }
+
+    // #[test]
+    // fn test_flag() {
+    //     let mut cpu = Cpu::new_for_test();
+    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+
+    //     cpu.set_flag(0b1010 << Pstate::NZCV.idx());
+    //     let ir = Ir::Value(Operand::ir(flag(Pstate::NZCV.range())));
+    //     let code = cg.compile_ir(ir);
+    //     let nzcv = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(nzcv.u64(), 0b1010);
+    // }
+
+    #[test]
+    fn test_highest_set_bit() {
+        for i in 0..63 {
+            assert_eq!(highest_set_bit(0b1 << i), i)
+        }
+    }
+
+    #[test]
+    fn test_ones() {
+        assert_eq!(0b0, ones(0));
+        assert_eq!(0b1, ones(1));
+        assert_eq!(0b11, ones(2));
+        assert_eq!(0b111, ones(3));
+        assert_eq!(0b1111, ones(4));
+        assert_eq!(u64::MAX, ones(64));
+    }
+
+    // #[test]
+    // fn test_replicate_reg64() {
+    //     let mut cpu = Cpu::new_for_test();
+    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+
+    //     let reg = cpu.reg_by_name("x0").unwrap();
+
+    //     **cpu.gpr_mut(reg) = Value::from_u64(0b0101);
+
+    //     let ir = Ir::Value(Operand::ir(replicate_reg64(reg, 0)));
+    //     let code = cg.compile_ir(ir);
+    //     let result = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(result.u64(), u64::MAX);
+
+    //     let ir = Ir::Value(Operand::ir(replicate_reg64(reg, 1)));
+    //     let code = cg.compile_ir(ir);
+    //     let result = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(result.u64(), 0);
+    // }
+
+    #[test]
+    // fn test_replace_bits() {
+    //     let mut cpu = Cpu::new_for_test();
+    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+    //     let reg = cpu.reg_by_name("x0").unwrap();
+
+    //     **cpu.gpr_mut(reg) = Value::from_u64(0b1001);
+    //     let ir = Ir::Value(Operand::ir(replace_bits(Operand::Gpr(Type::U64, reg), 0b01, 2..4)));
+    //     let code = cg.compile_ir(ir);
+    //     let result = unsafe { code.execute(&mut cpu) };
+    //     assert_eq!(result.u64(), 0b0101)
+    // }
+    #[test]
+    fn test_bit() {
+        let val = 0b1010_1100;
+        assert_eq!(false, bit(val, 0));
+        assert_eq!(false, bit(val, 1));
+        assert_eq!(true, bit(val, 2));
+        assert_eq!(true, bit(val, 3));
+        assert_eq!(0, bit(val, 4).into());
+        assert_eq!(1, bit(val, 5).into());
     }
 }

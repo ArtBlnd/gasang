@@ -3,7 +3,7 @@ use elf::ElfBytes;
 
 use machineinstr::aarch64::AArch64InstrParserRule;
 use machineinstr::MachineInstParser;
-use utility::BitReader;
+use utility::ByteReader;
 
 fn main() {
     // Get first argument
@@ -27,7 +27,7 @@ fn main() {
 
     let buf = &slice[ep_offset..(ep_offset + ep_size)];
 
-    let reader = BitReader::new(buf.iter().cloned());
+    let reader = ByteReader::new(buf.iter().cloned());
     let parser = MachineInstParser::new(reader, AArch64InstrParserRule);
 
     let mut n = 0;

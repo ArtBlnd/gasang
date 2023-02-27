@@ -1,5 +1,6 @@
 use crate::codegen::flag_policy::FlagPolicy;
 
+#[derive(Clone)]
 pub struct DummyFlagPolicy;
 impl FlagPolicy for DummyFlagPolicy {
     fn carry(&self, _vm: &crate::Cpu) -> bool {
