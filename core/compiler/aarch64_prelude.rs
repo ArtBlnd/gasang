@@ -6,6 +6,11 @@ use crate::register::RegId;
 use machineinstr::aarch64::OpcSizeImm12RnRt;
 use utility::*;
 
+pub const fn el(level: u8) -> u8 {
+    assert!(level <= 3);
+    level
+}
+
 pub enum Pstate {
     N,
     Z,
@@ -104,7 +109,7 @@ pub const fn decode_operand_for_ld_st_reg_imm(
     operand: OpcSizeImm12RnRt,
     is_simd_fp: bool,
 ) -> (bool, bool, i64) {
-    let opc1 = bit(operand.opc as u64, 1) as u8;
+    let opc1 = bit8(operand.opc, 1) as u8;
     if operand.idxt == 0b00 {
         let imm9 = extract_bits16(2..11, operand.imm12) as i64;
         let post = extract_bits16(0..2, operand.imm12) == 0b01;
@@ -204,6 +209,14 @@ pub fn flag(range: Range<u64>) -> Ir {
         )),
         Operand::imm(Type::U64, ones(range.end - range.start)),
     )
+}
+
+pub fn set_flag(range: Range<u64>, imm: u64) -> Ir {
+    Ir::Or(Type::U64, Operand::ir(Ir::And(
+        Type::U64,
+        Operand::Flag,
+        Operand::imm(Type::U64, !ones(range.end - range.start) << range.start),
+    )), Operand::imm(Type::U64, imm << range.start))
 }
 
 pub fn shift_reg(reg: Operand, shift_type: ShiftType, amount: Operand, t: Type) -> Ir {
@@ -380,30 +393,30 @@ pub fn adv_simd_exapnd_imm(op: u8, cmode: u8, imm8: u8) -> u64 {
                 return replicate(imm8, 8, 8);
             }
             if cmode0 == 0 && op == 1 {
-                let imm8a = replicate(bit(imm8, 7).into(), 8, 1) << 56;
-                let imm8b = replicate(bit(imm8, 6).into(), 8, 1) << 48;
-                let imm8c = replicate(bit(imm8, 5).into(), 8, 1) << 40;
-                let imm8d = replicate(bit(imm8, 4).into(), 8, 1) << 32;
-                let imm8e = replicate(bit(imm8, 3).into(), 8, 1) << 24;
-                let imm8f = replicate(bit(imm8, 2).into(), 8, 1) << 16;
-                let imm8g = replicate(bit(imm8, 1).into(), 8, 1) << 8;
-                let imm8h = replicate(bit(imm8, 0).into(), 8, 1);
+                let imm8a = replicate(bit64(imm8, 7).into(), 8, 1) << 56;
+                let imm8b = replicate(bit64(imm8, 6).into(), 8, 1) << 48;
+                let imm8c = replicate(bit64(imm8, 5).into(), 8, 1) << 40;
+                let imm8d = replicate(bit64(imm8, 4).into(), 8, 1) << 32;
+                let imm8e = replicate(bit64(imm8, 3).into(), 8, 1) << 24;
+                let imm8f = replicate(bit64(imm8, 2).into(), 8, 1) << 16;
+                let imm8g = replicate(bit64(imm8, 1).into(), 8, 1) << 8;
+                let imm8h = replicate(bit64(imm8, 0).into(), 8, 1);
 
                 return imm8a | imm8b | imm8c | imm8d | imm8e | imm8f | imm8g | imm8h;
             }
             if cmode0 == 1 && op == 0 {
-                let a = u64::from(bit(imm8, 7)) << 31;
-                let b = u64::from(!bit(imm8, 6)) << 30;
-                let c = replicate(bit(imm8, 6).into(), 5, 1) << 25;
+                let a = u64::from(bit64(imm8, 7)) << 31;
+                let b = u64::from(!bit64(imm8, 6)) << 30;
+                let c = replicate(bit64(imm8, 6).into(), 5, 1) << 25;
                 let d = imm8 & 0b111111 << 19;
 
                 let imm32 = a | b | c | d;
                 return replicate(imm32, 2, 32);
             }
             if cmode0 == 1 && op == 1 {
-                let a = u64::from(bit(imm8, 7)) << 63;
-                let b = u64::from(!bit(imm8, 6)) << 62;
-                let c = replicate(bit(imm8, 6).into(), 8, 1) << 54;
+                let a = u64::from(bit64(imm8, 7)) << 63;
+                let b = u64::from(!bit64(imm8, 6)) << 62;
+                let c = replicate(bit64(imm8, 6).into(), 8, 1) << 54;
                 let d = imm8 & 0b111111 << 48;
 
                 return a | b | c | d;
@@ -416,7 +429,13 @@ pub fn adv_simd_exapnd_imm(op: u8, cmode: u8, imm8: u8) -> u64 {
     }
 }
 
-pub const fn bit(val: u64, idx: u8) -> bool {
+pub const fn bit64(val: u64, idx: u8) -> bool {
+    assert!(idx <= 64);
+    ((val >> idx) & 0b1) == 0b1
+}
+
+pub const fn bit8(val: u8, idx: u8) -> bool {
+    assert!(idx <= 8);
     ((val >> idx) & 0b1) == 0b1
 }
 
@@ -452,25 +471,25 @@ pub fn check_transactional_system_acceess(
 ) -> bool {
     match (read, op0, op1, crn, crm, op2) {
         (0b0, 0b00, 0b011, 0b0100, _, _)
-            if parse_pattern("xxxx").test_u8(crm) && parse_pattern("11x").test_u8(op2) =>
+            if Pattern::from("xxxx").test_u8(crm) && Pattern::from("11x").test_u8(op2) =>
         {
             true
         }
         (0b0, 0b01, 0b011, 0b0111, 0b0100, 0b001) => true,
-        (0b0, 0b11, 0b011, 0b0100, 0b0010, _) if parse_pattern("00x").test_u8(op2) => true,
-        (0b0, 0b11, 0b011, 0b0100, 0b0100, _) if parse_pattern("00x").test_u8(op2) => true,
+        (0b0, 0b11, 0b011, 0b0100, 0b0010, _) if Pattern::from("00x").test_u8(op2) => true,
+        (0b0, 0b11, 0b011, 0b0100, 0b0100, _) if Pattern::from("00x").test_u8(op2) => true,
         (0b0, 0b11, 0b000, 0b0100, 0b0110, 0b000) => true,
         (0b0, 0b11, 0b011, 0b1001, 0b1100, 0b100) => true,
-        (0b1, 0b11, _, _, _, _) if parse_pattern("0xxx").test_u8(crn) => true,
-        (0b1, 0b11, _, _, _, _) if parse_pattern("100x").test_u8(crn) => true,
+        (0b1, 0b11, _, _, _, _) if Pattern::from("0xxx").test_u8(crn) => true,
+        (0b1, 0b11, _, _, _, _) if Pattern::from("100x").test_u8(crn) => true,
         (0b1, 0b11, _, 0b1010, _, _) => true,
-        (0b1, 0b11, 0b000, 0b1100, _, 0b010) if parse_pattern("1x00").test_u8(crm) => true,
+        (0b1, 0b11, 0b000, 0b1100, _, 0b010) if Pattern::from("1x00").test_u8(crm) => true,
         (0b1, 0b11, 0b000, 0b1100, 0b1011, 0b011) => true,
         (0b1, 0b11, _, 0b1101, _, _) => true,
         (0b1, 0b11, _, 0b1110, _, _) => true,
         (0b0, 0b01, 0b011, 0b0111, 0b0011, 0b111) => true,
-        (0b0, 0b01, 0b011, 0b0111, 0b0011, _) if parse_pattern("10x").test_u8(op2) => true,
-        (_, 0b11, _, _, _, _) if parse_pattern("1x11").test_u8(crn) => {
+        (0b0, 0b01, 0b011, 0b0111, 0b0011, _) if Pattern::from("10x").test_u8(op2) => true,
+        (_, 0b11, _, _, _, _) if Pattern::from("1x11").test_u8(crn) => {
             panic!("Need to return boolean IMPLEMENTATION_DEFINED")
         }
 
@@ -482,9 +501,10 @@ pub fn check_transactional_system_acceess(
 mod test {
     use crate::codegen::flag_policy::AArch64FlagPolicy;
     use crate::codegen::rustjit::InterpretCodegen;
-    use crate::codegen::{Codegen, Executable};
+    use crate::codegen::{Codegen, Executable, ExecutionContext};
     use crate::cpu::Cpu;
     use crate::value::Value;
+    use crate::softmmu::Mmu;
 
     use super::*;
 
@@ -505,80 +525,86 @@ mod test {
         }
     }
 
-    // #[test]
-    // fn test_gen_ip_rel() {
-    //     let mut cpu = Cpu::new_for_test();
-    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+    #[test]
+    fn test_gen_ip_rel() {
+        let mut cpu = Cpu::new_for_test();
+        let mut mmu = Mmu::new();
+        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
-    //     let diff = 100;
+        let diff = 100;
 
-    //     let ir = Ir::Value(Operand::Ip);
-    //     let code = cg.compile_ir(ir);
-    //     let origin_ip = unsafe { code.execute(&mut cpu) };
+        let ir = Ir::Value(Operand::Ip);
+        let code = cg.compile_ir(&ir);
+        let origin_ip = unsafe { code.execute(&mut ctx) };
 
-    //     let ir = gen_ip_relative(diff);
-    //     let code = cg.compile_ir(ir);
-    //     let plus_ip = unsafe { code.execute(&mut cpu) };
+        let ir = gen_ip_relative(diff);
+        let code = cg.compile_ir(&ir);
+        let plus_ip = unsafe { code.execute(&mut ctx) };
 
-    //     assert_eq!(origin_ip.i64() + diff, plus_ip.i64());
+        assert_eq!(origin_ip.i64() + diff, plus_ip.i64());
 
-    //     let ir = gen_ip_relative(-diff);
-    //     let code = cg.compile_ir(ir);
-    //     let minus_ip = unsafe { code.execute(&mut cpu) };
+        let ir = gen_ip_relative(-diff);
+        let code = cg.compile_ir(&ir);
+        let minus_ip = unsafe { code.execute(&mut ctx) };
 
-    //     assert_eq!(origin_ip.i64() - diff, minus_ip.i64());
-    // }
+        assert_eq!(origin_ip.i64() - diff, minus_ip.i64());
+    }
 
-    // #[test]
-    // fn test_condition_holds() {
-    //     let mut cpu = Cpu::new_for_test();
-    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+    #[test]
+    fn test_condition_holds() {
+        let mut cpu = Cpu::new_for_test();
+        let mut mmu = Mmu::new();
+        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
-    //     cpu.set_flag(0b1 << Pstate::Z.idx());
-    //     let ir = Ir::Value(condition_holds(0b0000)); // Condition: Zero flag set
-    //     let code = cg.compile_ir(ir);
-    //     let zf = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(zf.u8(), true as u8);
+        ctx.cpu.set_flag(0b1 << Pstate::Z.idx());
+        let ir = Ir::Value(condition_holds(0b0000)); // Condition: Zero flag set
+        let code = cg.compile_ir(&ir);
+        let zf = unsafe { code.execute(&mut ctx) };
+        assert_eq!(zf.u8(), true as u8);
 
-    //     let ir = Ir::Value(condition_holds(0b0001)); // Condition: Zero flag not set
-    //     let code = cg.compile_ir(ir);
-    //     let zf = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(zf.u8(), false as u8);
+        let ir = Ir::Value(condition_holds(0b0001)); // Condition: Zero flag not set
+        let code = cg.compile_ir(&ir);
+        let zf = unsafe { code.execute(&mut ctx) };
+        assert_eq!(zf.u8(), false as u8);
 
-    //     cpu.set_flag(0b1 << Pstate::C.idx());
-    //     let ir = Ir::Value(condition_holds(0b0010)); // Condition: Carry flag set
-    //     let code = cg.compile_ir(ir);
-    //     let cf = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(cf.u8(), true as u8);
+        ctx.cpu.set_flag(0b1 << Pstate::C.idx());
+        let ir = Ir::Value(condition_holds(0b0010)); // Condition: Carry flag set
+        let code = cg.compile_ir(&ir);
+        let cf = unsafe { code.execute(&mut ctx) };
+        assert_eq!(cf.u8(), true as u8);
 
-    //     let ir = Ir::Value(condition_holds(0b0011)); // Condition: Carry flag set
-    //     let code = cg.compile_ir(ir);
-    //     let cf = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(cf.u8(), false as u8);
+        let ir = Ir::Value(condition_holds(0b0011)); // Condition: Carry flag set
+        let code = cg.compile_ir(&ir);
+        let cf = unsafe { code.execute(&mut ctx) };
+        assert_eq!(cf.u8(), false as u8);
 
-    //     cpu.del_flag(u64::MAX);
-    //     let ir = Ir::Value(condition_holds(0b1110)); // Condition: True
-    //     let code = cg.compile_ir(ir);
-    //     let cf = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(cf.u8(), true as u8);
+        ctx.cpu.del_flag(u64::MAX);
+        let ir = Ir::Value(condition_holds(0b1110)); // Condition: True
+        let code = cg.compile_ir(&ir);
+        let cf = unsafe { code.execute(&mut ctx) };
+        assert_eq!(cf.u8(), true as u8);
 
-    //     let ir = Ir::Value(condition_holds(0b1111)); // Condition: True
-    //     let code = cg.compile_ir(ir);
-    //     let cf = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(cf.u8(), true as u8);
-    // }
+        let ir = Ir::Value(condition_holds(0b1111)); // Condition: True
+        let code = cg.compile_ir(&ir);
+        let cf = unsafe { code.execute(&mut ctx) };
+        assert_eq!(cf.u8(), true as u8);
+    }
 
-    // #[test]
-    // fn test_flag() {
-    //     let mut cpu = Cpu::new_for_test();
-    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+    #[test]
+    fn test_flag() {
+        let mut cpu = Cpu::new_for_test();
+        let mut mmu = Mmu::new();
+        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
-    //     cpu.set_flag(0b1010 << Pstate::NZCV.idx());
-    //     let ir = Ir::Value(Operand::ir(flag(Pstate::NZCV.range())));
-    //     let code = cg.compile_ir(ir);
-    //     let nzcv = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(nzcv.u64(), 0b1010);
-    // }
+        ctx.cpu.set_flag(0b1010 << Pstate::NZCV.idx());
+        let ir = Ir::Value(Operand::ir(flag(Pstate::NZCV.range())));
+        let code = cg.compile_ir(&ir);
+        let nzcv = unsafe { code.execute(&mut ctx) };
+        assert_eq!(nzcv.u64(), 0b1010);
+    }
 
     #[test]
     fn test_highest_set_bit() {
@@ -597,46 +623,65 @@ mod test {
         assert_eq!(u64::MAX, ones(64));
     }
 
-    // #[test]
-    // fn test_replicate_reg64() {
-    //     let mut cpu = Cpu::new_for_test();
-    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
+    #[test]
+    fn test_replicate_reg64() {
+        let mut cpu = Cpu::new_for_test();
+        let mut mmu = Mmu::new();
+        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
-    //     let reg = cpu.reg_by_name("x0").unwrap();
+        let reg = ctx.cpu.reg_by_name("x0").unwrap();
 
-    //     **cpu.gpr_mut(reg) = Value::from_u64(0b0101);
+        *ctx.cpu.gpr_mut(reg).u64_mut() = 0b0101;
 
-    //     let ir = Ir::Value(Operand::ir(replicate_reg64(reg, 0)));
-    //     let code = cg.compile_ir(ir);
-    //     let result = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(result.u64(), u64::MAX);
+        let ir = Ir::Value(Operand::ir(replicate_reg64(reg, 0)));
+        let code = cg.compile_ir(&ir);
+        let result = unsafe { code.execute(&mut ctx) };
+        assert_eq!(result.u64(), u64::MAX);
 
-    //     let ir = Ir::Value(Operand::ir(replicate_reg64(reg, 1)));
-    //     let code = cg.compile_ir(ir);
-    //     let result = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(result.u64(), 0);
-    // }
+        let ir = Ir::Value(Operand::ir(replicate_reg64(reg, 1)));
+        let code = cg.compile_ir(&ir);
+        let result = unsafe { code.execute(&mut ctx) };
+        assert_eq!(result.u64(), 0);
+    }
 
     #[test]
-    // fn test_replace_bits() {
-    //     let mut cpu = Cpu::new_for_test();
-    //     let cg = InterpretCodegen::new(AArch64FlagPolicy);
-    //     let reg = cpu.reg_by_name("x0").unwrap();
+    fn test_replace_bits() {
+        let mut cpu = Cpu::new_for_test();
+        let mut mmu = Mmu::new();
+        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let cg = InterpretCodegen::new(AArch64FlagPolicy);
+        let reg = ctx.cpu.reg_by_name("x0").unwrap();
 
-    //     **cpu.gpr_mut(reg) = Value::from_u64(0b1001);
-    //     let ir = Ir::Value(Operand::ir(replace_bits(Operand::Gpr(Type::U64, reg), 0b01, 2..4)));
-    //     let code = cg.compile_ir(ir);
-    //     let result = unsafe { code.execute(&mut cpu) };
-    //     assert_eq!(result.u64(), 0b0101)
-    // }
+        *ctx.cpu.gpr_mut(reg).u64_mut() = 0b1001;
+        let ir = Ir::Value(Operand::ir(replace_bits(Operand::Gpr(Type::U64, reg), 0b01, 2..4)));
+        let code = cg.compile_ir(&ir);
+        let result = unsafe { code.execute(&mut ctx) };
+        assert_eq!(result.u64(), 0b0101)
+    }
+
     #[test]
     fn test_bit() {
         let val = 0b1010_1100;
-        assert_eq!(false, bit(val, 0));
-        assert_eq!(false, bit(val, 1));
-        assert_eq!(true, bit(val, 2));
-        assert_eq!(true, bit(val, 3));
-        assert_eq!(0, bit(val, 4).into());
-        assert_eq!(1, bit(val, 5).into());
+        assert_eq!(false, bit64(val, 0));
+        assert_eq!(false, bit64(val, 1));
+        assert_eq!(true, bit64(val, 2));
+        assert_eq!(true, bit64(val, 3));
+        assert_eq!(0, bit64(val, 4).into());
+        assert_eq!(1, bit64(val, 5).into());
+    }
+
+    #[test]
+    fn test_set_flag() {
+        let mut cpu = Cpu::new_for_test();
+        let mut mmu = Mmu::new();
+        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let cg = InterpretCodegen::new(AArch64FlagPolicy);
+        
+        ctx.cpu.set_flag(0b1111 << Pstate::NZCV.idx());
+        let ir = Ir::Value(Operand::ir(set_flag(Pstate::NZCV.range(), 0b0011)));
+        let code = cg.compile_ir(&ir);
+        let nzcv = unsafe { code.execute(&mut ctx) };
+        assert_eq!(nzcv.u64(), 0b0011 << Pstate::NZCV.idx());
     }
 }

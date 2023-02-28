@@ -8,6 +8,8 @@ use crate::value::Value;
 
 use machineinstr::aarch64::*;
 
+use utility::Pattern;
+
 pub struct AArch64Compiler {
     register_info: HashMap<String, RegId>,
 }
@@ -104,6 +106,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::StlxrVar32(operand) => gen_stlxr(self, operand, Type::U32),
             AArch64Instr::StxrVar64(operand) => gen_stxr(self, operand, Type::U64),
             AArch64Instr::StxrVar32(operand) => gen_stxr(self, operand, Type::U32),
+            AArch64Instr::StrbRegShiftedReg(operand) => gen_strb_reg(self, operand),
 
             // Advanced SIMD and FP
             AArch64Instr::DupGeneral(operand) => gen_dup_general(self, operand),
@@ -194,7 +197,7 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Mrs(operand) => gen_mrs(self, operand),
             AArch64Instr::MsrReg(operand) => gen_msr_reg(self, operand),
             AArch64Instr::MsrImm(operand) => gen_msr_imm(self, operand),
-            AArch64Instr::Nop | AArch64Instr::Wfi | AArch64Instr::Dmb(_) => {
+            AArch64Instr::Nop | AArch64Instr::Wfi | AArch64Instr::Dmb(_) | AArch64Instr::Isb(_) => {
                 let mut block = IrBlock::new(4);
 
                 let ir = Ir::Nop;
@@ -998,7 +1001,7 @@ fn gen_mrs(compiler: &AArch64Compiler, operand: SysRegMov) -> IrBlock {
         operand.crm,
         operand.op2,
     ) {
-        (0b11, 0b011, 0b0000, 0b0000, 0b111) => {
+        (0b11, 0b011, 0b0000, 0b0000, 0b111) | (0b11, 0b000, 0b0000, 0b0000, 0b000) => {
             let implementer = 0; // Reserved for software use
             let variant = 0;
             let architecture = 0b1111; // Architectural features are individually identified in the ID_* registers, see 'ID registers'.
@@ -1679,7 +1682,7 @@ fn gen_ldrb_reg_shifted_reg(compiler: &AArch64Compiler, operand: LoadStoreRegReg
 }
 
 fn gen_movi(compiler: &AArch64Compiler, operand: AdvSimdModifiedImm) -> IrBlock {
-    use utility::parse_pattern;
+    use utility::Pattern;
 
     let mut block = IrBlock::new(4);
 
@@ -1692,17 +1695,17 @@ fn gen_movi(compiler: &AArch64Compiler, operand: AdvSimdModifiedImm) -> IrBlock 
     let datasize = ty.size();
 
     let operation = match cmode_op {
-        _ if parse_pattern("0xx00").test_u8(operand.cmode) => ImmediateOp::MOVI,
-        _ if parse_pattern("0xx01").test_u8(operand.cmode) => ImmediateOp::MVNI,
-        _ if parse_pattern("0xx10").test_u8(operand.cmode) => ImmediateOp::ORR,
-        _ if parse_pattern("0xx11").test_u8(operand.cmode) => ImmediateOp::BIC,
-        _ if parse_pattern("10x00").test_u8(operand.cmode) => ImmediateOp::MOVI,
-        _ if parse_pattern("10x01").test_u8(operand.cmode) => ImmediateOp::MVNI,
-        _ if parse_pattern("10x10").test_u8(operand.cmode) => ImmediateOp::ORR,
-        _ if parse_pattern("10x11").test_u8(operand.cmode) => ImmediateOp::BIC,
-        _ if parse_pattern("110x0").test_u8(operand.cmode) => ImmediateOp::MOVI,
-        _ if parse_pattern("110x1").test_u8(operand.cmode) => ImmediateOp::MVNI,
-        _ if parse_pattern("1110x").test_u8(operand.cmode) => ImmediateOp::MOVI,
+        _ if Pattern::from("0xx00").test_u8(operand.cmode) => ImmediateOp::MOVI,
+        _ if Pattern::from("0xx01").test_u8(operand.cmode) => ImmediateOp::MVNI,
+        _ if Pattern::from("0xx10").test_u8(operand.cmode) => ImmediateOp::ORR,
+        _ if Pattern::from("0xx11").test_u8(operand.cmode) => ImmediateOp::BIC,
+        _ if Pattern::from("10x00").test_u8(operand.cmode) => ImmediateOp::MOVI,
+        _ if Pattern::from("10x01").test_u8(operand.cmode) => ImmediateOp::MVNI,
+        _ if Pattern::from("10x10").test_u8(operand.cmode) => ImmediateOp::ORR,
+        _ if Pattern::from("10x11").test_u8(operand.cmode) => ImmediateOp::BIC,
+        _ if Pattern::from("110x0").test_u8(operand.cmode) => ImmediateOp::MOVI,
+        _ if Pattern::from("110x1").test_u8(operand.cmode) => ImmediateOp::MVNI,
+        _ if Pattern::from("1110x").test_u8(operand.cmode) => ImmediateOp::MOVI,
         0b11110 => ImmediateOp::MOVI,
         0b11111 => ImmediateOp::MOVI,
         _ => unreachable!(),
@@ -2108,7 +2111,7 @@ fn gen_ldr_reg_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffse
     let mut block = IrBlock::new(4);
 
     let ext_type = decode_reg_extend(operand.option);
-    let scale = bit(operand.opc as u64, 1) as u8 * 4 + operand.size;
+    let scale = bit8(operand.opc, 1) as u8 * 4 + operand.size;
     let shift = if operand.s == 1 { scale } else { 0 };
     let ty = Type::uscalar_from_size(1 << scale);
 
@@ -2137,7 +2140,7 @@ fn gen_str_reg_simd_fp(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffse
     let mut block = IrBlock::new(4);
 
     let ext_type = decode_reg_extend(operand.option);
-    let scale = bit(operand.opc as u64, 1) as u8 * 4 + operand.size;
+    let scale = bit8(operand.opc, 1) as u8 * 4 + operand.size;
     let shift = if operand.s == 1 { scale } else { 0 };
     let ty = Type::uscalar_from_size(1 << scale);
 
@@ -2288,5 +2291,95 @@ fn gen_csinv(compiler: &AArch64Compiler, operand: RmCondRnRd, ty: Type) -> IrBlo
 }
 
 fn gen_msr_imm(compiler: &AArch64Compiler, operand: PstateOp) -> IrBlock {
-    todo!()
+    let mut block = IrBlock::new(4);
+
+    let min_el = match operand.op1 {
+        _  if Pattern::from("00x").test_u8(operand.op1) => el(1),
+        0b010 => el(1),
+        0b011 => el(0),
+        0b100 => el(2),
+        0b101 => el(2), // if Not have virt host extension UNDEFINED,
+        0b110 => el(3),
+        0b111 => el(1),
+        _ => unreachable!(),
+    };
+
+    let field = match operand.op1 << 3 | operand.op2 {
+        0b000_011 => PSTATEField::UAO,
+        0b000_100 => PSTATEField::PAN,
+        0b000_101 => PSTATEField::SP,
+        0b001_000 => PSTATEField::ALLINT,
+        0b011_010 => PSTATEField::DIT,
+        0b011_011 => match operand.crm {
+            _ if Pattern::from("001x").test_u8(operand.crm) => PSTATEField::SVCRSM,
+            _ if Pattern::from("010x").test_u8(operand.crm) => PSTATEField::SVCRZA,
+            _ if Pattern::from("011x").test_u8(operand.crm) => PSTATEField::SVCRSMZA,
+            _ => unreachable!()
+        }
+        0b011_100 => PSTATEField::TCO,
+        0b011_110 => PSTATEField::DAIFSet,
+        0b011_111 => PSTATEField::DAIFClr,
+        0b011_001 => PSTATEField::SSBS,
+        _ => unreachable!(),
+    };
+
+    let crm0 = bit8(operand.crm, 0) as u64;
+    let crm1 = bit8(operand.crm, 1) as u64;
+    let crm2 = bit8(operand.crm, 2) as u64;
+    let crm3 = bit8(operand.crm, 3) as u64;
+
+
+    let ir = match field {
+        PSTATEField::SSBS => {
+            set_flag(Pstate::SSBS.range(), crm0)
+        },
+        PSTATEField::SP => set_flag(Pstate::SP.range(), crm0),
+        PSTATEField::DAIFSet => {
+            let imm = crm3 << Pstate::D.idx() | crm2 << Pstate::A.idx() | crm1 << Pstate::I.idx() | crm0 << Pstate::F.idx();
+
+            Ir::Or(Type::U64, Operand::Flag, Operand::imm(Type::U64, imm))
+        }
+        PSTATEField::DAIFClr => {
+            let imm = crm3 << Pstate::D.idx() | crm2 << Pstate::A.idx() | crm1 << Pstate::I.idx() | crm0 << Pstate::F.idx();
+            let imm = !imm;
+
+            Ir::And(Type::U64, Operand::Flag, Operand::imm(Type::U64, imm))
+        },
+        PSTATEField::PAN => set_flag(Pstate::PAN.range(), crm0),
+        PSTATEField::UAO => set_flag(Pstate::UAO.range(), crm0),
+        PSTATEField::DIT => set_flag(Pstate::DIT.range(), crm0),
+        PSTATEField::TCO => set_flag(Pstate::TCO.range(), crm0),
+        PSTATEField::ALLINT => set_flag(Pstate::ALLINT.range(), crm0),
+        PSTATEField::SVCRSM => todo!(),
+        PSTATEField::SVCRZA => todo!(),
+        PSTATEField::SVCRSMZA => todo!(),
+    };
+
+    let ds = BlockDestination::Flags;
+
+    block.append(ir, ds);
+
+    block
+}
+
+fn gen_strb_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let ext_type = decode_reg_extend(operand.option);
+    let offset = extend_reg(compiler.gpr(operand.rm), ext_type, 0, 8);
+
+    let addr = if operand.rn == 31 {
+        compiler.stack_reg()
+    } else {
+        compiler.gpr(operand.rn)
+    };
+
+    let addr = Ir::Add(Type::U64, Operand::Gpr(Type::U64, addr), Operand::ir(offset));
+
+    let ir = Ir::Value(Operand::Gpr(Type::U8, compiler.gpr(operand.rt)));
+    let ds = BlockDestination::MemoryIr(addr);
+
+    block.append(ir, ds);
+
+    block
 }

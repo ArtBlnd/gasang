@@ -13,6 +13,10 @@ use core::Cpu;
 use std::convert::Infallible;
 use std::path::PathBuf;
 
+struct Configuration {
+    ram_size: u64,
+}
+
 fn main() {
     // get file
     let args: Vec<String> = std::env::args().collect();
@@ -25,12 +29,15 @@ fn main() {
     let cgen = InterpretCodegen::new(AArch64FlagPolicy);
     let parser_rule = AArch64InstrParserRule;
 
+    let config = Configuration { ram_size: 2 * 1024 * 1024 };
+
     // initialize image into mmu.
     let image = std::fs::read(PathBuf::from(filename)).unwrap();
-    unsafe { init_image_and_run(cpu, mmu, comp, cgen, parser_rule, image) };
+    unsafe { init_and_run(config, cpu, mmu, comp, cgen, parser_rule, image) };
 }
 
-pub unsafe fn init_image_and_run<C, G, P>(
+unsafe fn init_and_run<C, G, P>(
+    config: Configuration,
     cpu: Cpu,
     mmu: Mmu,
     comp: C,
@@ -43,11 +50,25 @@ where
     P: MachineInstrParserRule<MachineInstr = C::Item>,
     G: Codegen,
 {
-    mmu.mmap(0x0, image.len() as u64, true, true, true);
-    unsafe {
-        mmu.frame(0x0).write(&image).unwrap();
-    }
-    let board = Board::new(comp, cgen, mci_parser, mmu, cpu);
+    // https://qemu.readthedocs.io/en/latest/system/arm/virt.html
 
+    let addr_flash = 0x0000_0000u64;
+    let size_flash = 0x0800_0000u64;
+    mmu.mmap(addr_flash, size_flash, true, true, true); // flash is read-only
+    mmu.frame(addr_flash).write(&image).unwrap();
+
+    let addr_lowmem_peripherals = 0x0800_0000u64;
+    let size_lowmem_peripherals = 0x3800_0000u64;
+    mmu.mmap(addr_lowmem_peripherals, size_lowmem_peripherals, true, true, true);
+
+    let addr_ram = 0x4000_0000u64;
+    let size_ram = config.ram_size;
+    mmu.mmap(addr_ram, size_ram, true, true, true);
+    {
+        let dtb = std::fs::read("binaries/virt-dtb.dtb").unwrap();
+        mmu.frame(addr_ram).write(&dtb).unwrap();
+    }
+
+    let board = Board::new(comp, cgen, mci_parser, mmu, cpu);
     board.run().unwrap()
 }

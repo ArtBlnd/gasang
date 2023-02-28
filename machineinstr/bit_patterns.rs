@@ -1,4 +1,5 @@
 use utility::extract_bits32;
+use utility::Pattern;
 
 use num_traits::FromPrimitive;
 
@@ -53,8 +54,7 @@ where
 }
 
 pub struct Match<H, A> {
-    pattern: u32,
-    mask: u32,
+    pattern: Pattern,
     handler: H,
     __p: PhantomData<A>,
 }
@@ -64,46 +64,21 @@ where
     H: Handler<A>,
 {
     pub fn new<'s>(pattern: &'s str, handler: H) -> Self {
-        let (pattern, mask) = Self::parse_pattern(pattern);
+        let pattern = Pattern::from(pattern);
 
         Self {
             pattern,
-            mask,
             handler,
             __p: PhantomData,
         }
     }
 
     pub fn handle(&self, raw_instr: u32) -> Option<H::Output> {
-        if (!(raw_instr ^ self.pattern) & self.mask) == self.mask {
+        if self.pattern.test_u32(raw_instr) {
             Some(self.handler.handle(raw_instr))
         } else {
             None
         }
-    }
-
-    fn parse_pattern(pattern: &str) -> (u32, u32) {
-        let mut pattern_result = 0b0;
-        let mut mask_result = 0b0;
-
-        for char in pattern.chars() {
-            let (pat, mask) = match char {
-                'x' => (0, 0),
-                '0' => (0, 1),
-                '1' => (1, 1),
-                '_' | ' ' => {
-                    continue;
-                }
-                _ => unreachable!("Bad parse pattern!"),
-            };
-            pattern_result <<= 1;
-            pattern_result |= pat;
-
-            mask_result <<= 1;
-            mask_result |= mask;
-        }
-
-        (pattern_result, mask_result)
     }
 }
 
