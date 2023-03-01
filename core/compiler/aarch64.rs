@@ -2294,7 +2294,7 @@ fn gen_msr_imm(compiler: &AArch64Compiler, operand: PstateOp) -> IrBlock {
     let mut block = IrBlock::new(4);
 
     let min_el = match operand.op1 {
-        _  if Pattern::from("00x").test_u8(operand.op1) => el(1),
+        _ if Pattern::from("00x").test_u8(operand.op1) => el(1),
         0b010 => el(1),
         0b011 => el(0),
         0b100 => el(2),
@@ -2314,8 +2314,8 @@ fn gen_msr_imm(compiler: &AArch64Compiler, operand: PstateOp) -> IrBlock {
             _ if Pattern::from("001x").test_u8(operand.crm) => PSTATEField::SVCRSM,
             _ if Pattern::from("010x").test_u8(operand.crm) => PSTATEField::SVCRZA,
             _ if Pattern::from("011x").test_u8(operand.crm) => PSTATEField::SVCRSMZA,
-            _ => unreachable!()
-        }
+            _ => unreachable!(),
+        },
         0b011_100 => PSTATEField::TCO,
         0b011_110 => PSTATEField::DAIFSet,
         0b011_111 => PSTATEField::DAIFClr,
@@ -2328,23 +2328,26 @@ fn gen_msr_imm(compiler: &AArch64Compiler, operand: PstateOp) -> IrBlock {
     let crm2 = bit8(operand.crm, 2) as u64;
     let crm3 = bit8(operand.crm, 3) as u64;
 
-
     let ir = match field {
-        PSTATEField::SSBS => {
-            set_flag(Pstate::SSBS.range(), crm0)
-        },
+        PSTATEField::SSBS => set_flag(Pstate::SSBS.range(), crm0),
         PSTATEField::SP => set_flag(Pstate::SP.range(), crm0),
         PSTATEField::DAIFSet => {
-            let imm = crm3 << Pstate::D.idx() | crm2 << Pstate::A.idx() | crm1 << Pstate::I.idx() | crm0 << Pstate::F.idx();
+            let imm = crm3 << Pstate::D.idx()
+                | crm2 << Pstate::A.idx()
+                | crm1 << Pstate::I.idx()
+                | crm0 << Pstate::F.idx();
 
             Ir::Or(Type::U64, Operand::Flag, Operand::imm(Type::U64, imm))
         }
         PSTATEField::DAIFClr => {
-            let imm = crm3 << Pstate::D.idx() | crm2 << Pstate::A.idx() | crm1 << Pstate::I.idx() | crm0 << Pstate::F.idx();
+            let imm = crm3 << Pstate::D.idx()
+                | crm2 << Pstate::A.idx()
+                | crm1 << Pstate::I.idx()
+                | crm0 << Pstate::F.idx();
             let imm = !imm;
 
             Ir::And(Type::U64, Operand::Flag, Operand::imm(Type::U64, imm))
-        },
+        }
         PSTATEField::PAN => set_flag(Pstate::PAN.range(), crm0),
         PSTATEField::UAO => set_flag(Pstate::UAO.range(), crm0),
         PSTATEField::DIT => set_flag(Pstate::DIT.range(), crm0),
@@ -2374,7 +2377,11 @@ fn gen_strb_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset) -> I
         compiler.gpr(operand.rn)
     };
 
-    let addr = Ir::Add(Type::U64, Operand::Gpr(Type::U64, addr), Operand::ir(offset));
+    let addr = Ir::Add(
+        Type::U64,
+        Operand::Gpr(Type::U64, addr),
+        Operand::ir(offset),
+    );
 
     let ir = Ir::Value(Operand::Gpr(Type::U8, compiler.gpr(operand.rt)));
     let ds = BlockDestination::MemoryIr(addr);

@@ -1,4 +1,2 @@
-
 // flatten device tree
-pub struct Fdt {
-}
+pub struct Fdt {}

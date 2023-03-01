@@ -29,7 +29,9 @@ fn main() {
     let cgen = InterpretCodegen::new(AArch64FlagPolicy);
     let parser_rule = AArch64InstrParserRule;
 
-    let config = Configuration { ram_size: 2 * 1024 * 1024 };
+    let config = Configuration {
+        ram_size: 2 * 1024 * 1024,
+    };
 
     // initialize image into mmu.
     let image = std::fs::read(PathBuf::from(filename)).unwrap();
@@ -59,7 +61,13 @@ where
 
     let addr_lowmem_peripherals = 0x0800_0000u64;
     let size_lowmem_peripherals = 0x3800_0000u64;
-    mmu.mmap(addr_lowmem_peripherals, size_lowmem_peripherals, true, true, true);
+    mmu.mmap(
+        addr_lowmem_peripherals,
+        size_lowmem_peripherals,
+        true,
+        true,
+        true,
+    );
 
     let addr_ram = 0x4000_0000u64;
     let size_ram = config.ram_size;

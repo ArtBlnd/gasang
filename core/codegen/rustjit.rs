@@ -194,7 +194,8 @@ where
 {
     // Optimiations
     match ir {
-        Ir::ZextCast(_, Operand::Ir(ir)) => {
+        Ir::ZextCast(ty, Operand::Ir(ir)) if ir.get_type().size() <= ty.size() => {
+            // ZextCast is a no-op if the source is smaller or equal than the destination
             return Ok(compile_ir(ir, flag_policy.clone())?);
         }
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::I64, imm)) => {
@@ -303,6 +304,8 @@ where
 
         Ir::Value(op) => compile_op(op, flag_policy.clone()),
         Ir::Nop => Ok(FnExec::new(|_| Value::new(0))),
+
+        Ir::Shuffle(t, op1, op2) => gen_shuffle(t, op1, op2, flag_policy),
 
         Ir::If(t, cond, if_true, if_false) => gen_if(t, cond, if_true, if_false, flag_policy),
         Ir::CmpEq(op1, op2) => gen_cmp_eq(op1, op2, flag_policy),
@@ -1412,5 +1415,60 @@ where
             (lhs < rhs).into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
+    })
+}
+
+unsafe fn gen_shuffle<T>(
+    ty: &Type,
+    op1: &Operand,
+    op2: &Operand,
+    flag_policy: T,
+) -> Result<FnExec<Value>, CodegenError>
+where
+    T: FlagPolicy + Clone + 'static,
+{
+    assert!(ty == &op1.get_type() && ty == &op2.get_type());
+
+    let lhs = compile_op(op1, flag_policy.clone())?;
+    let rhs = compile_op(op2, flag_policy.clone())?;
+
+    Ok(match ty {
+        Type::Vec(VecType::U8, 4) => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx);
+            let lhs = lhs.u8_slice_ref();
+            let rhs = rhs.execute(ctx);
+            let rhs = rhs.u8_slice_ref();
+
+            let mut val = Value::new(4);
+            let val_slice = val.u8_slice_mut();
+
+            val_slice[0] = lhs[rhs[0] as usize];
+            val_slice[1] = lhs[rhs[1] as usize];
+            val_slice[2] = lhs[rhs[2] as usize];
+            val_slice[3] = lhs[rhs[3] as usize];
+
+            val
+        }),
+        Type::Vec(VecType::U8, 8) => FnExec::new(move |ctx| {
+            let lhs = lhs.execute(ctx);
+            let lhs = lhs.u8_slice_ref();
+            let rhs = rhs.execute(ctx);
+            let rhs = rhs.u8_slice_ref();
+
+            let mut val = Value::new(8);
+            let val_slice = val.u8_slice_mut();
+
+            val_slice[0] = lhs[rhs[0] as usize];
+            val_slice[1] = lhs[rhs[1] as usize];
+            val_slice[2] = lhs[rhs[2] as usize];
+            val_slice[3] = lhs[rhs[3] as usize];
+            val_slice[4] = lhs[rhs[4] as usize];
+            val_slice[5] = lhs[rhs[5] as usize];
+            val_slice[6] = lhs[rhs[6] as usize];
+            val_slice[7] = lhs[rhs[7] as usize];
+
+            val
+        }),
+        _ => todo!(),
     })
 }

@@ -56,8 +56,14 @@ impl PageTable {
         let d1_offset = ((addr & D1_MASK) >> 28) as usize;
         let pg_offset = ((addr & PG_MASK) >> 12) as usize;
 
-        debug_assert_eq!(D3_MASK | D2_MASK | D1_MASK | PG_MASK | (PAGE_SIZE-1), u64::MAX);
-        debug_assert_eq!(D3_MASK ^ D2_MASK ^ D1_MASK ^ PG_MASK ^ (PAGE_SIZE-1), u64::MAX);
+        debug_assert_eq!(
+            D3_MASK | D2_MASK | D1_MASK | PG_MASK | (PAGE_SIZE - 1),
+            u64::MAX
+        );
+        debug_assert_eq!(
+            D3_MASK ^ D2_MASK ^ D1_MASK ^ PG_MASK ^ (PAGE_SIZE - 1),
+            u64::MAX
+        );
 
         (d3_offset, d2_offset, d1_offset, pg_offset)
     }

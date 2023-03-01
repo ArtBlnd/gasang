@@ -212,11 +212,15 @@ pub fn flag(range: Range<u64>) -> Ir {
 }
 
 pub fn set_flag(range: Range<u64>, imm: u64) -> Ir {
-    Ir::Or(Type::U64, Operand::ir(Ir::And(
+    Ir::Or(
         Type::U64,
-        Operand::Flag,
-        Operand::imm(Type::U64, !ones(range.end - range.start) << range.start),
-    )), Operand::imm(Type::U64, imm << range.start))
+        Operand::ir(Ir::And(
+            Type::U64,
+            Operand::Flag,
+            Operand::imm(Type::U64, !ones(range.end - range.start) << range.start),
+        )),
+        Operand::imm(Type::U64, imm << range.start),
+    )
 }
 
 pub fn shift_reg(reg: Operand, shift_type: ShiftType, amount: Operand, t: Type) -> Ir {
@@ -503,8 +507,8 @@ mod test {
     use crate::codegen::rustjit::InterpretCodegen;
     use crate::codegen::{Codegen, Executable, ExecutionContext};
     use crate::cpu::Cpu;
-    use crate::value::Value;
     use crate::softmmu::Mmu;
+    use crate::value::Value;
 
     use super::*;
 
@@ -529,7 +533,10 @@ mod test {
     fn test_gen_ip_rel() {
         let mut cpu = Cpu::new_for_test();
         let mut mmu = Mmu::new();
-        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let mut ctx = ExecutionContext {
+            cpu: &mut cpu,
+            mmu: &mut mmu,
+        };
         let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
         let diff = 100;
@@ -555,7 +562,10 @@ mod test {
     fn test_condition_holds() {
         let mut cpu = Cpu::new_for_test();
         let mut mmu = Mmu::new();
-        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let mut ctx = ExecutionContext {
+            cpu: &mut cpu,
+            mmu: &mut mmu,
+        };
         let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
         ctx.cpu.set_flag(0b1 << Pstate::Z.idx());
@@ -596,7 +606,10 @@ mod test {
     fn test_flag() {
         let mut cpu = Cpu::new_for_test();
         let mut mmu = Mmu::new();
-        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let mut ctx = ExecutionContext {
+            cpu: &mut cpu,
+            mmu: &mut mmu,
+        };
         let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
         ctx.cpu.set_flag(0b1010 << Pstate::NZCV.idx());
@@ -627,7 +640,10 @@ mod test {
     fn test_replicate_reg64() {
         let mut cpu = Cpu::new_for_test();
         let mut mmu = Mmu::new();
-        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let mut ctx = ExecutionContext {
+            cpu: &mut cpu,
+            mmu: &mut mmu,
+        };
         let cg = InterpretCodegen::new(AArch64FlagPolicy);
 
         let reg = ctx.cpu.reg_by_name("x0").unwrap();
@@ -649,12 +665,19 @@ mod test {
     fn test_replace_bits() {
         let mut cpu = Cpu::new_for_test();
         let mut mmu = Mmu::new();
-        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let mut ctx = ExecutionContext {
+            cpu: &mut cpu,
+            mmu: &mut mmu,
+        };
         let cg = InterpretCodegen::new(AArch64FlagPolicy);
         let reg = ctx.cpu.reg_by_name("x0").unwrap();
 
         *ctx.cpu.gpr_mut(reg).u64_mut() = 0b1001;
-        let ir = Ir::Value(Operand::ir(replace_bits(Operand::Gpr(Type::U64, reg), 0b01, 2..4)));
+        let ir = Ir::Value(Operand::ir(replace_bits(
+            Operand::Gpr(Type::U64, reg),
+            0b01,
+            2..4,
+        )));
         let code = cg.compile_ir(&ir);
         let result = unsafe { code.execute(&mut ctx) };
         assert_eq!(result.u64(), 0b0101)
@@ -675,9 +698,12 @@ mod test {
     fn test_set_flag() {
         let mut cpu = Cpu::new_for_test();
         let mut mmu = Mmu::new();
-        let mut ctx = ExecutionContext{cpu: &mut cpu, mmu: &mut mmu};
+        let mut ctx = ExecutionContext {
+            cpu: &mut cpu,
+            mmu: &mut mmu,
+        };
         let cg = InterpretCodegen::new(AArch64FlagPolicy);
-        
+
         ctx.cpu.set_flag(0b1111 << Pstate::NZCV.idx());
         let ir = Ir::Value(Operand::ir(set_flag(Pstate::NZCV.range(), 0b0011)));
         let code = cg.compile_ir(&ir);

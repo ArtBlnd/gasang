@@ -70,7 +70,7 @@ impl From<&str> for Pattern {
     fn from(value: &str) -> Self {
         let mut pattern_result = 0b0;
         let mut mask_result = 0b0;
-    
+
         for char in value.chars() {
             let (pat, mask) = match char {
                 'x' => (0, 0),
@@ -83,11 +83,11 @@ impl From<&str> for Pattern {
             };
             pattern_result <<= 1;
             pattern_result |= pat;
-    
+
             mask_result <<= 1;
             mask_result |= mask;
         }
-    
+
         Self {
             pattern: pattern_result,
             mask: mask_result,

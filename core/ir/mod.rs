@@ -38,6 +38,10 @@ pub enum Ir {
     CmpGt(Operand, Operand),             // Greater than
     CmpLt(Operand, Operand),             // Less than
     Value(Operand),
+
+    // Shuffle(ty, vec, mask)
+    Shuffle(Type, Operand, Operand),
+
     Nop,
 }
 
@@ -71,6 +75,8 @@ impl Ir {
 
             Ir::Value(op) => op.get_type(),
             Ir::Nop => Type::Void,
+
+            Ir::Shuffle(t, _, _) => *t,
 
             Ir::If(t, _, _, _) => *t,
             Ir::CmpEq(_, _) | Ir::CmpNe(_, _) | Ir::CmpGt(_, _) | Ir::CmpLt(_, _) => Type::Bool,
