@@ -208,24 +208,7 @@ where
             let imm = *imm;
             return Ok(FnExec::new(move |ctx| (ctx.cpu.pc() + imm).into()));
         }
-        Ir::Value(Operand::Ir(ir)) => return compile_ir(ir, flag_policy.clone()),
-        Ir::Value(Operand::Immediate(t, imm)) => {
-            let imm = *imm;
-            let _t = *t;
-
-            return Ok(FnExec::new(move |_ctx| imm.into()));
-        }
-        Ir::Value(Operand::Gpr(t, reg)) => {
-            let reg = *reg;
-            let t = *t;
-            return Ok(FnExec::new(move |ctx| match t {
-                Type::U8 | Type::I8 => (ctx.cpu.gpr(reg).u8()).into(),
-                Type::U16 | Type::I16 => (ctx.cpu.gpr(reg).u16()).into(),
-                Type::U32 | Type::I32 => (ctx.cpu.gpr(reg).u32()).into(),
-                Type::U64 | Type::I64 => (ctx.cpu.gpr(reg).u64()).into(),
-                _ => unreachable!("Invalid type"),
-            }));
-        }
+        Ir::Value(op) => return compile_op(op, flag_policy.clone()),
         Ir::LShr(t, op1, Operand::Immediate(t1, val)) => {
             assert!(t == t1, "Type mismatch");
             let op1 = compile_op(op1, flag_policy.clone())?;
