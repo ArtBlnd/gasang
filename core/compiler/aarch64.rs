@@ -55,6 +55,9 @@ impl Compiler for AArch64Compiler {
             AArch64Instr::Adr(operand) => gen_adr(self, operand),
             AArch64Instr::Adrp(operand) => gen_adrp(self, operand),
 
+            AArch64Instr::RevVar32(operand) => gen_rev_var(self, operand, Type::U32),
+            AArch64Instr::RevVar64(operand) => gen_rev_var(self, operand, Type::U64),
+
             // Load and Stores
             AArch64Instr::LdrImm32(operand) => gen_ldr_imm(self, operand, Type::U32),
             AArch64Instr::LdrImm64(operand) => gen_ldr_imm(self, operand, Type::U64),
@@ -2388,5 +2391,32 @@ fn gen_strb_reg(compiler: &AArch64Compiler, operand: LoadStoreRegRegOffset) -> I
 
     block.append(ir, ds);
 
+    block
+}
+
+fn gen_rev_var(compiler: &AArch64Compiler, operand: RnRd, ty: Type) -> IrBlock {
+    let mut block = IrBlock::new(4);
+
+    let (vec_ty, mask) = match ty {
+        Type::U32 => (
+            Type::Vec(VecType::U8, 4),
+            Operand::imm_value(Type::Vec(VecType::U8, 4), Value::from_u8x4([3, 2, 1, 0])),
+        ),
+        Type::U64 => (
+            Type::Vec(VecType::U8, 8),
+            Operand::imm_value(
+                Type::Vec(VecType::U8, 8),
+                Value::from_u8x8([7, 6, 5, 4, 3, 2, 1, 0]),
+            ),
+        ),
+        _ => unreachable!(),
+    };
+    let src = Ir::BitCast(vec_ty, Operand::gpr(ty, compiler.gpr(operand.rn)));
+
+    let ir = Ir::Shuffle(vec_ty, Operand::ir(src), mask);
+    let ir = Ir::ZextCast(Type::U64, Operand::ir(Ir::BitCast(ty, Operand::ir(ir))));
+    let ds = BlockDestination::Gpr(Type::U64, compiler.gpr(operand.rd));
+
+    block.append(ir, ds);
     block
 }

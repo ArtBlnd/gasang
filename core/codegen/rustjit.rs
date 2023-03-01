@@ -366,6 +366,9 @@ where
                     *ret.u64x2_mut() = imm.u64x2();
                     ret
                 }
+                Type::Vec(VecType::U8, _) => {
+                    imm.clone().truncate_to(t)
+                }
                 _ => unreachable!("Invalid type"),
             })
         }

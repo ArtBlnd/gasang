@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 
 use std::slice;
 
-use crate::ir::Type;
+use crate::ir::{Type, VecType};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Value(SmallVec<[u64; 2]>);
@@ -78,6 +78,69 @@ impl Value {
         v
     }
 
+    pub fn from_u8x4(val: [u8; 4]) -> Self {
+        let mut v = Self::new(4);
+
+        for i in 0..4 {
+            v.u8_slice_mut()[i] = val[i];
+        }
+        v
+    }
+
+    pub fn from_u16x2(val: [u16; 2]) -> Self {
+        let mut v = Self::new(4);
+
+        for i in 0..2 {
+            v.u16_slice_mut()[i] = val[i];
+        }
+        v
+    }
+
+    pub fn from_u32x2(val: [u32; 2]) -> Self {
+        let mut v = Self::new(8);
+
+        for i in 0..2 {
+            v.u32_slice_mut()[i] = val[i];
+        }
+        v
+    }
+
+    pub fn from_u8x8(val: [u8; 8]) -> Self {
+        let mut v = Self::new(8);
+
+        for i in 0..8 {
+            v.u8_slice_mut()[i] = val[i];
+        }
+        v
+    }
+
+    pub fn from_u16x4(val: [u16; 4]) -> Self {
+        let mut v = Self::new(8);
+
+        for i in 0..4 {
+            v.u16_slice_mut()[i] = val[i];
+        }
+        v
+    }
+
+    pub fn from_u32x4(val: [u32; 4]) -> Self {
+        let mut v = Self::new(16);
+
+        for i in 0..4 {
+            v.u32_slice_mut()[i] = val[i];
+        }
+        v
+    }
+
+    pub fn from_u64x2(val: [u64; 2]) -> Self {
+        let mut v = Self::new(16);
+
+        for i in 0..2 {
+            v.u64_slice_mut()[i] = val[i];
+        }
+        v
+    }
+
     pub fn new(len: usize) -> Self {
         let len = usize::max(len, 16);
         let len = if len % 8 == 0 { len / 8 } else { len / 8 + 1 };
@@ -90,10 +153,10 @@ impl Value {
 
     pub fn truncate_to(mut self, ty: Type) -> Self {
         match ty {
-            Type::I64 | Type::U64 => {
+            Type::I64 | Type::U64 | Type::Vec(VecType::U8, 8) => {
                 self.0.truncate(1);
             }
-            Type::I32 | Type::U32 => {
+            Type::I32 | Type::U32 | Type::Vec(VecType::U8, 4) => {
                 self.0.truncate(1);
                 *self.u64_mut() = *self.u32_mut() as u64;
             }
@@ -119,9 +182,7 @@ impl Value {
                 self.0.truncate(1);
                 *self.u64_mut() = (*self.u8_mut() & 0b1) as u64;
             }
-            Type::Vec(_ty, _sz) => {
-                todo!()
-            }
+            _ => unimplemented!("truncate_to({:?})", ty),
         }
 
         self
