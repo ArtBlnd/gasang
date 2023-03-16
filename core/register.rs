@@ -14,7 +14,7 @@ impl Display for RegId {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct GprRegister {
     name: String,
     size: u8,
@@ -53,7 +53,7 @@ impl DerefMut for GprRegister {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FprRegister {
     name: String,
     size: u8,
@@ -92,7 +92,7 @@ impl DerefMut for FprRegister {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SysRegister {
     name: String,
     size: u8,

@@ -2,9 +2,12 @@ use crate::register::*;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
+use gdbstub::arch::Registers;
 use slab::Slab;
 
+#[derive(Debug)]
 pub struct Cpu {
     gpr_registers: Slab<GprRegister>,
     fpr_registers: Slab<FprRegister>,
@@ -13,6 +16,41 @@ pub struct Cpu {
 
     flags: AtomicU64,
     pc: u64,
+    arch: Architecture,
+}
+
+impl PartialEq for Cpu {
+    fn eq(&self, other: &Self) -> bool {
+        for (k, v) in self.gpr_registers.iter() {
+            if other.gpr_registers.get(k) == Some(v) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        for (k, v) in self.fpr_registers.iter() {
+            if other.fpr_registers.get(k) == Some(v) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        for (k, v) in self.sys_registers.iter() {
+            if other.sys_registers.get(k) == Some(v) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+
+        self.flag() == other.flag() && self.pc == other.pc
+    }
+}
+
+impl Default for Cpu {
+    fn default() -> Self {
+        panic!("No default cpu");
+    }
 }
 
 impl Clone for Cpu {
@@ -25,6 +63,7 @@ impl Clone for Cpu {
 
             flags: AtomicU64::new(self.flags.load(Ordering::Relaxed)),
             pc: self.pc,
+            arch: self.arch.clone(),
         }
     }
 }
@@ -33,6 +72,7 @@ impl Cpu {
     pub fn new(arch: Architecture) -> Self {
         match arch {
             Architecture::AArch64Bin => init_base_aarch64_cpu(),
+            _ => unreachable!(),
         }
     }
 
@@ -51,6 +91,7 @@ impl Cpu {
 
             flags: AtomicU64::new(0),
             pc: 0,
+            arch: Architecture::Test,
         }
     }
 
@@ -116,6 +157,10 @@ impl Cpu {
         self.flags.fetch_and(!flag, Ordering::SeqCst);
     }
 
+    pub fn arch(&self) -> &Architecture {
+        &self.arch
+    }
+
     pub fn dump(&self) {
         self.dump_gpr();
         self.dump_fpr();
@@ -150,8 +195,24 @@ impl Cpu {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Architecture {
+    Test,
     AArch64Bin,
+}
+
+impl Architecture {
+    pub fn gprs(&self) -> Vec<String> {
+        let mut result = Vec::new();
+        for i in 0..31 {
+            let name = format!("x{}", i);
+            result.push(name);
+        }
+
+        result.push("sp".to_string());
+
+        result
+    }
 }
 
 fn init_base_aarch64_cpu() -> Cpu {
@@ -162,6 +223,7 @@ fn init_base_aarch64_cpu() -> Cpu {
         reg_name_map: HashMap::new(),
         flags: AtomicU64::new(0),
         pc: 0,
+        arch: Architecture::AArch64Bin,
     };
 
     for i in 0..31 {
