@@ -45,7 +45,7 @@ impl Codegen for InterpretCodegen {
 
 unsafe fn execute(
     code: &SmallVec<[(FnExec<Value>, BlockDestination); 2]>,
-    ctx: &mut ExecutionContext,
+    ctx: &mut ExecutionContext<'_>,
     ip_inc: u64,
 ) {
     let mut ip_modified = false;
@@ -55,7 +55,8 @@ unsafe fn execute(
     }
 
     if !ip_modified {
-        ctx.cpu.set_pc(ctx.cpu.pc() + ip_inc);
+        let next_pc = ctx.cpu().pc() + ip_inc;
+        ctx.cpu_mut().set_pc(next_pc);
     }
 }
 
@@ -67,15 +68,15 @@ unsafe fn handle_block_dest<'a>(
 ) {
     match dest {
         BlockDestination::Flags => {
-            ctx.cpu.set_flag(val.u64());
+            ctx.cpu().set_flag(val.u64());
         }
         BlockDestination::Pc => {
-            ctx.cpu.set_pc(val.u64());
+            ctx.cpu_mut().set_pc(val.u64());
             *ip_modified = true;
         }
         BlockDestination::None => { /* do nothing */ }
         BlockDestination::Gpr(ty, reg_id) => {
-            let gpr = ctx.cpu.gpr_mut(reg_id);
+            let gpr = ctx.cpu_mut().gpr_mut(reg_id);
 
             match ty {
                 Type::U8 | Type::I8 => *gpr.u8_mut() = val.u8(),
@@ -86,7 +87,7 @@ unsafe fn handle_block_dest<'a>(
             }
         }
         BlockDestination::Fpr(ty, reg_id) => {
-            let fpr = ctx.cpu.fpr_mut(reg_id);
+            let fpr = ctx.cpu_mut().fpr_mut(reg_id);
 
             match ty {
                 Type::U8 | Type::I8 => *fpr.u8_mut() = val.u8(),
@@ -100,7 +101,7 @@ unsafe fn handle_block_dest<'a>(
             }
         }
         BlockDestination::Sys(ty, reg_id) => {
-            let sys = ctx.cpu.sys_mut(reg_id);
+            let sys = ctx.cpu_mut().sys_mut(reg_id);
 
             match ty {
                 Type::U8 | Type::I8 => *sys.u8_mut() = val.u8(),
@@ -111,7 +112,7 @@ unsafe fn handle_block_dest<'a>(
             }
         }
         BlockDestination::FprSlot(ty, reg_id, slot_id) => {
-            let fpr = ctx.cpu.fpr_mut(reg_id);
+            let fpr = ctx.cpu_mut().fpr_mut(reg_id);
 
             match ty {
                 Type::U8 | Type::I8 => fpr.u8_slice_mut()[slot_id as usize] = val.u8(),
@@ -126,44 +127,44 @@ unsafe fn handle_block_dest<'a>(
         }
         BlockDestination::Memory(ty, addr) => {
             match ty {
-                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
-                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
-                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
-                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::U8 | Type::I8 => ctx.mem_write_u8(addr, val.u8()),
+                Type::U16 | Type::I16 => ctx.mem_write_u16(addr, val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mem_write_u32(addr, val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mem_write_u64(addr, val.u64()),
                 Type::Vec(VecType::U64 | VecType::I64, 2) => {
-                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                    ctx.mem_write(addr, &val.u8_slice_ref()[..16])
                 }
                 _ => unreachable!(),
             }
             .unwrap();
         }
         BlockDestination::MemoryRelI64(ty, reg_id, offs) => {
-            let (addr, of) = ctx.cpu.gpr(reg_id).u64().overflowing_add_signed(offs);
+            let (addr, of) = ctx.cpu().gpr(reg_id).u64().overflowing_add_signed(offs);
             assert_eq!(of, false);
 
             match ty {
-                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
-                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
-                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
-                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::U8 | Type::I8 => ctx.mem_write_u8(addr, val.u8()),
+                Type::U16 | Type::I16 => ctx.mem_write_u16(addr, val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mem_write_u32(addr, val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mem_write_u64(addr, val.u64()),
                 Type::Vec(VecType::U64 | VecType::I64, 2) => {
-                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                    ctx.mem_write(addr, &val.u8_slice_ref()[..16])
                 }
                 _ => unreachable!(),
             }
             .unwrap();
         }
         BlockDestination::MemoryRelU64(ty, reg_id, offs) => {
-            let (addr, of) = ctx.cpu.gpr(reg_id).u64().overflowing_add(offs);
+            let (addr, of) = ctx.cpu().gpr(reg_id).u64().overflowing_add(offs);
             assert_eq!(of, false);
 
             match ty {
-                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
-                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
-                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
-                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::U8 | Type::I8 => ctx.mem_write_u8(addr, val.u8()),
+                Type::U16 | Type::I16 => ctx.mem_write_u16(addr, val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mem_write_u32(addr, val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mem_write_u64(addr, val.u64()),
                 Type::Vec(VecType::U64 | VecType::I64, 2) => {
-                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                    ctx.mem_write(addr, &val.u8_slice_ref()[..16])
                 }
                 _ => unreachable!(),
             }
@@ -174,12 +175,12 @@ unsafe fn handle_block_dest<'a>(
             let addr = compile_ir(&ir, DummyFlagPolicy).unwrap().execute(ctx).u64();
 
             match ty {
-                Type::U8 | Type::I8 => ctx.mmu.frame(addr).write_u8(val.u8()),
-                Type::U16 | Type::I16 => ctx.mmu.frame(addr).write_u16(val.u16()),
-                Type::U32 | Type::I32 | Type::F32 => ctx.mmu.frame(addr).write_u32(val.u32()),
-                Type::U64 | Type::I64 | Type::F64 => ctx.mmu.frame(addr).write_u64(val.u64()),
+                Type::U8 | Type::I8 => ctx.mem_write_u8(addr, val.u8()),
+                Type::U16 | Type::I16 => ctx.mem_write_u16(addr, val.u16()),
+                Type::U32 | Type::I32 | Type::F32 => ctx.mem_write_u32(addr, val.u32()),
+                Type::U64 | Type::I64 | Type::F64 => ctx.mem_write_u64(addr, val.u64()),
                 Type::Vec(VecType::U64 | VecType::I64, 2) => {
-                    ctx.mmu.frame(addr).write(&val.u8_slice_ref()[..16])
+                    ctx.mem_write(addr, &val.u8_slice_ref()[..16])
                 }
                 _ => unreachable!(),
             }
@@ -201,12 +202,12 @@ where
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::I64, imm)) => {
             let imm = *imm;
             return Ok(FnExec::new(move |ctx| {
-                (ctx.cpu.pc() as i64 + imm as i64).into()
+                (ctx.cpu().pc() as i64 + imm as i64).into()
             }));
         }
         Ir::Add(Type::U64, Operand::Ip, Operand::Immediate(Type::U64, imm)) => {
             let imm = *imm;
-            return Ok(FnExec::new(move |ctx| (ctx.cpu.pc() + imm).into()));
+            return Ok(FnExec::new(move |ctx| (ctx.cpu().pc() + imm).into()));
         }
         Ir::Value(op) => return compile_op(op, flag_policy.clone()),
         Ir::LShr(t, op1, Operand::Immediate(t1, val)) => {
@@ -230,7 +231,7 @@ where
         }
         Ir::And(Type::U64, Operand::Flag, Operand::Immediate(Type::U64, imm)) => {
             let imm = *imm;
-            return Ok(FnExec::new(move |ctx| (ctx.cpu.flag() & imm).into()));
+            return Ok(FnExec::new(move |ctx| (ctx.cpu().flag() & imm).into()));
         }
         Ir::And(t, Operand::Immediate(t1, imm1), Operand::Immediate(t2, imm2)) => {
             assert!(t1 == t2 && t1 == t, "Type mismatch");
@@ -308,10 +309,10 @@ where
             let reg = *reg;
             let t = *t;
             FnExec::new(move |ctx| match t {
-                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu.gpr(reg).u8()),
-                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu.gpr(reg).u16()),
-                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu.gpr(reg).u32()),
-                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu.gpr(reg).u64()),
+                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu().gpr(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu().gpr(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu().gpr(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu().gpr(reg).u64()),
                 _ => unreachable!("Invalid type"),
             })
         }
@@ -319,13 +320,13 @@ where
             let reg = *reg;
             let t = *t;
             FnExec::new(move |ctx| match t {
-                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu.fpr(reg).u8()),
-                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu.fpr(reg).u16()),
-                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu.fpr(reg).u32()),
-                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu.fpr(reg).u64()),
+                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu().fpr(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu().fpr(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu().fpr(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu().fpr(reg).u64()),
                 Type::Vec(VecType::U64 | VecType::I64, 2) => {
                     let mut ret = Value::new(16);
-                    *ret.u64x2_mut() = ctx.cpu.fpr(reg).u64x2();
+                    *ret.u64x2_mut() = ctx.cpu().fpr(reg).u64x2();
                     ret
                 }
                 _ => unreachable!("Invalid type"),
@@ -335,10 +336,10 @@ where
             let reg = *reg;
             let t = *t;
             FnExec::new(move |ctx| match t {
-                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu.sys(reg).u8()),
-                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu.sys(reg).u16()),
-                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu.sys(reg).u32()),
-                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu.sys(reg).u64()),
+                Type::U8 | Type::I8 => Value::from_u8(ctx.cpu().sys(reg).u8()),
+                Type::U16 | Type::I16 => Value::from_u16(ctx.cpu().sys(reg).u16()),
+                Type::U32 | Type::I32 => Value::from_u32(ctx.cpu().sys(reg).u32()),
+                Type::U64 | Type::I64 => Value::from_u64(ctx.cpu().sys(reg).u64()),
                 _ => unreachable!("Invalid type"),
             })
         }
@@ -346,6 +347,7 @@ where
             let imm = *imm & t.gen_mask();
             let t = *t;
             FnExec::new(move |_| match t {
+                Type::Bool => Value::from_u8(imm as u8),
                 Type::U8 | Type::I8 => Value::from_u8(imm as u8),
                 Type::U16 | Type::I16 => Value::from_u16(imm as u16),
                 Type::U32 | Type::I32 => Value::from_u32(imm as u32),
@@ -377,8 +379,8 @@ where
                 Value::new(0)
             })
         }
-        Operand::Ip => FnExec::new(move |ctx| Value::from_u64(ctx.cpu.pc())),
-        Operand::Flag => FnExec::new(move |ctx| Value::from_u64(ctx.cpu.flag())),
+        Operand::Ip => FnExec::new(move |ctx| Value::from_u64(ctx.cpu().pc())),
+        Operand::Flag => FnExec::new(move |ctx| Value::from_u64(ctx.cpu().flag())),
         Operand::Dbg(s, op) => {
             let op = compile_op(op, flag_policy.clone())?;
             let s = s.to_string();
@@ -667,28 +669,28 @@ where
             let lhs = lhs.execute(ctx).u8();
             let rhs = rhs.execute(ctx).u8();
 
-            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu);
+            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu());
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let lhs = lhs.execute(ctx).u16();
             let rhs = rhs.execute(ctx).u16();
 
-            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu);
+            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu());
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U32 | Type::I32 => FnExec::new(move |ctx| {
             let lhs = lhs.execute(ctx).u32();
             let rhs = rhs.execute(ctx).u32();
 
-            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu);
+            flag_policy.add_carry(t, lhs as u64, rhs as u64, ctx.cpu());
             lhs.overflowing_add(rhs).0.into()
         }),
         Type::U64 | Type::I64 => FnExec::new(move |ctx| {
             let lhs = lhs.execute(ctx).u64();
             let rhs = rhs.execute(ctx).u64();
 
-            flag_policy.add_carry(t, lhs, rhs, ctx.cpu);
+            flag_policy.add_carry(t, lhs, rhs, ctx.cpu());
             lhs.overflowing_add(rhs).0.into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -722,28 +724,28 @@ where
             let lhs = lhs.execute(ctx).u8();
             let rhs = rhs.execute(ctx).u8();
 
-            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu);
+            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu());
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let lhs = lhs.execute(ctx).u16();
             let rhs = rhs.execute(ctx).u16();
 
-            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu);
+            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu());
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U32 | Type::I32 => FnExec::new(move |ctx| {
             let lhs = lhs.execute(ctx).u32();
             let rhs = rhs.execute(ctx).u32();
 
-            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu);
+            flag_policy.sub_carry(t, lhs as u64, rhs as u64, ctx.cpu());
             lhs.overflowing_sub(rhs).0.into()
         }),
         Type::U64 | Type::I64 => FnExec::new(move |ctx| {
             let lhs = lhs.execute(ctx).u64();
             let rhs = rhs.execute(ctx).u64();
 
-            flag_policy.sub_carry(t, lhs, rhs, ctx.cpu);
+            flag_policy.sub_carry(t, lhs, rhs, ctx.cpu());
             lhs.overflowing_sub(rhs).0.into()
         }),
         _ => unreachable!("invalid type: {:?}", t),
@@ -969,30 +971,29 @@ where
     Ok(match t {
         Type::Bool => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            (ctx.mmu.frame(*var.u64_mut()).read_u8().unwrap() & 0b1).into()
+            (ctx.mem_read_u8(var.u64()).unwrap() & 0b1).into()
         }),
         Type::U8 | Type::I8 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mmu.frame(*var.u64_mut()).read_u8().unwrap().into()
+            ctx.mem_read_u8(var.u64()).unwrap().into()
         }),
         Type::U16 | Type::I16 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mmu.frame(*var.u64_mut()).read_u16().unwrap().into()
+            ctx.mem_read_u16(var.u64()).unwrap().into()
         }),
         Type::U32 | Type::I32 | Type::F32 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mmu.frame(*var.u64_mut()).read_u32().unwrap().into()
+            ctx.mem_read_u32(var.u64()).unwrap().into()
         }),
         Type::U64 | Type::I64 | Type::F64 => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            ctx.mmu.frame(*var.u64_mut()).read_u64().unwrap().into()
+            ctx.mem_read_u64(var.u64()).unwrap().into()
         }),
         Type::Vec(VecType::U64, 2) => FnExec::new(move |ctx| {
             let mut var = op.execute(ctx);
-            let mut mem = ctx.mmu.frame(*var.u64_mut());
 
             let mut value = Value::new(16);
-            mem.read(value.u8_slice_mut()).unwrap();
+            ctx.mem_read(var.u64(), value.u8_slice_mut()).unwrap();
 
             value
         }),

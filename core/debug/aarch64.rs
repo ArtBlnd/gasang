@@ -1,9 +1,6 @@
-use gdbstub::{
-    arch::Arch,
-    target::{ext::base::singlethread::SingleThreadBase, Target, TargetError},
-};
+use gdbstub::arch::Arch;
 
-use crate::{codegen::ExecutionContext, cpu::Architecture, error::DebugError, Cpu};
+use crate::{error::DebugError, Cpu};
 
 #[derive(Debug)]
 pub struct AArch64RegId(u8);
@@ -23,11 +20,7 @@ impl gdbstub::arch::RegId for AArch64RegId {
     }
 }
 
-pub struct AArch64State<'a> {
-    inner: ExecutionContext<'a>,
-}
-
-pub struct AArch64 {}
+pub struct AArch64;
 
 impl Arch for AArch64 {
     type Usize = u64;
@@ -37,93 +30,6 @@ impl Arch for AArch64 {
 
     fn single_step_gdb_behavior() -> gdbstub::arch::SingleStepGdbBehavior {
         gdbstub::arch::SingleStepGdbBehavior::Required
-    }
-}
-
-impl SingleThreadBase for AArch64State<'_> {
-    fn read_registers(
-        &mut self,
-        regs: &mut <Self::Arch as Arch>::Registers,
-    ) -> gdbstub::target::TargetResult<(), Self> {
-        for name in Architecture::AArch64Bin.gprs() {
-            let src = self.inner.cpu.reg_by_name(&name).unwrap();
-            let src = self.inner.cpu.gpr(src);
-            let dst = regs.reg_by_name(&name).unwrap();
-            let dst = regs.gpr_mut(dst);
-
-            *dst = src.clone();
-        }
-
-        regs.set_pc(self.inner.cpu.pc());
-        regs.set_flag(self.inner.cpu.flag());
-
-        Ok(())
-    }
-
-    fn write_registers(
-        &mut self,
-        regs: &<Self::Arch as Arch>::Registers,
-    ) -> gdbstub::target::TargetResult<(), Self> {
-        for name in Architecture::AArch64Bin.gprs() {
-            let dst = self
-                .inner
-                .cpu
-                .reg_by_name(&name)
-                .ok_or(TargetError::Fatal(DebugError::InvalidRegName(name.clone())))?;
-            let dst = self.inner.cpu.gpr_mut(dst);
-            let src = regs
-                .reg_by_name(&name)
-                .ok_or(TargetError::Fatal(DebugError::InvalidRegName(name.clone())))?;
-            let src = regs.gpr(src);
-
-            *dst = src.clone();
-        }
-
-        self.inner.cpu.set_pc(regs.pc());
-        self.inner.cpu.set_flag(regs.flag());
-
-        Ok(())
-    }
-
-    fn read_addrs(
-        &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        data: &mut [u8],
-    ) -> gdbstub::target::TargetResult<(), Self> {
-        unsafe {
-            self.inner
-                .mmu
-                .frame(start_addr)
-                .read(data)
-                .map_err(|e| TargetError::Fatal(DebugError::MMU(e)))?;
-        }
-
-        Ok(())
-    }
-
-    fn write_addrs(
-        &mut self,
-        start_addr: <Self::Arch as Arch>::Usize,
-        data: &[u8],
-    ) -> gdbstub::target::TargetResult<(), Self> {
-        unsafe {
-            self.inner
-                .mmu
-                .frame(start_addr)
-                .write(data)
-                .map_err(|e| TargetError::Fatal(DebugError::MMU(e)))?;
-        }
-
-        Ok(())
-    }
-}
-
-impl Target for AArch64State<'_> {
-    type Arch = AArch64;
-    type Error = DebugError;
-
-    fn base_ops(&mut self) -> gdbstub::target::ext::base::BaseOps<'_, Self::Arch, Self::Error> {
-        gdbstub::target::ext::base::BaseOps::SingleThread(self)
     }
 }
 

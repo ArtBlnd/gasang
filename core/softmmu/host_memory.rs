@@ -1,14 +1,12 @@
 use std::cell::UnsafeCell;
-use std::sync::Arc;
-
 // Host Memory
 //
 // This is the memory that is allocated by the host. It is used to store the
 // guest memory as unsafe way. Note that accessing the memory outside of VM
 // is very dangerous.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HostMemory {
-    memory: Arc<UnsafeCell<Box<[u8]>>>,
+    memory: UnsafeCell<Box<[u8]>>,
 }
 
 impl HostMemory {
@@ -18,7 +16,7 @@ impl HostMemory {
         let mut memory = Vec::with_capacity(size);
         memory.resize(size, 0);
         HostMemory {
-            memory: Arc::new(UnsafeCell::new(memory.into_boxed_slice())),
+            memory: UnsafeCell::new(memory.into_boxed_slice()),
         }
     }
 
@@ -27,6 +25,14 @@ impl HostMemory {
     }
 }
 
-trait HostMemoryAllocator {
-    fn alloc(&mut self, size: usize) -> HostMemory;
+impl Clone for HostMemory {
+    fn clone(&self) -> Self {
+        let mut memory = Vec::new();
+        unsafe {
+            memory.extend_from_slice(self.slice());
+        }
+
+        let memory = UnsafeCell::new(memory.into_boxed_slice());
+        Self { memory }
+    }
 }
