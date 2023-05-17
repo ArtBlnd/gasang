@@ -2,6 +2,7 @@ pub mod board;
 pub mod codegen;
 pub mod compiler;
 pub mod cpu;
+pub mod debug;
 pub mod error;
 pub mod image;
 pub mod ir;

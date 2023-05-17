@@ -1,154 +1,280 @@
-use crate::softmmu::{HostMemory, PAGE_SIZE};
+use crate::error::MmuError;
 
-#[derive(Debug, Clone)]
-pub enum Page {
-    Unmapped,
-    Memory {
-        memory: HostMemory,
+use super::host_memory::HostMemory;
+use super::MmuEvent;
+use super::PAGE_SIZE;
 
-        readable: bool,
-        writable: bool,
-        executable: bool,
-    },
+fn offset(addr: u64) -> usize {
+    addr as usize & (PAGE_SIZE - 1)
 }
 
-#[derive(Debug)]
-pub struct PageTableDepth0 {
-    table: Box<[Page; 65536]>,
+pub trait Page {
+    unsafe fn try_write(&self, addr: u64, buf: &[u8]) -> Result<(), MmuError>;
+    unsafe fn try_read(&self, addr: u64, buf: &mut [u8]) -> Result<(), MmuError>;
+
+    fn is_readable(&self) -> bool;
+    fn is_writable(&self) -> bool;
+    fn is_executable(&self) -> bool;
+
+    unsafe fn into_inner(self: Box<Self>) -> HostMemory;
 }
 
-#[derive(Debug)]
-pub struct PageTableDepth1 {
-    table: [Option<PageTableDepth0>; 4096],
+#[derive(Clone)]
+pub struct BasicPage {
+    memory: HostMemory,
+    readable: bool,
+    writable: bool,
+    executable: bool,
 }
 
-#[derive(Debug)]
-pub struct PageTableDepth2 {
-    table: [Option<Box<PageTableDepth1>>; 4096],
-}
-
-#[derive(Debug)]
-pub struct PageTableDepth3 {
-    table: [Option<Box<PageTableDepth2>>; 4096],
-}
-
-#[derive(Debug)]
-pub struct PageTable {
-    root: PageTableDepth3,
-}
-
-impl PageTable {
-    pub fn new() -> Self {
+impl BasicPage {
+    pub fn new(readable: bool, writable: bool, executable: bool) -> Self {
         Self {
-            root: PageTableDepth3 {
-                table: std::array::from_fn(|_| None),
-            },
+            memory: HostMemory::new(PAGE_SIZE),
+            readable,
+            writable,
+            executable,
         }
     }
 
-    fn as_offset(addr: u64) -> (usize, usize, usize, usize) {
-        const D3_MASK: u64 = 0xFFF0_0000_0000_0000;
-        const D2_MASK: u64 = 0x000F_FF00_0000_0000;
-        const D1_MASK: u64 = 0x0000_00FF_F000_0000;
-        const PG_MASK: u64 = 0x0000_0000_0FFF_F000;
-        let d3_offset = ((addr & D3_MASK) >> 52) as usize;
-        let d2_offset = ((addr & D2_MASK) >> 40) as usize;
-        let d1_offset = ((addr & D1_MASK) >> 28) as usize;
-        let pg_offset = ((addr & PG_MASK) >> 12) as usize;
-
-        debug_assert_eq!(
-            D3_MASK | D2_MASK | D1_MASK | PG_MASK | (PAGE_SIZE - 1),
-            u64::MAX
-        );
-        debug_assert_eq!(
-            D3_MASK ^ D2_MASK ^ D1_MASK ^ PG_MASK ^ (PAGE_SIZE - 1),
-            u64::MAX
-        );
-
-        (d3_offset, d2_offset, d1_offset, pg_offset)
+    pub fn from_page(page: Box<dyn Page>) -> Self {
+        let readable = page.is_readable();
+        let writable = page.is_writable();
+        let executable = page.is_executable();
+        let memory = unsafe { page.into_inner() };
+        Self {
+            memory,
+            readable,
+            writable,
+            executable,
+        }
     }
+}
 
-    pub fn get_mem_offset(addr: u64) -> usize {
-        (addr & 0x0000_0000_0000_0FFF) as usize
-    }
-
-    pub fn get_mut(&mut self, addr: u64) -> Option<&mut Page> {
-        let (d3, d2, d1, pg) = Self::as_offset(addr);
-
-        Some(
-            &mut self.root.table[d3].as_mut()?.table[d2].as_mut()?.table[d1]
-                .as_mut()?
-                .table[pg],
-        )
-    }
-
-    pub fn get_ref(&self, addr: u64) -> Option<&Page> {
-        let (d3, d2, d1, pg) = Self::as_offset(addr);
-
-        Some(
-            &self.root.table[d3].as_ref()?.table[d2].as_ref()?.table[d1]
-                .as_ref()?
-                .table[pg],
-        )
-    }
-
-    pub fn get_or_mmap<F>(&mut self, addr: u64, f: F) -> &mut Page
-    where
-        F: FnOnce() -> Page,
-    {
-        let (d3, d2, d1, pg) = Self::as_offset(addr);
-
-        let pt = &mut self.root;
-        let pt = pt.table[d3].get_or_insert_with(|| {
-            Box::new(PageTableDepth2 {
-                table: utility::make_array(|_| None),
-            })
-        });
-
-        let pt = pt.table[d2].get_or_insert_with(|| {
-            Box::new(PageTableDepth1 {
-                table: utility::make_array(|_| None),
-            })
-        });
-
-        let pt = pt.table[d1].get_or_insert_with(|| {
-            let mut table = Vec::new();
-            table.resize(65536, Page::Unmapped);
-
-            PageTableDepth0 {
-                table: table.into_boxed_slice().try_into().unwrap(),
-            }
-        });
-
-        if let Page::Unmapped = pt.table[pg] {
-            pt.table[pg] = f();
+impl Page for BasicPage {
+    unsafe fn try_write(&self, addr: u64, buf: &[u8]) -> Result<(), MmuError> {
+        if self.writable == false {
+            return Err(MmuError::AccessViolation(addr));
         }
 
-        &mut pt.table[pg]
+        let start = offset(addr);
+        let end = start + buf.len();
+
+        self.memory.slice()[start..end].copy_from_slice(buf);
+
+        debug_assert!(end <= PAGE_SIZE, "buffer is too large");
+
+        Ok(())
+    }
+
+    unsafe fn try_read(&self, addr: u64, buf: &mut [u8]) -> Result<(), MmuError> {
+        if self.readable == false {
+            return Err(MmuError::AccessViolation(addr));
+        }
+
+        let start = offset(addr);
+        let end = start + buf.len();
+
+        debug_assert!(end <= PAGE_SIZE, "buffer is too large");
+
+        buf.copy_from_slice(&self.memory.slice()[start..end]);
+
+        Ok(())
+    }
+
+    fn is_readable(&self) -> bool {
+        self.readable
+    }
+
+    fn is_writable(&self) -> bool {
+        self.writable
+    }
+
+    fn is_executable(&self) -> bool {
+        self.executable
+    }
+
+    unsafe fn into_inner(self: Box<Self>) -> HostMemory {
+        self.memory
+    }
+}
+
+pub struct PageWithCallback {
+    memory: HostMemory,
+    callback: Box<dyn Fn(MmuEvent) -> ()>,
+    readable: bool,
+    writable: bool,
+    executable: bool,
+}
+
+impl PageWithCallback {
+    pub fn from_page(page: Box<dyn Page>, callback: Box<dyn Fn(MmuEvent) -> ()>) -> Self {
+        let readable = page.is_readable();
+        let writable = page.is_writable();
+        let executable = page.is_executable();
+        let memory = unsafe { page.into_inner() };
+        Self {
+            memory,
+            callback,
+            readable,
+            writable,
+            executable,
+        }
+    }
+}
+
+impl Page for PageWithCallback {
+    unsafe fn try_write(&self, addr: u64, buf: &[u8]) -> Result<(), MmuError> {
+        if self.writable == false {
+            return Err(MmuError::AccessViolation(addr));
+        }
+
+        debug_assert!(buf.len() <= PAGE_SIZE, "buffer is too large");
+
+        let start = offset(addr);
+        let end = start + buf.len();
+
+        self.memory.slice()[start..end].copy_from_slice(buf);
+
+        (self.callback)(MmuEvent::Write(addr..addr + buf.len() as u64));
+
+        Ok(())
+    }
+
+    unsafe fn try_read(&self, addr: u64, buf: &mut [u8]) -> Result<(), MmuError> {
+        if self.readable == false {
+            return Err(MmuError::AccessViolation(addr));
+        }
+
+        debug_assert!(buf.len() <= PAGE_SIZE, "buffer is too large");
+
+        let start = offset(addr);
+        let end = start + buf.len();
+
+        buf.copy_from_slice(&self.memory.slice()[start..end]);
+
+        (self.callback)(MmuEvent::Read(addr..addr + buf.len() as u64));
+
+        Ok(())
+    }
+
+    fn is_readable(&self) -> bool {
+        self.readable
+    }
+
+    fn is_writable(&self) -> bool {
+        self.writable
+    }
+
+    fn is_executable(&self) -> bool {
+        self.executable
+    }
+
+    unsafe fn into_inner(self: Box<Self>) -> HostMemory {
+        self.memory
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::sync::{Arc, Mutex};
+
     use super::*;
-    use crate::softmmu::PAGE_SIZE;
 
     #[test]
-    fn test_paging() {
-        let mut table = PageTable::new();
+    fn basic_page_write_test() {
+        let page = BasicPage::new(true, true, true);
+        let content = "Hello World".as_bytes();
+        unsafe {
+            page.try_write(0xbee, content).unwrap();
+        }
 
-        table.get_or_mmap(0xCAFE_BABE_DEAD_BEEE, || Page::Memory {
-            memory: HostMemory::new(PAGE_SIZE as usize),
-            readable: true,
-            writable: true,
-            executable: true,
-        });
+        let result = unsafe { &page.memory.slice()[0xbee..0xbee + content.len()] };
 
-        let page = table.root;
+        assert_eq!(content, result)
+    }
 
-        let page = page.table[3247].as_ref().unwrap();
-        let page = page.table[3770].as_ref().unwrap();
-        let page = page.table[3053].as_ref().unwrap();
-        let _ = &page.table[60123];
+    #[test]
+    fn basic_page_read_test() {
+        let page = BasicPage::new(true, true, true);
+        let content = "Hello World".as_bytes();
+
+        unsafe {
+            page.memory.slice()[0xbee..0xbee + content.len()].copy_from_slice(content);
+        }
+
+        let mut result: Vec<_> = (0..content.len()).map(|_| 0u8).collect();
+
+        unsafe {
+            page.try_read(0xbee, &mut result).unwrap();
+        }
+
+        assert_eq!(content, &result)
+    }
+
+    #[test]
+    fn page_with_callback_write_test() {
+        let page = BasicPage::new(true, true, true);
+        let event_list = Arc::new(Mutex::new(Vec::new()));
+        let e_list = event_list.clone();
+
+        let page = PageWithCallback::from_page(
+            Box::new(page),
+            Box::new(move |e| {
+                let mut e_list = e_list.lock().unwrap();
+                e_list.push(e);
+            }),
+        );
+
+        let content = "Hello World".as_bytes();
+
+        unsafe {
+            page.try_write(0xbee, content).unwrap();
+        }
+
+        let result = unsafe { &page.memory.slice()[0xbee..0xbee + content.len()] };
+
+        assert_eq!(content, result);
+
+        let event_list = event_list.lock().unwrap();
+        assert_eq!(
+            event_list[0],
+            MmuEvent::Write(0xbee..0xbee + content.len() as u64)
+        )
+    }
+
+    #[test]
+    fn page_with_callback_read_test() {
+        let page = BasicPage::new(true, true, true);
+        let event_list = Arc::new(Mutex::new(Vec::new()));
+        let e_list = event_list.clone();
+
+        let page = PageWithCallback::from_page(
+            Box::new(page),
+            Box::new(move |e| {
+                let mut e_list = e_list.lock().unwrap();
+                e_list.push(e);
+            }),
+        );
+
+        let content = "Hello World".as_bytes();
+
+        unsafe {
+            page.memory.slice()[0xbee..0xbee + content.len()].copy_from_slice(content);
+        }
+
+        let mut result: Vec<_> = (0..content.len()).map(|_| 0u8).collect();
+
+        unsafe {
+            page.try_read(0xbee, &mut result).unwrap();
+        }
+
+        assert_eq!(content, &result);
+
+        let event_list = event_list.lock().unwrap();
+        assert_eq!(
+            event_list[0],
+            MmuEvent::Read(0xbee..0xbee + content.len() as u64)
+        )
     }
 }

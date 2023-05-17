@@ -19,6 +19,7 @@ where
         let mut inst: u32 = 0;
         for i in 0..4 {
             let byte = self.iter.next()?;
+
             inst |= (byte as u32) << (i * 8);
         }
 
