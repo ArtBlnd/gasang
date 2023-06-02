@@ -1,0 +1,14 @@
+[package]
+name = "execution"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+core = { path = "../core/" }
+cranelift = "0.96.3"
+cranelift-jit = "0.96.3"
+
+
