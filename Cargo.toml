@@ -1,9 +1,8 @@
 [workspace]
-
 members = [
-    "machineinstr",
-    "driver",
+    "arch_desc",
     "core",
+    "runtime",
+    "codegen",
     "utility",
-    "virtio"
 ]
