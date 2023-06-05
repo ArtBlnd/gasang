@@ -42,11 +42,11 @@ impl Executable for RustjitExectuable {
     unsafe fn execute<'a>(
         &'a self,
         context: &'a mut Self::Context,
-        mmu: &'a SoftMmu,
+        io_device: &'a SoftMmu,
     ) -> Self::Generator<'a> {
         || {
             for inst in &self.inst {
-                let Some(interrput) = inst(context, mmu) else {
+                let Some(interrput) = inst(context, io_device) else {
                     continue;
                 };
 
