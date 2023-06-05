@@ -17,16 +17,16 @@ pub struct RustjitContext {
 impl RustjitContext {
     pub fn get(&self, value: IrValue) -> u64 {
         match value {
-            IrValue::Variable(ty, id) => todo!(),
-            IrValue::Register(ty, id) => todo!(),
-            IrValue::Constant(constant) => todo!(),
+            IrValue::Variable(_ty, _id) => todo!(),
+            IrValue::Register(_ty, _id) => todo!(),
+            IrValue::Constant(_constant) => todo!(),
         }
     }
-    pub fn set(&mut self, value: IrValue, data: u64) {
+    pub fn set(&mut self, value: IrValue, _data: u64) {
         match value {
-            IrValue::Variable(ty, id) => todo!(),
-            IrValue::Register(ty, id) => todo!(),
-            IrValue::Constant(constant) => todo!(),
+            IrValue::Variable(_ty, _id) => todo!(),
+            IrValue::Register(_ty, _id) => todo!(),
+            IrValue::Constant(_constant) => todo!(),
         }
     }
 }

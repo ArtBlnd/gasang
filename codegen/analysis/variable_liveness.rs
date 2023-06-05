@@ -25,8 +25,7 @@ impl VariableLiveness {
         self.killed[..inst_idx]
             .iter()
             .rev()
-            .find(|killed| killed.contains(value))
-            .is_some()
+            .any(|killed| killed.contains(value))
     }
 
     /// Get the maximum number of variables live at any point in the basic block.
@@ -41,7 +40,7 @@ impl Analysis for VariableLivenessAnalysis<'_> {
     fn analyze(&self) -> Self::Output {
         let mut killed: Vec<HashSet<IrValue>> = Vec::new();
         let mut is_variable_used = HashSet::new();
-        killed.resize_with(self.basic_block.inst().len(), || Default::default());
+        killed.resize_with(self.basic_block.inst().len(), Default::default);
 
         let mut try_mark_as_dead = |idx: usize, value: IrValue| {
             if let IrValue::Variable(..) = value {

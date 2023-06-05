@@ -1,4 +1,4 @@
-use crate::ir::{BasicBlock, IrInst};
+use crate::ir::{BasicBlock};
 
 /// The representation of a machine instruction
 pub trait Instruction {

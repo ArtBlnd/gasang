@@ -26,7 +26,7 @@ impl Architecture for AArch64Architecture {
         let reg_prefix = &name[0..1];
 
         assert!(reg_number < 32, "invalid register number {}", reg_number);
-        return match reg_prefix {
+        match reg_prefix {
             // Handle scalar registers
             "x" => AArch64RegisterId::X(reg_number),
             "w" => AArch64RegisterId::W(reg_number),
@@ -39,7 +39,7 @@ impl Architecture for AArch64Architecture {
             "h" => AArch64RegisterId::H(reg_number),
             "b" => AArch64RegisterId::B(reg_number),
             _ => unreachable!("invalid register name {}", name),
-        };
+        }
     }
 
     type MnemonicHint = AArch64MnemonicHint;

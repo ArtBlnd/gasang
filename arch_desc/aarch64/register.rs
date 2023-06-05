@@ -190,7 +190,7 @@ impl RegisterId for AArch64RegisterId {
     fn raw(&self) -> RawRegisterId {
         let raw = match self {
             &Self::W(v) => 0x00FF + v as usize,
-            &Self::X(v) => 0x0000 + v as usize,
+            &Self::X(v) => v as usize,
             &Self::V(v) => 0x01FF + v as usize,
             &Self::Q(v) => 0x02FF + v as usize,
             &Self::D(v) => 0x03FF + v as usize,

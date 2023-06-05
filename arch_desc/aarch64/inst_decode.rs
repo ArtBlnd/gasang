@@ -6,11 +6,8 @@ use crate::aarch64::AArch64Architecture;
 use crate::aarch64::AArch64MnemonicHint;
 use utility::BitPatternMatcher;
 
-use utility::extract_bits32;
-use utility::Byte;
-use utility::Le;
-
 use once_cell::sync::Lazy;
+use utility::Extract;
 
 pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> AArch64Inst {
     // AArch64 instruction has fixed length of 32 bits
@@ -19,9 +16,9 @@ pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> AArch64Inst {
         m.bind(
             "0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx",
             |raw_instr: &[u8],
-             Byte(op0): Byte<29, 31>,
-             Byte(op1): Byte<16, 25>,
-             Le(imm16): Le<u16, 0, 16>| {
+             Extract(op0): Extract<u8, 29, 31>,
+             Extract(op1): Extract<u8, 16, 25>,
+             Extract(imm16): Extract<u16, 0, 16>| {
                 let imm16 = Imm16 { imm16 };
                 match (op0, op1) {
                     (0b00, 0b000000000) => AArch64Inst::Udf(imm16),
@@ -325,7 +322,7 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: &[u8]) -> AArch64Inst {
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
                 "0xx0", "10", "xxxx", "xxxxxxxx1"
             ),
-            |raw_instr: &[u8], Byte(op2): Byte<19, 23>| {
+            |raw_instr: &[u8], Extract(op2): Extract<u8, 19, 23>| {
                 if op2 == 0b0000 {
                     parse_adv_simd_modified_imm(raw_instr)
                 } else {
@@ -626,18 +623,18 @@ fn parse_add_sub_shifted_reg(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xxx_01011_xx_0_xxxxxxxxxxxxxxxxxxxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(shift): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(imm6): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(shift): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(imm6): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = ShiftRmImm6RnRd {
-                    shift: shift,
+                    shift,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
-                    imm6: imm6,
+                    imm6,
                 };
 
                 match (sf_op_s, shift, imm6) {
@@ -671,14 +668,14 @@ fn parse_add_sub_immediate(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_100010_x_xxxxxxxxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(sh): Byte<22, 23>,
-             Le(imm12): Le<u16, 10, 22>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(sh): Extract<u8, 22, 23>,
+             Extract(imm12): Extract<u16, 10, 22>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = ShImm12RnRd {
-                    sh: sh,
-                    imm12: imm12,
+                    sh,
+                    imm12,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -716,15 +713,15 @@ fn parse_fp_data_processing_3src(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11111_xx_x_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(m): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(o1): Byte<21, 22>,
-             Byte(rm): Byte<16, 21>,
-             Byte(o0): Byte<15, 16>,
-             Byte(ra): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(m): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(o1): Extract<u8, 21, 22>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(o0): Extract<u8, 15, 16>,
+             Extract(ra): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RmRaRnRd {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
                     ra: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, ra),
@@ -766,18 +763,18 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_111_x_01_xx_xxxxxxxxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(idxt): Byte<24, 26>,
-             Byte(opc): Byte<22, 24>,
-             Le(imm12): Le<u16, 10, 22>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(idxt): Extract<u8, 24, 26>,
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(imm12): Extract<u16, 10, 22>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = OpcSizeImm12RnRt {
-                    idxt: idxt,
-                    opc: opc,
-                    size: size,
-                    imm12: imm12,
+                    idxt,
+                    opc,
+                    size,
+                    imm12,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -834,13 +831,13 @@ fn parse_move_wide_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_xx_100101_xx_xxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf_opc): Byte<29, 32>,
-             Byte(hw): Byte<21, 23>,
-             Le(imm16): Le<u16, 5, 21>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_opc): Extract<u8, 29, 32>,
+             Extract(hw): Extract<u8, 21, 23>,
+             Extract(imm16): Extract<u16, 5, 21>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = HwImm16Rd {
-                    hw: hw,
-                    imm16: imm16,
+                    hw,
+                    imm16,
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
                 };
 
@@ -872,14 +869,14 @@ fn parse_uncond_branch_reg(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "1101011_xxxx_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<21, 25>,
-             Byte(op2): Byte<16, 21>,
-             Byte(op3): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(op4): Byte<0, 5>,
-             Byte(z): Byte<24, 25>,
-             Byte(op): Byte<21, 23>,
-             Byte(a): Byte<11, 12>| {
+             Extract(opc): Extract<u8, 21, 25>,
+             Extract(op2): Extract<u8, 16, 21>,
+             Extract(op3): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(op4): Extract<u8, 0, 5>,
+             Extract(z): Extract<u8, 24, 25>,
+             Extract(op): Extract<u8, 21, 23>,
+             Extract(a): Extract<u8, 11, 12>| {
                 let data = UncondBranchReg {
                     z,
                     op,
@@ -957,8 +954,10 @@ fn parse_uncond_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "x_00101_xxxxxxxxxxxxxxxxxxxxxxxxxx",
-            |raw_instr: &[u8], Byte(op): Byte<31, 32>, Le(imm26): Le<u32, 0, 26>| {
-                let data = Imm26 { imm26: imm26 };
+            |raw_instr: &[u8],
+             Extract(op): Extract<u8, 31, 32>,
+             Extract(imm26): Extract<u32, 0, 26>| {
+                let data = Imm26 { imm26 };
 
                 match op {
                     0b0 => AArch64Inst::BImm(data),
@@ -984,14 +983,11 @@ fn parse_cond_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0101010_x_xxxxxxxxxxxxxxxxxxx_x_xxxx",
             |raw_instr: &[u8],
-             Byte(o1): Byte<24, 25>,
-             Le(imm19): Le<u32, 5, 24>,
-             Byte(o0): Byte<4, 5>,
-             Byte(cond): Byte<0, 4>| {
-                let data = Imm19Cond {
-                    imm19: imm19,
-                    cond: cond,
-                };
+             Extract(o1): Extract<u8, 24, 25>,
+             Extract(imm19): Extract<u32, 5, 24>,
+             Extract(o0): Extract<u8, 4, 5>,
+             Extract(cond): Extract<u8, 0, 4>| {
+                let data = Imm19Cond { imm19, cond };
 
                 match (o1, o0) {
                     (0b0, 0b0) => AArch64Inst::BCond(data),
@@ -1017,15 +1013,15 @@ fn parse_cond_sel(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_11010100_xxxxx_xxxx_xx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(rm): Byte<16, 21>,
-             Byte(cond): Byte<12, 16>,
-             Byte(op2): Byte<10, 12>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(cond): Extract<u8, 12, 16>,
+             Extract(op2): Extract<u8, 10, 12>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RmCondRnRd {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
-                    cond: cond,
+                    cond,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
                 };
@@ -1060,15 +1056,15 @@ fn parse_test_and_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_011011_x_xxxxx_xxxxxxxxxxxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(b5): Byte<31, 32>,
-             Byte(op): Byte<24, 25>,
-             Byte(b40): Byte<19, 24>,
-             Le(imm14): Le<u16, 5, 19>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(b5): Extract<u8, 31, 32>,
+             Extract(op): Extract<u8, 24, 25>,
+             Extract(b40): Extract<u8, 19, 24>,
+             Extract(imm14): Extract<u16, 5, 19>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = B5B40Imm14Rt {
-                    b5: b5,
-                    b40: b40,
-                    imm14: imm14,
+                    b5,
+                    b40,
+                    imm14,
                     rt: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt),
                 };
 
@@ -1096,18 +1092,18 @@ fn parse_logical_shifted_register(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_xx_01010_xx_x_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(opc): Byte<29, 31>,
-             Byte(shift): Byte<22, 24>,
-             Byte(n): Byte<21, 22>,
-             Byte(rm): Byte<16, 21>,
-             Byte(imm6): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(opc): Extract<u8, 29, 31>,
+             Extract(shift): Extract<u8, 22, 24>,
+             Extract(n): Extract<u8, 21, 22>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(imm6): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = ShiftRmImm6RnRd {
-                    shift: shift,
+                    shift,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
-                    imm6: imm6,
+                    imm6,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
                 };
@@ -1150,7 +1146,9 @@ fn parse_hints(raw_instr: &[u8]) -> AArch64Inst {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "11010101000000110010_xxxx_xxx_11111",
-            |raw_instr: &[u8], Byte(crm): Byte<8, 12>, Byte(op2): Byte<5, 8>| match (crm, op2) {
+            |raw_instr: &[u8],
+             Extract(crm): Extract<u8, 8, 12>,
+             Extract(op2): Extract<u8, 5, 8>| match (crm, op2) {
                 (0b0000, 0b000) => AArch64Inst::Nop,
                 (0b0000, 0b001) => AArch64Inst::Yield,
                 (0b0000, 0b010) => AArch64Inst::Wfe,
@@ -1192,10 +1190,10 @@ fn parse_pc_rel_addressing(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_xx_10000_xxxxxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(op): Byte<31, 32>,
-             Byte(immlo): Byte<29, 31>,
-             Le(immhi): Le<u32, 5, 24>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(op): Extract<u8, 31, 32>,
+             Extract(immlo): Extract<u8, 29, 31>,
+             Extract(immhi): Extract<u32, 5, 24>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = PcRelAddressing {
                     immlo,
                     immhi,
@@ -1226,15 +1224,15 @@ fn parse_exception_gen(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "11010100_xxx_xxxxxxxxxxxxxxxx_xxx_xx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<21, 24>,
-             Le(imm16): Le<u16, 5, 21>,
-             Byte(op2): Byte<2, 5>,
-             Byte(ll): Byte<0, 2>| {
+             Extract(opc): Extract<u8, 21, 24>,
+             Extract(imm16): Extract<u16, 5, 21>,
+             Extract(op2): Extract<u8, 2, 5>,
+             Extract(ll): Extract<u8, 0, 2>| {
                 let data = ExceptionGen {
-                    opc: opc,
-                    imm16: imm16,
-                    op2: op2,
-                    ll: ll,
+                    opc,
+                    imm16,
+                    op2,
+                    ll,
                 };
 
                 match (opc, op2, ll) {
@@ -1268,21 +1266,21 @@ fn parse_load_store_reg_reg_offset(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_111_x_00_xx_1_xxxxx_xxx_x_10_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(opc): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(option): Byte<13, 16>,
-             Byte(s): Byte<12, 13>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(option): Extract<u8, 13, 16>,
+             Extract(s): Extract<u8, 12, 13>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LoadStoreRegRegOffset {
-                    size: size,
-                    v: v,
-                    opc: opc,
+                    size,
+                    v,
+                    opc,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
-                    option: option,
-                    s: s,
+                    option,
+                    s,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -1332,17 +1330,17 @@ fn parse_add_sub_ext_reg(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_01011_xx_1_xxxxx_xxx_xxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(opt): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(option): Byte<13, 16>,
-             Byte(imm3): Byte<10, 13>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(opt): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(option): Extract<u8, 13, 16>,
+             Extract(imm3): Extract<u8, 10, 13>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AddSubtractExtReg {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
-                    option: option,
-                    imm3: imm3,
+                    option,
+                    imm3,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -1383,17 +1381,17 @@ fn parse_bitfield(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_xx_100110_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(opc): Byte<29, 31>,
-             Byte(n): Byte<22, 23>,
-             Byte(immr): Byte<16, 22>,
-             Byte(imms): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(opc): Extract<u8, 29, 31>,
+             Extract(n): Extract<u8, 22, 23>,
+             Extract(immr): Extract<u8, 16, 22>,
+             Extract(imms): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = Bitfield {
-                    n: n,
-                    immr: immr,
-                    imms: imms,
+                    n,
+                    immr,
+                    imms,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
                 };
@@ -1427,17 +1425,17 @@ fn parse_logical_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_xx_100100_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(opc): Byte<29, 31>,
-             Byte(n): Byte<22, 23>,
-             Byte(immr): Byte<16, 22>,
-             Byte(imms): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(opc): Extract<u8, 29, 31>,
+             Extract(n): Extract<u8, 22, 23>,
+             Extract(immr): Extract<u8, 16, 22>,
+             Extract(imms): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = LogicalImm {
-                    n: n,
-                    immr: immr,
-                    imms: imms,
+                    n,
+                    immr,
+                    imms,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
@@ -1476,18 +1474,18 @@ fn parse_load_store_reg_pair_offset(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_101_x_010_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(l): Byte<22, 23>,
-             Byte(imm7): Byte<15, 22>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(opc): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(imm7): Extract<u8, 15, 22>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LoadStoreRegPair {
-                    opc: opc,
-                    imm7: imm7,
+                    opc,
+                    imm7,
                     o: 0b010,
-                    rt2: rt2,
+                    rt2,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -1529,18 +1527,18 @@ fn parse_add_sub_imm_with_tags(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_100011_x_xxxxxx_xx_xxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(o2): Byte<22, 23>,
-             Byte(uimm6): Byte<16, 22>,
-             Byte(op3): Byte<14, 16>,
-             Byte(uimm4): Byte<10, 14>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(o2): Extract<u8, 22, 23>,
+             Extract(uimm6): Extract<u8, 16, 22>,
+             Extract(op3): Extract<u8, 14, 16>,
+             Extract(uimm4): Extract<u8, 10, 14>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AddSubImmWithTags {
-                    o2: o2,
-                    uimm6: uimm6,
-                    op3: op3,
-                    uimm4: uimm4,
+                    o2,
+                    uimm6,
+                    op3,
+                    uimm4,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -1575,16 +1573,16 @@ fn parse_extract(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_xx_100111_x_x_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf_op21): Byte<29, 32>,
-             Byte(n): Byte<22, 23>,
-             Byte(o0): Byte<21, 22>,
-             Byte(rm): Byte<16, 21>,
-             Byte(imms): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_op21): Extract<u8, 29, 32>,
+             Extract(n): Extract<u8, 22, 23>,
+             Extract(o0): Extract<u8, 21, 22>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(imms): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = ExtractImm {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
-                    imms: imms,
+                    imms,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
                 };
@@ -1615,12 +1613,12 @@ fn parse_data_proc_1src(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_1_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(opcode2): Byte<16, 21>,
-             Byte(opcode): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(opcode2): Extract<u8, 16, 21>,
+             Extract(opcode): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RnRd {
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
@@ -1659,12 +1657,12 @@ fn parse_cmp_and_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_011010_x_xxxxxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(op): Byte<24, 25>,
-             Le(imm19): Le<u32, 5, 24>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(op): Extract<u8, 24, 25>,
+             Extract(imm19): Extract<u32, 5, 24>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = Imm19Rt {
-                    imm19: imm19,
+                    imm19,
                     rt: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt),
                 };
 
@@ -1694,14 +1692,14 @@ fn parse_data_proccessing_3src(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_xx_11011_xxx_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(op54): Byte<29, 31>,
-             Byte(op31): Byte<21, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(o0): Byte<15, 16>,
-             Byte(ra): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(op54): Extract<u8, 29, 31>,
+             Extract(op31): Extract<u8, 21, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(o0): Extract<u8, 15, 16>,
+             Extract(ra): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = DataProc3Src {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
                     ra: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, ra),
@@ -1741,14 +1739,14 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_111_x_00_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(opc): Byte<22, 24>,
-             Le(imm9): Le<u16, 12, 21>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(imm9): Extract<u16, 12, 21>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LdStRegUnscaledImm {
-                    imm9: imm9,
+                    imm9,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -1803,19 +1801,19 @@ fn parse_sys_reg_mov(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "1101010100_x_1_x_xxx_xxxx_xxxx_xxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(l): Byte<21, 22>,
-             Byte(o0): Byte<19, 20>,
-             Byte(op1): Byte<16, 19>,
-             Byte(crn): Byte<12, 16>,
-             Byte(crm): Byte<8, 12>,
-             Byte(op2): Byte<5, 8>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(l): Extract<u8, 21, 22>,
+             Extract(o0): Extract<u8, 19, 20>,
+             Extract(op1): Extract<u8, 16, 19>,
+             Extract(crn): Extract<u8, 12, 16>,
+             Extract(crm): Extract<u8, 8, 12>,
+             Extract(op2): Extract<u8, 5, 8>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = SysRegMov {
-                    o0: o0,
-                    op1: op1,
-                    crn: crn,
-                    crm: crm,
-                    op2: op2,
+                    o0,
+                    op1,
+                    crn,
+                    crm,
+                    op2,
                     rt: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt),
                 };
 
@@ -1843,18 +1841,18 @@ fn parse_load_store_reg_pair_pre_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_101_x_011_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(l): Byte<22, 23>,
-             Byte(imm7): Byte<15, 22>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(opc): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(imm7): Extract<u8, 15, 22>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LoadStoreRegPair {
-                    opc: opc,
+                    opc,
                     o: 0b011,
-                    imm7: imm7,
-                    rt2: rt2,
+                    imm7,
+                    rt2,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -1896,18 +1894,18 @@ fn parse_load_store_reg_pair_post_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_101_x_001_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(l): Byte<22, 23>,
-             Byte(imm7): Byte<15, 22>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(opc): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(imm7): Extract<u8, 15, 22>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LoadStoreRegPair {
-                    opc: opc,
+                    opc,
                     o: 0b001,
-                    imm7: imm7,
-                    rt2: rt2,
+                    imm7,
+                    rt2,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -1949,12 +1947,12 @@ fn parse_data_proc_2src(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(rm): Byte<16, 21>,
-             Byte(opcode): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(opcode): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = DataProc2Src {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
@@ -1997,18 +1995,18 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_111_x_00_xx_0_xxxxxxxxx_11_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(idxt): Byte<24, 26>, // Indexing type
-             Byte(opc): Byte<22, 24>,
-             Le(imm12): Le<u16, 10, 22>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(idxt): Extract<u8, 24, 26>, // Indexing type
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(imm12): Extract<u16, 10, 22>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = OpcSizeImm12RnRt {
-                    idxt: idxt,
-                    opc: opc,
-                    size: size,
-                    imm12: imm12,
+                    idxt,
+                    opc,
+                    size,
+                    imm12,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -2063,18 +2061,18 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_111_x_00_xx_0_xxxxxxxxx_01_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(idxt): Byte<24, 26>,
-             Byte(opc): Byte<22, 24>,
-             Le(imm12): Le<u16, 10, 21>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(idxt): Extract<u8, 24, 26>,
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(imm12): Extract<u16, 10, 21>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = OpcSizeImm12RnRt {
-                    idxt: idxt,
-                    opc: opc,
-                    size: size,
-                    imm12: imm12,
+                    idxt,
+                    opc,
+                    size,
+                    imm12,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -2129,10 +2127,10 @@ fn parse_barriers(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "11010101000000110011_xxxx_xxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(crm): Byte<8, 12>,
-             Byte(op2): Byte<5, 8>,
-             Byte(rt): Byte<0, 5>| {
-                let data = Barriers { crm: crm };
+             Extract(crm): Extract<u8, 8, 12>,
+             Extract(op2): Extract<u8, 5, 8>,
+             Extract(rt): Extract<u8, 0, 5>| {
+                let data = Barriers { crm };
 
                 match (crm, op2, rt) {
                     (_, 0b010, 0b11111) => AArch64Inst::Clrex(data),
@@ -2161,12 +2159,12 @@ fn parse_advanced_simd_copy(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_x_01110000_xxxxx_0_xxxx_1_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(op): Byte<29, 30>,
-             Byte(imm5): Byte<16, 21>,
-             Byte(imm4): Byte<11, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(op): Extract<u8, 29, 30>,
+             Extract(imm5): Extract<u8, 16, 21>,
+             Extract(imm4): Extract<u8, 11, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AdvancedSimdCopy {
                     q,
                     imm5,
@@ -2205,18 +2203,18 @@ fn parse_cond_cmp_reg(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_11010010_xxxxx_xxxx_0_x_xxxxx_x_xxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(rm): Byte<16, 21>,
-             Byte(cond): Byte<12, 16>,
-             Byte(o2): Byte<10, 11>,
-             Byte(rn): Byte<5, 10>,
-             Byte(o3): Byte<4, 5>,
-             Byte(nzcv): Byte<0, 4>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(cond): Extract<u8, 12, 16>,
+             Extract(o2): Extract<u8, 10, 11>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(o3): Extract<u8, 4, 5>,
+             Extract(nzcv): Extract<u8, 0, 4>| {
                 let data = CondCmpReg {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
-                    cond: cond,
+                    cond,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
-                    nzcv: nzcv,
+                    nzcv,
                 };
 
                 match (sf_op_s, o2, o3) {
@@ -2246,20 +2244,20 @@ fn parse_adv_simd_ld_st_multi_structures(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_0011000_x_000000_xxxx_xx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(l): Byte<22, 23>,
-             Byte(opcode): Byte<12, 16>,
-             Byte(size): Byte<10, 12>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(opcode): Extract<u8, 12, 16>,
+             Extract(size): Extract<u8, 10, 12>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = AdvSimdLdStMultiStructures {
-                    q: q,
-                    size: size,
+                    q,
+                    size,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
                     ),
-                    rt: rt,
+                    rt,
                 };
 
                 match (l, opcode) {
@@ -2300,16 +2298,16 @@ fn parse_advanced_simd_extract(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_101110_xx_0_xxxxx_0_xxxx_0_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(op2): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(imm4): Byte<11, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(op2): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(imm4): Extract<u8, 11, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AdvancedSimdExtract {
-                    q: q,
+                    q,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
-                    imm4: imm4,
+                    imm4,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -2337,22 +2335,22 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: &[u8]) -> AArch
         m.bind(
             "0_x_0011001_x_0_xxxxx_xxxx_xx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(l): Byte<22, 23>,
-             Byte(rm): Byte<16, 21>,
-             Byte(opcode): Byte<12, 16>,
-             Byte(size): Byte<10, 12>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(opcode): Extract<u8, 12, 16>,
+             Extract(size): Extract<u8, 10, 12>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = AdvSimdLdStMultiStructuresPostIndexed {
-                    q: q,
+                    q,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
-                    size: size,
+                    size,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
                     ),
-                    rt: rt,
+                    rt,
                 };
 
                 match (l, rm, opcode) {
@@ -2436,13 +2434,13 @@ fn parse_conv_between_float_and_int(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11110_xx_1_xx_xxx_000000_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(rmode): Byte<19, 21>,
-             Byte(opcode): Byte<16, 19>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(rmode): Extract<u8, 19, 21>,
+             Extract(opcode): Extract<u8, 16, 19>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RnRd {
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rd),
@@ -2636,38 +2634,37 @@ fn parse_adv_simd_modified_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_x_01111_00000_x_x_x_xxxx_x_1_x_x_x_x_x_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(op): Byte<29, 30>,
-             Byte(a): Byte<18, 19>,
-             Byte(b): Byte<17, 18>,
-             Byte(c): Byte<16, 17>,
-             Byte(cmode): Byte<12, 16>,
-             Byte(o2): Byte<11, 12>,
-             Byte(d): Byte<9, 10>,
-             Byte(e): Byte<8, 9>,
-             Byte(f): Byte<7, 8>,
-             Byte(g): Byte<6, 7>,
-             Byte(h): Byte<5, 6>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(op): Extract<u8, 29, 30>,
+             Extract(a): Extract<u8, 18, 19>,
+             Extract(b): Extract<u8, 17, 18>,
+             Extract(c): Extract<u8, 16, 17>,
+             Extract(cmode): Extract<u8, 12, 16>,
+             Extract(cmode3): Extract<u8, 12, 13>,
+             Extract(cmode2): Extract<u8, 13, 14>,
+             Extract(cmode1): Extract<u8, 14, 15>,
+             Extract(cmode0): Extract<u8, 15, 16>,
+             Extract(o2): Extract<u8, 11, 12>,
+             Extract(d): Extract<u8, 9, 10>,
+             Extract(e): Extract<u8, 8, 9>,
+             Extract(f): Extract<u8, 7, 8>,
+             Extract(g): Extract<u8, 6, 7>,
+             Extract(h): Extract<u8, 5, 6>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AdvSimdModifiedImm {
-                    q: q,
-                    op: op,
-                    a: a,
-                    b: b,
-                    c: c,
-                    cmode: cmode,
-                    d: d,
-                    e: e,
-                    f: f,
-                    g: g,
-                    h: h,
+                    q,
+                    op,
+                    a,
+                    b,
+                    c,
+                    cmode,
+                    d,
+                    e,
+                    f,
+                    g,
+                    h,
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
-                let cmode = cmode as u32;
-                let cmode0 = extract_bits32(3..4, cmode);
-                let cmode1 = extract_bits32(2..3, cmode);
-                let cmode2 = extract_bits32(1..2, cmode);
-                let cmode3 = extract_bits32(0..1, cmode);
 
                 match (q, op, cmode0, cmode1, cmode2, cmode3, o2) {
                     (_, 0b0, 0, _, _, 0, 0b0) => AArch64Inst::MoviShiftedImmVar32(data),
@@ -2710,18 +2707,18 @@ fn parse_cond_cmp_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_11010010_xxxxx_xxxx_1_x_xxxxx_x_xxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(imm5): Byte<16, 21>,
-             Byte(cond): Byte<12, 16>,
-             Byte(o2): Byte<10, 11>,
-             Byte(rn): Byte<5, 10>,
-             Byte(o3): Byte<4, 5>,
-             Byte(nzcv): Byte<0, 4>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(imm5): Extract<u8, 16, 21>,
+             Extract(cond): Extract<u8, 12, 16>,
+             Extract(o2): Extract<u8, 10, 11>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(o3): Extract<u8, 4, 5>,
+             Extract(nzcv): Extract<u8, 0, 4>| {
                 let data = CondCmpImm {
-                    imm5: imm5,
-                    cond: cond,
+                    imm5,
+                    cond,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
-                    nzcv: nzcv,
+                    nzcv,
                 };
 
                 match (sf_op_s, o2, o3) {
@@ -2751,16 +2748,16 @@ fn parse_load_store_exclusive_register(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_0010000_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(l): Byte<22, 23>,
-             Byte(rs): Byte<16, 21>,
-             Byte(o0): Byte<15, 16>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(rs): Extract<u8, 16, 21>,
+             Extract(o0): Extract<u8, 15, 16>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = RsRt2RnRt {
                     rs: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rs),
-                    rt2: rt2,
+                    rt2,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -2808,16 +2805,16 @@ fn parse_load_store_ordered(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_0010001_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(l): Byte<22, 23>,
-             Byte(rs): Byte<16, 21>,
-             Byte(o0): Byte<15, 16>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(rs): Extract<u8, 16, 21>,
+             Extract(o0): Extract<u8, 15, 16>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = RsRt2RnRt {
                     rs: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rs),
-                    rt2: rt2,
+                    rt2,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -2856,16 +2853,16 @@ fn parse_advanced_simd_three_same(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_x_01110_xx_1_xxxxx_xxxxx_1_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(u): Byte<29, 30>,
-             Byte(size): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(opcode): Byte<11, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(u): Extract<u8, 29, 30>,
+             Extract(size): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(opcode): Extract<u8, 11, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = QSizeRmRnRd {
-                    q: q,
-                    size: size,
+                    q,
+                    size,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
@@ -2981,15 +2978,15 @@ fn parse_adv_simd_shift_by_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_x_011110_xxxx_xxx_xxxxx_1_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(u): Byte<29, 30>,
-             Byte(immb): Byte<16, 19>,
-             Byte(opcode): Byte<11, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(u): Extract<u8, 29, 30>,
+             Extract(immb): Extract<u8, 16, 19>,
+             Extract(opcode): Extract<u8, 11, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AdvSimdShiftByImm {
-                    q: q,
-                    immb: immb,
+                    q,
+                    immb,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -3049,12 +3046,12 @@ fn parse_float_data_proc_1src(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11110_xx_1_xxxxxx_10000_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(m): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(opcode): Byte<15, 21>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(m): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(opcode): Extract<u8, 15, 21>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RnRd {
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
@@ -3114,13 +3111,13 @@ fn parse_adv_simd_scalar_pairwise(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "01_x_11110_xx_11000_xxxxx_10_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(u): Byte<29, 30>,
-             Byte(size): Byte<22, 24>,
-             Byte(opcode): Byte<12, 17>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(u): Extract<u8, 29, 30>,
+             Extract(size): Extract<u8, 22, 24>,
+             Extract(opcode): Extract<u8, 12, 17>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AdvSimdScalarPairwise {
-                    size: size,
+                    size,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -3154,23 +3151,23 @@ fn parse_adv_simd_ld_st_single_structure(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_0011010_x_x_00000_xxx_x_xx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(l): Byte<22, 23>,
-             Byte(r): Byte<21, 22>,
-             Byte(opcode): Byte<13, 16>,
-             Byte(s): Byte<12, 13>,
-             Byte(size): Byte<10, 12>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(r): Extract<u8, 21, 22>,
+             Extract(opcode): Extract<u8, 13, 16>,
+             Extract(s): Extract<u8, 12, 13>,
+             Extract(size): Extract<u8, 10, 12>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = AdvSimdLdStSingleStructure {
-                    q: q,
-                    s: s,
-                    size: size,
+                    q,
+                    s,
+                    size,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
                     ),
-                    rt: rt,
+                    rt,
                 };
 
                 match (l, r, opcode, s, size) {
@@ -3244,15 +3241,15 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_x_01110_xx_10000_xxxxx_10_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(u): Byte<29, 30>,
-             Byte(size): Byte<22, 24>,
-             Byte(opcode): Byte<12, 17>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(u): Extract<u8, 29, 30>,
+             Extract(size): Extract<u8, 22, 24>,
+             Extract(opcode): Extract<u8, 12, 17>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = QSizeRnRd {
-                    q: q,
-                    size: size,
+                    q,
+                    size,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -3348,15 +3345,15 @@ fn parse_adv_simd_across_lanes(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_x_01110_xx_11000_xxxxx_10_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(u): Byte<29, 30>,
-             Byte(size): Byte<22, 24>,
-             Byte(opcode): Byte<12, 17>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(u): Extract<u8, 29, 30>,
+             Extract(size): Extract<u8, 22, 24>,
+             Extract(opcode): Extract<u8, 12, 17>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = QSizeRnRd {
-                    q: q,
-                    size: size,
+                    q,
+                    size,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -3398,13 +3395,13 @@ fn parse_compare_and_swap(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_0010001_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(l): Byte<22, 23>,
-             Byte(rs): Byte<16, 21>,
-             Byte(o0): Byte<15, 16>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(rs): Extract<u8, 16, 21>,
+             Extract(o0): Extract<u8, 15, 16>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = RsRnRt {
                     rs: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rs),
                     rn: AArch64Architecture::get_register_by_mnemonic(
@@ -3456,15 +3453,15 @@ fn parse_atomic_memory_operations(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_111_x_00_x_x_1_xxxxx_x_xxx_00_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(a): Byte<23, 24>,
-             Byte(r): Byte<22, 23>,
-             Byte(rs): Byte<16, 21>,
-             Byte(o3): Byte<15, 16>,
-             Byte(opc): Byte<12, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(a): Extract<u8, 23, 24>,
+             Extract(r): Extract<u8, 22, 23>,
+             Extract(rs): Extract<u8, 16, 21>,
+             Extract(o3): Extract<u8, 15, 16>,
+             Extract(opc): Extract<u8, 12, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = RsRnRt {
                     rs: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rs),
                     rn: AArch64Architecture::get_register_by_mnemonic(
@@ -3667,10 +3664,10 @@ fn parse_add_sub_with_carry(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_11010000_xxxxx_000000_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(rm): Byte<16, 21>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RmRnRd {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rm),
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
@@ -3709,18 +3706,18 @@ fn parse_floating_point_compare(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11110_xx_1_xxxxx_xx_1000_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(m): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(op): Byte<14, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(opcode2): Byte<0, 5>| {
+             Extract(m): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(op): Extract<u8, 14, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(opcode2): Extract<u8, 0, 5>| {
                 let data = FloatingPointCompare {
-                    ptype: ptype,
+                    ptype,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
-                    opcode2: opcode2,
+                    opcode2,
                 };
 
                 match (m, s, ptype, op, opcode2) {
@@ -3753,15 +3750,15 @@ fn parse_advanced_simd_permute(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_001110_xx_0_xxxxx_0_xxx_10_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<30, 31>,
-             Byte(size): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(opcode): Byte<12, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 30, 31>,
+             Extract(size): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(opcode): Extract<u8, 12, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = QSizeRmRnRd {
-                    q: q,
-                    size: size,
+                    q,
+                    size,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
@@ -3797,13 +3794,13 @@ fn parse_float_data_proc_2src(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11110_xx_1_xxxxx_xxxx_10_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(m): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(opcode): Byte<12, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(m): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(opcode): Extract<u8, 12, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RmRnRd {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
@@ -3852,14 +3849,14 @@ fn parse_floating_point_immediate(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11110_xx_1_xxxxxxxx_100_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(m): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(imm8): Byte<13, 21>,
-             Byte(imm5): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(m): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(imm8): Extract<u8, 13, 21>,
+             Extract(imm5): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = FloatingPointImmediate {
-                    imm8: imm8,
+                    imm8,
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
 
@@ -3888,16 +3885,16 @@ fn parse_conv_between_float_and_fixed_point(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11110_xx_0_xx_xxx_xxxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sf): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(rmode): Byte<19, 21>,
-             Byte(opcode): Byte<16, 19>,
-             Byte(scale): Byte<10, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(sf): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(rmode): Extract<u8, 19, 21>,
+             Extract(opcode): Extract<u8, 16, 19>,
+             Extract(scale): Extract<u8, 10, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = ConvBetweenFloatAndFixedPoint {
-                    scale: scale,
+                    scale,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -3976,16 +3973,16 @@ fn parse_floating_point_conditional_select(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_0_x_11110_xx_1_xxxxx_xxxx_11_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(m): Byte<31, 32>,
-             Byte(s): Byte<29, 30>,
-             Byte(ptype): Byte<22, 24>,
-             Byte(rm): Byte<16, 21>,
-             Byte(cond): Byte<12, 16>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(m): Extract<u8, 31, 32>,
+             Extract(s): Extract<u8, 29, 30>,
+             Extract(ptype): Extract<u8, 22, 24>,
+             Extract(rm): Extract<u8, 16, 21>,
+             Extract(cond): Extract<u8, 12, 16>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = RmCondRnRd {
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
-                    cond: cond,
+                    cond,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -4015,23 +4012,23 @@ fn parse_adv_simd_vec_x_indexed_elem(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_x_01111_xx_x_x_xxxx_xxxx_x_0_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(q): Byte<31, 32>,
-             Byte(u): Byte<29, 30>,
-             Byte(size): Byte<22, 24>,
-             Byte(l): Byte<21, 22>,
-             Byte(m): Byte<20, 21>,
-             Byte(rm): Byte<16, 20>,
-             Byte(opcode): Byte<12, 16>,
-             Byte(h): Byte<11, 12>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(q): Extract<u8, 31, 32>,
+             Extract(u): Extract<u8, 29, 30>,
+             Extract(size): Extract<u8, 22, 24>,
+             Extract(l): Extract<u8, 21, 22>,
+             Extract(m): Extract<u8, 20, 21>,
+             Extract(rm): Extract<u8, 16, 20>,
+             Extract(opcode): Extract<u8, 12, 16>,
+             Extract(h): Extract<u8, 11, 12>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AdvSimdXIndexedElem {
-                    q: q,
-                    size: size,
-                    l: l,
-                    m: m,
+                    q,
+                    size,
+                    l,
+                    m,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
-                    h: h,
+                    h,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -4080,22 +4077,22 @@ fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "01_x_11111_xx_x_x_xxxx_xxxx_x_0_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(u): Byte<29, 30>,
-             Byte(size): Byte<22, 24>,
-             Byte(l): Byte<21, 22>,
-             Byte(m): Byte<20, 21>,
-             Byte(rm): Byte<16, 20>,
-             Byte(opcode): Byte<12, 16>,
-             Byte(h): Byte<11, 12>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rd): Byte<0, 5>| {
+             Extract(u): Extract<u8, 29, 30>,
+             Extract(size): Extract<u8, 22, 24>,
+             Extract(l): Extract<u8, 21, 22>,
+             Extract(m): Extract<u8, 20, 21>,
+             Extract(rm): Extract<u8, 16, 20>,
+             Extract(opcode): Extract<u8, 12, 16>,
+             Extract(h): Extract<u8, 11, 12>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rd): Extract<u8, 0, 5>| {
                 let data = AdvSimdXIndexedElem {
                     q: 0b1,
-                    size: size,
-                    l: l,
-                    m: m,
+                    size,
+                    l,
+                    m,
                     rm: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rm),
-                    h: h,
+                    h,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rn),
                     rd: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::V, rd),
                 };
@@ -4134,9 +4131,9 @@ fn parse_sys_instr_with_reg_arg(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "11010101000000110001_xxxx_xxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(crm): Byte<8, 12>,
-             Byte(op2): Byte<5, 8>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(crm): Extract<u8, 8, 12>,
+             Extract(op2): Extract<u8, 5, 8>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = Rt {
                     rt: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt),
                 };
@@ -4166,15 +4163,11 @@ fn parse_pstate(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "1101010100000_xxx_0100_xxxx_xxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(op1): Byte<16, 19>,
-             Byte(crm): Byte<8, 12>,
-             Byte(op2): Byte<5, 8>,
-             Byte(rt): Byte<0, 5>| {
-                let data = PstateOp {
-                    op1: op1,
-                    crm: crm,
-                    op2: op2,
-                };
+             Extract(op1): Extract<u8, 16, 19>,
+             Extract(crm): Extract<u8, 8, 12>,
+             Extract(op2): Extract<u8, 5, 8>,
+             Extract(rt): Extract<u8, 0, 5>| {
+                let data = PstateOp { op1, crm, op2 };
 
                 match (op1, op2, rt) {
                     (0b000, 0b000, 0b11111) => AArch64Inst::Cfinv(data),
@@ -4203,11 +4196,11 @@ fn parse_sys_with_result(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "1101010100000_xxx_0100_xxxx_xxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(op1): Byte<16, 19>,
-             Byte(crn): Byte<12, 16>,
-             Byte(crm): Byte<8, 12>,
-             Byte(op2): Byte<5, 8>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(op1): Extract<u8, 16, 19>,
+             Extract(crn): Extract<u8, 12, 16>,
+             Extract(crm): Extract<u8, 8, 12>,
+             Extract(op2): Extract<u8, 5, 8>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = Rt {
                     rt: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt),
                 };
@@ -4237,17 +4230,17 @@ fn parse_sys_instr(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "1101010100000_xxx_0100_xxxx_xxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(l): Byte<21, 22>,
-             Byte(op1): Byte<16, 19>,
-             Byte(crn): Byte<12, 16>,
-             Byte(crm): Byte<8, 12>,
-             Byte(op2): Byte<5, 8>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(l): Extract<u8, 21, 22>,
+             Extract(op1): Extract<u8, 16, 19>,
+             Extract(crn): Extract<u8, 12, 16>,
+             Extract(crm): Extract<u8, 8, 12>,
+             Extract(op2): Extract<u8, 5, 8>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = SystemInstructions {
-                    op1: op1,
-                    crn: crn,
-                    crm: crm,
-                    op2: op2,
+                    op1,
+                    crn,
+                    crm,
+                    op2,
                     rt: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt),
                 };
 
@@ -4276,15 +4269,15 @@ fn parse_rot_right_into_flags(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_11010000_xxxxxx_00001_xxxxx_x_xxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(imm6): Byte<15, 21>,
-             Byte(rn): Byte<5, 10>,
-             Byte(o2): Byte<4, 5>,
-             Byte(mask): Byte<0, 4>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(imm6): Extract<u8, 15, 21>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(o2): Extract<u8, 4, 5>,
+             Extract(mask): Extract<u8, 0, 4>| {
                 let data = RotateRightIntoFlags {
-                    imm6: imm6,
+                    imm6,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
-                    mask: mask,
+                    mask,
                 };
 
                 match (sf_op_s, o2) {
@@ -4311,12 +4304,12 @@ fn parse_eval_into_flags(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "x_x_x_11010000_xxxxxx_x_0010_xxxxx_x_xxxx",
             |raw_instr: &[u8],
-             Byte(sf_op_s): Byte<29, 32>,
-             Byte(opcode2): Byte<15, 21>,
-             Byte(sz): Byte<14, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(o3): Byte<4, 5>,
-             Byte(mask): Byte<0, 4>| {
+             Extract(sf_op_s): Extract<u8, 29, 32>,
+             Extract(opcode2): Extract<u8, 15, 21>,
+             Extract(sz): Extract<u8, 14, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(o3): Extract<u8, 4, 5>,
+             Extract(mask): Extract<u8, 0, 4>| {
                 let data = Rn {
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
                 };
@@ -4346,12 +4339,12 @@ fn parse_load_register_literal(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_011_x_00_xxxxxxxxxxxxxxxxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Le(imm19): Le<u32, 5, 24>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(opc): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(imm19): Extract<u32, 5, 24>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = Imm19Rt {
-                    imm19: imm19,
+                    imm19,
                     rt: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt),
                 };
 
@@ -4385,17 +4378,17 @@ fn parse_compare_and_swap_pair(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "0_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sz): Byte<30, 31>,
-             Byte(l): Byte<22, 23>,
-             Byte(rs): Byte<16, 21>,
-             Byte(o0): Byte<15, 16>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(sz): Extract<u8, 30, 31>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(rs): Extract<u8, 16, 21>,
+             Extract(o0): Extract<u8, 15, 16>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = CompareAndSwapPair {
-                    rs: rs,
+                    rs,
                     rn: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rn),
-                    rt: rt,
+                    rt,
                 };
 
                 match (sz, l, o0, rt2) {
@@ -4430,14 +4423,14 @@ fn parse_load_store_memory_tags(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "11011001_xx_1_xxxxxxxxx_xx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<22, 24>,
-             Le(imm9): Le<u16, 12, 221>,
-             Byte(op2): Byte<10, 12>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(imm9): Extract<u16, 12, 221>,
+             Extract(op2): Extract<u8, 10, 12>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LoadStoreMemoryTags {
-                    imm9: imm9,
-                    op2: op2,
+                    imm9,
+                    op2,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -4479,13 +4472,13 @@ fn parse_load_store_exclusive_pair(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "1_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(sz): Byte<30, 31>,
-             Byte(l): Byte<22, 23>,
-             Byte(rs): Byte<16, 21>,
-             Byte(o0): Byte<15, 16>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(sz): Extract<u8, 30, 31>,
+             Extract(l): Extract<u8, 22, 23>,
+             Extract(rs): Extract<u8, 16, 21>,
+             Extract(o0): Extract<u8, 15, 16>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LoadStoreExclusivePair {
                     rs: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rs),
                     rt2: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt2),
@@ -4528,13 +4521,13 @@ fn parse_ldapr_stlr_unscaled_imm(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_011001_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(opc): Byte<22, 24>,
-             Le(imm9): Le<u16, 12, 21>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(imm9): Extract<u16, 12, 21>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = Imm9RnRt {
-                    imm9: imm9,
+                    imm9,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,
@@ -4581,15 +4574,15 @@ fn parse_ld_st_no_alloc_pair_offset(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_101_x_000_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(opc): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Le(l): Le<u16, 22, 23>,
-             Byte(imm7): Byte<15, 22>,
-             Byte(rt2): Byte<10, 15>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(opc): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(l): Extract<u16, 22, 23>,
+             Extract(imm7): Extract<u8, 15, 22>,
+             Extract(rt2): Extract<u8, 10, 15>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = LdStNoAllocPairOffset {
-                    imm7: imm7,
+                    imm7,
                     rt2: AArch64Architecture::get_register_by_mnemonic(AArch64MnemonicHint::X, rt2),
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
@@ -4632,14 +4625,14 @@ fn parse_load_store_reg_unprivileged(raw_instr: &[u8]) -> AArch64Inst {
         m.bind(
             "xx_111_x_00_xx_0_xxxxxxxxx_10_xxxxx_xxxxx",
             |raw_instr: &[u8],
-             Byte(size): Byte<30, 32>,
-             Byte(v): Byte<26, 27>,
-             Byte(opc): Byte<22, 24>,
-             Le(imm9): Le<u16, 12, 21>,
-             Byte(rn): Byte<5, 10>,
-             Byte(rt): Byte<0, 5>| {
+             Extract(size): Extract<u8, 30, 32>,
+             Extract(v): Extract<u8, 26, 27>,
+             Extract(opc): Extract<u8, 22, 24>,
+             Extract(imm9): Extract<u16, 12, 21>,
+             Extract(rn): Extract<u8, 5, 10>,
+             Extract(rt): Extract<u8, 0, 5>| {
                 let data = Imm9RnRt {
-                    imm9: imm9,
+                    imm9,
                     rn: AArch64Architecture::get_register_by_mnemonic(
                         AArch64MnemonicHint::X_SP,
                         rn,

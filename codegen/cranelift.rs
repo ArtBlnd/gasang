@@ -23,7 +23,7 @@ impl Codegen for CraneliftCodegen {
         todo!()
     }
 
-    fn compile(&self, bb: BasicBlock) -> Self::Executable {
+    fn compile(&self, _bb: BasicBlock) -> Self::Executable {
         todo!()
     }
 }
@@ -32,7 +32,7 @@ pub struct CraneliftExecutable;
 impl Executable for CraneliftExecutable {
     type Context = ();
 
-    unsafe fn execute(&self, context: &mut Self::Context) {
+    unsafe fn execute(&self, _context: &mut Self::Context) {
         todo!()
     }
 }
