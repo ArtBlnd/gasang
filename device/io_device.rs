@@ -12,7 +12,9 @@ pub trait IoDevice {
     unsafe fn read_all_at(&self, offset: u64, buf: &mut [u8]) -> usize {
         let mut read = 0;
         while read < buf.len() {
-            read += self.read_at(offset + read as u64, &mut buf[read..]);
+            let len = self.read_at(offset + read as u64, &mut buf[read..]);
+            assert!(len > 0);
+            read += len;
         }
         read
     }
@@ -21,7 +23,9 @@ pub trait IoDevice {
     unsafe fn write_all_at(&self, offset: u64, buf: &[u8]) -> usize {
         let mut written = 0;
         while written < buf.len() {
-            written += self.write_at(offset + written as u64, &buf[written..]);
+            let len = self.write_at(offset + written as u64, &buf[written..]);
+            assert!(len > 0);
+            written += len;
         }
         written
     }
