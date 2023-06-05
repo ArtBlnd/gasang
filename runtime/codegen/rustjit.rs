@@ -5,6 +5,7 @@ use core::{
 };
 use std::{collections::HashMap, ops::Generator};
 
+use device::devices::SoftMmu;
 pub use register_file::*;
 
 use super::{interrupt::Interrupt, Codegen, Executable};
@@ -31,17 +32,21 @@ impl RustjitContext {
 }
 
 pub struct RustjitExectuable {
-    inst: Vec<Box<dyn Fn(&mut RustjitContext) -> Option<Interrupt>>>,
+    inst: Vec<Box<dyn Fn(&mut RustjitContext, &SoftMmu) -> Option<Interrupt>>>,
 }
 
 impl Executable for RustjitExectuable {
     type Context = RustjitContext;
     type Generator<'a> = impl Generator<Yield = Interrupt, Return = ()> + 'a;
 
-    unsafe fn execute<'a>(&'a self, context: &'a mut Self::Context) -> Self::Generator<'a> {
+    unsafe fn execute<'a>(
+        &'a self,
+        context: &'a mut Self::Context,
+        mmu: &'a SoftMmu,
+    ) -> Self::Generator<'a> {
         || {
             for inst in &self.inst {
-                let Some(interrput) = inst(context) else {
+                let Some(interrput) = inst(context, mmu) else {
                     continue;
                 };
 
@@ -69,20 +74,24 @@ impl Codegen for RustjitCodegen {
 
         for inst in bb.inst() {
             let inst = match inst {
-                &IrInst::Add { dst, lhs, rhs } => Box::new(move |ctx: &mut RustjitContext| {
-                    let lhs = ctx.get(lhs);
-                    let rhs = ctx.get(rhs);
-                    ctx.set(dst, lhs + rhs);
+                &IrInst::Add { dst, lhs, rhs } => {
+                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
+                        let lhs = ctx.get(lhs);
+                        let rhs = ctx.get(rhs);
+                        ctx.set(dst, lhs + rhs);
 
-                    None
-                }) as Box<_>,
-                &IrInst::Sub { dst, lhs, rhs } => Box::new(move |ctx: &mut RustjitContext| {
-                    let lhs = ctx.get(lhs);
-                    let rhs = ctx.get(rhs);
-                    ctx.set(dst, lhs - rhs);
+                        None
+                    }) as Box<_>
+                }
+                &IrInst::Sub { dst, lhs, rhs } => {
+                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
+                        let lhs = ctx.get(lhs);
+                        let rhs = ctx.get(rhs);
+                        ctx.set(dst, lhs - rhs);
 
-                    None
-                }) as Box<_>,
+                        None
+                    }) as Box<_>
+                }
                 _ => todo!(),
             };
 

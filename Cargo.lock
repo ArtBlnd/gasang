@@ -209,6 +209,7 @@ dependencies = [
  "core",
  "cranelift",
  "cranelift-jit",
+ "device",
 ]
 
 [[package]]
