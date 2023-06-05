@@ -1,0 +1,10 @@
+[package]
+name = "device"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+thread_local = "1.1.7"

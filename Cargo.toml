@@ -3,6 +3,7 @@ members = [
     "arch_desc",
     "core",
     "runtime",
+    "device",
     "codegen",
     "utility",
 ]

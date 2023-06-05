@@ -196,6 +196,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "device"
+version = "0.1.0"
+dependencies = [
+ "thread_local",
+]
+
+[[package]]
 name = "execution"
 version = "0.1.0"
 dependencies = [
@@ -340,6 +347,16 @@ name = "target-lexicon"
 version = "0.12.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd1ba337640d60c3e96bc6f0638a939b9c9a7f2c316a1598c279828b3d1dc8c5"
+
+[[package]]
+name = "thread_local"
+version = "1.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+]
 
 [[package]]
 name = "utility"
