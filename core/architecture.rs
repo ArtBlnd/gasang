@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 
-use crate::{Instruction, Primitive, Register, RegisterFileDesc, RegisterId};
+use crate::{
+    ir::BasicBlock, Instruction, Interrupt, Primitive, Register, RegisterFileDesc, RegisterId,
+};
 
 // The representation of an architecture
 pub trait Architecture: Default + Clone + Copy + PartialEq + Eq {
@@ -24,4 +26,8 @@ pub trait Architecture: Default + Clone + Copy + PartialEq + Eq {
 
     /// Get register file description.
     fn get_register_file_desc() -> RegisterFileDesc;
+
+    /// Get the basic block that represents the behavior of an interrupt.
+    /// The executor will jump to this basic block when an interrupt is raised.
+    fn interrupt_behavior(interrupt: Interrupt) -> BasicBlock;
 }

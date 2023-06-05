@@ -8,4 +8,6 @@ mod primitives;
 pub use primitives::*;
 mod register_file;
 pub use register_file::*;
+mod interrupt;
+pub use interrupt::*;
 pub mod ir;

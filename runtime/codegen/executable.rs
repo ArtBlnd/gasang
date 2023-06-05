@@ -1,8 +1,7 @@
+use core::Interrupt;
 use std::ops::Generator;
 
 use device::devices::SoftMmu;
-
-use super::interrupt::Interrupt;
 
 /// An executable object that can be executed on a context.
 pub trait Executable {

@@ -1,4 +1,4 @@
-use core::{Architecture, Primitive, RegisterFileDesc};
+use core::{ir::BasicBlock, Architecture, Interrupt, Primitive, RegisterFileDesc};
 
 use super::{AArch64Inst, AArch64MnemonicHint, AArch64Register, AArch64RegisterId};
 
@@ -67,6 +67,12 @@ impl Architecture for AArch64Architecture {
     }
 
     fn get_register_file_desc() -> RegisterFileDesc {
+        todo!()
+    }
+
+    fn interrupt_behavior(interrupt: Interrupt) -> BasicBlock {
+        let mut bb = BasicBlock::new(0);
+
         todo!()
     }
 }

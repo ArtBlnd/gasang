@@ -1,14 +1,14 @@
 mod register_file;
 use core::{
     ir::{BasicBlock, IrInst, IrValue},
-    Architecture,
+    Architecture, Interrupt,
 };
 use std::{collections::HashMap, ops::Generator};
 
 use device::devices::SoftMmu;
 pub use register_file::*;
 
-use super::{interrupt::Interrupt, Codegen, Executable};
+use super::{Codegen, Executable};
 pub struct RustjitContext {
     registers: RegisterFile,
     variables: HashMap<usize, u64>,
