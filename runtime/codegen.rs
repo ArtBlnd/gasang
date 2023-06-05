@@ -2,6 +2,7 @@ pub mod cranelift;
 mod executable;
 
 pub mod analysis;
+pub mod interrupt;
 pub mod rustjit;
 
 use core::{ir::BasicBlock, Architecture};

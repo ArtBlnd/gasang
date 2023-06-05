@@ -3,12 +3,11 @@ use core::{
     ir::{BasicBlock, IrInst, IrValue},
     Architecture,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Generator};
 
 pub use register_file::*;
 
-use crate::{Codegen, Executable};
-
+use super::{interrupt::Interrupt, Codegen, Executable};
 pub struct RustjitContext {
     registers: RegisterFile,
     variables: HashMap<usize, u64>,
@@ -32,15 +31,22 @@ impl RustjitContext {
 }
 
 pub struct RustjitExectuable {
-    executables: Vec<Box<dyn Fn(&mut RustjitContext)>>,
+    inst: Vec<Box<dyn Fn(&mut RustjitContext) -> Option<Interrupt>>>,
 }
 
 impl Executable for RustjitExectuable {
     type Context = RustjitContext;
+    type Generator<'a> = impl Generator<Yield = Interrupt, Return = ()> + 'a;
 
-    unsafe fn execute(&self, context: &mut Self::Context) {
-        for executable in &self.executables {
-            executable(context);
+    unsafe fn execute<'a>(&'a self, context: &'a mut Self::Context) -> Self::Generator<'a> {
+        || {
+            for inst in &self.inst {
+                let Some(interrput) = inst(context) else {
+                    continue;
+                };
+
+                yield interrput;
+            }
         }
     }
 }
@@ -59,9 +65,7 @@ impl Codegen for RustjitCodegen {
     }
 
     fn compile(&self, bb: BasicBlock) -> Self::Executable {
-        let mut executable = RustjitExectuable {
-            executables: Vec::new(),
-        };
+        let mut executable = RustjitExectuable { inst: Vec::new() };
 
         for inst in bb.inst() {
             let inst = match inst {
@@ -69,16 +73,20 @@ impl Codegen for RustjitCodegen {
                     let lhs = ctx.get(lhs);
                     let rhs = ctx.get(rhs);
                     ctx.set(dst, lhs + rhs);
+
+                    None
                 }) as Box<_>,
                 &IrInst::Sub { dst, lhs, rhs } => Box::new(move |ctx: &mut RustjitContext| {
                     let lhs = ctx.get(lhs);
                     let rhs = ctx.get(rhs);
                     ctx.set(dst, lhs - rhs);
+
+                    None
                 }) as Box<_>,
                 _ => todo!(),
             };
 
-            executable.executables.push(inst);
+            executable.inst.push(inst);
         }
 
         executable

@@ -48,11 +48,11 @@ impl Architecture for AArch64Architecture {
 
         match (hint, raw) {
             (AArch64MnemonicHint::X, 31) => AArch64RegisterId::Xzr,
-            (AArch64MnemonicHint::X, v) => AArch64RegisterId::X(v),
+            (AArch64MnemonicHint::X, v) if v < 31 => AArch64RegisterId::X(v),
             (AArch64MnemonicHint::X_PC, 31) => AArch64RegisterId::Pc,
-            (AArch64MnemonicHint::X_PC, v) => AArch64RegisterId::X(v),
+            (AArch64MnemonicHint::X_PC, v) if v < 31 => AArch64RegisterId::X(v),
             (AArch64MnemonicHint::X_SP, 31) => AArch64RegisterId::Sp,
-            (AArch64MnemonicHint::X_SP, v) => AArch64RegisterId::X(v),
+            (AArch64MnemonicHint::X_SP, v) if v < 31 => AArch64RegisterId::X(v),
             (AArch64MnemonicHint::V, v) => AArch64RegisterId::V(v),
             _ => unreachable!("invalid mnemonic with mnemonic hint {:?} {}", hint, raw),
         }
