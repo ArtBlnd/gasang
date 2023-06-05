@@ -4,17 +4,20 @@ use crate::RawRegisterId;
 
 #[derive(Clone)]
 pub struct RegisterFileDesc {
-    total_size: usize,
     register: HashMap<RawRegisterId, RegisterDesc>,
 }
 
 impl RegisterFileDesc {
-    pub fn size(&self) -> usize {
-        self.total_size
-    }
-
     pub fn register(&self, id: RawRegisterId) -> &RegisterDesc {
         self.register.get(&id).unwrap()
+    }
+
+    pub fn total_size(&self) -> usize {
+        self.register
+            .values()
+            .map(|r| r.offset + r.size)
+            .max()
+            .unwrap_or(0)
     }
 }
 

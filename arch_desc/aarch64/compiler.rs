@@ -22,8 +22,6 @@ fn compile_movn(bb: &mut BasicBlock, operand: &HwImm16Rd, ty: IrType) {
         dst: IrValue::Register(IrType::U64, rd),
         src: IrValue::Constant(IrConstant::new(ty, {
             let pos = operand.hw << 4;
-            
-
             !((operand.imm16 as u64) << pos)
         })),
     });
