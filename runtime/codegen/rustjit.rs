@@ -1,15 +1,15 @@
 mod register_file;
+pub use register_file::*;
+
 use core::{
-    ir::{BasicBlock, IrInst, IrValue},
+    ir::{BasicBlock, IrConstant, IrInst, IrValue},
     Architecture, Interrupt,
 };
 use std::{collections::HashMap, ops::Generator};
 
-pub use register_file::*;
-
+use super::{Codegen, Context, Executable};
 use crate::SoftMmu;
 
-use super::{Codegen, Executable};
 pub struct RustjitContext {
     registers: RegisterFile,
     variables: HashMap<usize, u64>,
@@ -24,6 +24,16 @@ impl RustjitContext {
         }
     }
     pub fn set(&mut self, value: IrValue, _data: u64) {
+        match value {
+            IrValue::Variable(_ty, _id) => todo!(),
+            IrValue::Register(_ty, _id) => todo!(),
+            IrValue::Constant(_constant) => todo!(),
+        }
+    }
+}
+
+impl Context for RustjitContext {
+    fn evaluate(&self, value: IrValue) -> IrConstant {
         match value {
             IrValue::Variable(_ty, _id) => todo!(),
             IrValue::Register(_ty, _id) => todo!(),

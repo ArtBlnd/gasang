@@ -1,11 +1,13 @@
 pub mod cranelift;
 mod executable;
+pub use executable::*;
+mod context;
+pub use context::*;
 
 pub mod analysis;
 pub mod rustjit;
 
 use core::{ir::BasicBlock, Architecture};
-pub use executable::*;
 
 pub trait Codegen {
     type Context;
