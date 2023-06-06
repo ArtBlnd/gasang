@@ -70,7 +70,7 @@ impl Architecture for AArch64Architecture {
         todo!()
     }
 
-    fn interrupt_behavior(interrupt: Interrupt) -> BasicBlock {
+    fn interrupt(interrupt: Interrupt) -> BasicBlock {
         let mut bb = BasicBlock::new(0);
 
         todo!()

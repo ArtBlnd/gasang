@@ -4,4 +4,6 @@ pub enum Interrupt {
     Reset(u64),
     Exception(u64),
     Interrupt(u64),
+    Yield,
+    WaitForInterrupt,
 }

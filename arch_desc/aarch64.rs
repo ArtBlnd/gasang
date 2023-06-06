@@ -8,6 +8,7 @@ mod register;
 pub use register::*;
 mod compiler;
 pub use compiler::*;
+pub(crate) mod compiler_prelude;
 
 mod inst_decode;
 pub(crate) use inst_decode::*;

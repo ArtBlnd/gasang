@@ -23,9 +23,7 @@ impl RegisterFileDesc {
 
 #[derive(Clone)]
 pub struct RegisterDesc {
-    /// The name of the register
+    pub is_read_only: bool,
     pub size: usize,
-
-    /// The offset of the register in the register file
     pub offset: usize,
 }

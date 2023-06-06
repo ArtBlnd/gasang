@@ -6,6 +6,7 @@ pub struct RegisterFile {
     file: Box<[u8]>,
 }
 
+/// The trait that represents the projection of a register.
 pub trait RegisterProjection: Sized {}
 impl RegisterProjection for u8 {}
 impl RegisterProjection for u16 {}
@@ -43,7 +44,7 @@ impl RegisterFile {
     /// Get reference of the the register as T
     ///
     /// This function will panic if the size of T and the register size does not match.
-    pub fn get_ref<T>(&self, reg: RawRegisterId) -> &T
+    pub fn get<T>(&self, reg: RawRegisterId) -> T
     where
         T: RegisterProjection,
     {
@@ -53,7 +54,7 @@ impl RegisterFile {
 
             assert!(reg.offset + std::mem::size_of::<T>() <= self.file.len());
             assert!(std::mem::size_of::<T>() == reg.size);
-            &*(ptr as *const T)
+            std::mem::transmute_copy(&*ptr)
         }
     }
 
@@ -66,6 +67,7 @@ impl RegisterFile {
     {
         unsafe {
             let reg = self.desc.register(reg);
+            assert!(reg.is_read_only == false);
             let ptr = self.file.as_mut_ptr().add(reg.offset);
 
             assert!(reg.offset + std::mem::size_of::<T>() <= self.file.len());

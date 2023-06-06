@@ -29,5 +29,5 @@ pub trait Architecture: Default + Clone + Copy + PartialEq + Eq {
 
     /// Get the basic block that represents the behavior of an interrupt.
     /// The executor will jump to this basic block when an interrupt is raised.
-    fn interrupt_behavior(interrupt: Interrupt) -> BasicBlock;
+    fn interrupt(interrupt: Interrupt) -> BasicBlock;
 }
