@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::IoDevice;
 
 /// A simple memory device.
+#[derive(Clone)]
 pub struct Memory {
     mem: Arc<UnsafeCell<Box<[u8]>>>,
 }

@@ -1,6 +1,6 @@
 use core::{
     ir::{BasicBlock, IrConstant, IrInst, IrType, IrValue},
-    Architecture, RegisterId,
+    Architecture, Register,
 };
 
 use super::AArch64Architecture;

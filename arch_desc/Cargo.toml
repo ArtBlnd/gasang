@@ -1,5 +1,5 @@
 [package]
-name = "aarch64"
+name = "arch_desc"
 version = "0.1.0"
 edition = "2021"
 

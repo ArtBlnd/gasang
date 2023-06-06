@@ -5,8 +5,9 @@ use core::{
 };
 use std::{collections::HashMap, ops::Generator};
 
-use device::devices::SoftMmu;
 pub use register_file::*;
+
+use crate::SoftMmu;
 
 use super::{Codegen, Executable};
 pub struct RustjitContext {
@@ -42,11 +43,11 @@ impl Executable for RustjitExectuable {
     unsafe fn execute<'a>(
         &'a self,
         context: &'a mut Self::Context,
-        io_device: &'a SoftMmu,
+        mmu: &'a SoftMmu,
     ) -> Self::Generator<'a> {
         || {
             for inst in &self.inst {
-                let Some(interrput) = inst(context, io_device) else {
+                let Some(interrput) = inst(context, mmu) else {
                     continue;
                 };
 
@@ -75,7 +76,7 @@ impl Codegen for RustjitCodegen {
         for inst in bb.inst() {
             let inst = match inst {
                 &IrInst::Add { dst, lhs, rhs } => {
-                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
+                    Box::new(move |ctx: &mut RustjitContext, mmu: &SoftMmu| {
                         let lhs = ctx.get(lhs);
                         let rhs = ctx.get(rhs);
                         ctx.set(dst, lhs + rhs);
@@ -84,7 +85,7 @@ impl Codegen for RustjitCodegen {
                     }) as Box<_>
                 }
                 &IrInst::Sub { dst, lhs, rhs } => {
-                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
+                    Box::new(move |ctx: &mut RustjitContext, mmu: &SoftMmu| {
                         let lhs = ctx.get(lhs);
                         let rhs = ctx.get(rhs);
                         ctx.set(dst, lhs - rhs);

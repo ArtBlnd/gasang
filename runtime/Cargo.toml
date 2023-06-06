@@ -11,5 +11,6 @@ core = { path = "../core/" }
 device = { path = "../device/" }
 cranelift = "0.96.3"
 cranelift-jit = "0.96.3"
+thread_local = "1.1.7"
 
 

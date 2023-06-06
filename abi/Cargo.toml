@@ -1,5 +1,5 @@
 [package]
-name = "device"
+name = "abi"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,5 +8,5 @@ path = "lib.rs"
 
 [dependencies]
 core = { path = "../core" }
-crossbeam-queue = "0.3.8"
-thread_local = "1.1.7"
+utility = { path = "../utility" }
+once_cell = "1.17.1"

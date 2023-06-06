@@ -1,6 +1,6 @@
 use core::{
     ir::{BasicBlock, BasicBlockTerminator, IrConstant, IrInst, IrType, IrValue, VecTy},
-    RegisterId,
+    Register,
 };
 
 use super::{
@@ -228,80 +228,310 @@ fn compile_movn(bb: &mut BasicBlock, operand: &HwImm16Rd, ty: IrType) {
     compiler_prelude::gen_move_pc(bb);
 }
 
-fn compile_movk(bb: &mut BasicBlock, operand: &HwImm16Rd, ty: IrType) {}
-fn compile_movi(bb: &mut BasicBlock, operand: &AdvSimdModifiedImm) {}
-fn compile_adr(bb: &mut BasicBlock, operand: &PcRelAddressing) {}
-fn compile_adrp(bb: &mut BasicBlock, operand: &PcRelAddressing) {}
-fn compile_rev_var(bb: &mut BasicBlock, operand: &RnRd, ty: IrType) {}
-fn compile_ldr_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {}
-fn compile_ldr_imm_simd_fp(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {}
-fn compile_ldr_lit_var64(bb: &mut BasicBlock, operand: &Imm19Rt) {}
-fn compile_ldrh_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt) {}
-fn compile_ldrb_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt) {}
-fn compile_ldr_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset, ty: IrType) {}
-fn compile_ldrb_reg_shifted_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {}
-fn compile_ldp(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {}
-fn compile_ldrsh_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset, ty: IrType) {}
-fn compile_ldaxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {}
-fn compile_ldar(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {}
-fn compile_ldur(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm, ty: IrType) {}
-fn compile_ldp_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {}
-fn compile_ldr_reg_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {}
-fn compile_ldxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {}
-fn compile_str_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {}
-fn compile_stp_var(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {}
-fn compile_strb_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt) {}
-fn compile_sturb_imm(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm) {}
-fn compile_str_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset, ty: IrType) {}
-fn compile_stur(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm, ty: IrType) {}
-fn compile_stur_simd_fp(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm, ty: IrType) {}
-fn compile_stp_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {}
-fn compile_str_imm_simd_fp(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {}
-fn compile_str_reg_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {}
-fn compile_stlxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {}
-fn compile_stxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {}
-fn compile_strb_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {}
-fn compile_dup_general(bb: &mut BasicBlock, operand: &AdvancedSimdCopy) {}
-fn compile_add_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {}
-fn compile_adds_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {}
-fn compile_add_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_adds_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_add_ext_reg(bb: &mut BasicBlock, operand: &AddSubtractExtReg, ty: IrType) {}
-fn compile_sub_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {}
-fn compile_sub_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_subs_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_subs_ext_reg(bb: &mut BasicBlock, operand: &AddSubtractExtReg, ty: IrType) {}
-fn compile_subs_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {}
-fn compile_madd(bb: &mut BasicBlock, operand: &DataProc3Src, ty: IrType) {}
-fn compile_msub(bb: &mut BasicBlock, operand: &DataProc3Src, ty: IrType) {}
-fn compile_div(bb: &mut BasicBlock, operand: &DataProc2Src, ty: IrType) {}
-fn compile_ubfm(bb: &mut BasicBlock, operand: &Bitfield, ty: IrType) {}
-fn compile_sbfm(bb: &mut BasicBlock, operand: &Bitfield, ty: IrType) {}
-fn compile_and_imm(bb: &mut BasicBlock, operand: &LogicalImm, ty: IrType) {}
-fn compile_ands_imm(bb: &mut BasicBlock, operand: &LogicalImm, ty: IrType) {}
-fn compile_ands_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_and_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_orr_imm(bb: &mut BasicBlock, operand: &LogicalImm, ty: IrType) {}
-fn compile_orr_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_orn_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {}
-fn compile_lslv(bb: &mut BasicBlock, operand: &DataProc2Src, ty: IrType) {}
-fn compile_bl_imm(bb: &mut BasicBlock, operand: &Imm26) {}
-fn compile_b_imm(bb: &mut BasicBlock, operand: &Imm26) {}
-fn compile_br(bb: &mut BasicBlock, operand: &UncondBranchReg) {}
-fn compile_blr(bb: &mut BasicBlock, operand: &UncondBranchReg) {}
-fn compile_b_cond(bb: &mut BasicBlock, operand: &Imm19Cond) {}
-fn compile_cbz(bb: &mut BasicBlock, operand: &Imm19Rt, ty: IrType) {}
-fn compile_cbnz(bb: &mut BasicBlock, operand: &Imm19Rt, ty: IrType) {}
-fn compile_ret(bb: &mut BasicBlock, operand: &UncondBranchReg) {}
-fn compile_tbz(bb: &mut BasicBlock, operand: &B5B40Imm14Rt) {}
-fn compile_tbnz(bb: &mut BasicBlock, operand: &B5B40Imm14Rt) {}
-fn compile_ccmp_imm(bb: &mut BasicBlock, operand: &CondCmpImm, ty: IrType) {}
-fn compile_ccmp_reg(bb: &mut BasicBlock, operand: &CondCmpReg, ty: IrType) {}
-fn compile_ccmn_imm(bb: &mut BasicBlock, operand: &CondCmpImm, ty: IrType) {}
-fn compile_csel(bb: &mut BasicBlock, operand: &RmCondRnRd, ty: IrType) {}
-fn compile_csinv(bb: &mut BasicBlock, operand: &RmCondRnRd, ty: IrType) {}
-fn compile_svc(bb: &mut BasicBlock, operand: &ExceptionGen) {}
-fn compile_brk(bb: &mut BasicBlock, operand: &ExceptionGen) {}
-fn compile_mrs(bb: &mut BasicBlock, operand: &SysRegMov) {}
-fn compile_msr_reg(bb: &mut BasicBlock, operand: &SysRegMov) {}
-fn compile_msr_imm(bb: &mut BasicBlock, operand: &PstateOp) {}
+fn compile_movk(bb: &mut BasicBlock, operand: &HwImm16Rd, ty: IrType) {
+    todo!()
+}
+
+fn compile_movi(bb: &mut BasicBlock, operand: &AdvSimdModifiedImm) {
+    todo!()
+}
+
+fn compile_adr(bb: &mut BasicBlock, operand: &PcRelAddressing) {
+    todo!()
+}
+
+fn compile_adrp(bb: &mut BasicBlock, operand: &PcRelAddressing) {
+    todo!()
+}
+
+fn compile_rev_var(bb: &mut BasicBlock, operand: &RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldr_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldr_imm_simd_fp(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldr_lit_var64(bb: &mut BasicBlock, operand: &Imm19Rt) {
+    todo!()
+}
+
+fn compile_ldrh_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt) {
+    todo!()
+}
+
+fn compile_ldrb_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt) {
+    todo!()
+}
+
+fn compile_ldr_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldrb_reg_shifted_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {
+    todo!()
+}
+
+fn compile_ldp(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldrsh_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldaxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldar(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldur(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldp_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {
+    todo!()
+}
+
+fn compile_ldr_reg_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {
+    todo!()
+}
+
+fn compile_ldxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_str_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_stp_var(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {
+    todo!()
+}
+
+fn compile_strb_imm(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt) {
+    todo!()
+}
+
+fn compile_sturb_imm(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm) {
+    todo!()
+}
+
+fn compile_str_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset, ty: IrType) {
+    todo!()
+}
+
+fn compile_stur(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_stur_simd_fp(bb: &mut BasicBlock, operand: &LdStRegUnscaledImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_stp_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegPair, ty: IrType) {
+    todo!()
+}
+
+fn compile_str_imm_simd_fp(bb: &mut BasicBlock, operand: &OpcSizeImm12RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_str_reg_simd_fp(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {
+    todo!()
+}
+
+fn compile_stlxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_stxr(bb: &mut BasicBlock, operand: &RsRt2RnRt, ty: IrType) {
+    todo!()
+}
+
+fn compile_strb_reg(bb: &mut BasicBlock, operand: &LoadStoreRegRegOffset) {
+    todo!()
+}
+
+fn compile_dup_general(bb: &mut BasicBlock, operand: &AdvancedSimdCopy) {
+    todo!()
+}
+
+fn compile_add_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_adds_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_add_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_adds_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_add_ext_reg(bb: &mut BasicBlock, operand: &AddSubtractExtReg, ty: IrType) {
+    todo!()
+}
+
+fn compile_sub_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_sub_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_subs_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_subs_ext_reg(bb: &mut BasicBlock, operand: &AddSubtractExtReg, ty: IrType) {
+    todo!()
+}
+
+fn compile_subs_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_madd(bb: &mut BasicBlock, operand: &DataProc3Src, ty: IrType) {
+    todo!()
+}
+
+fn compile_msub(bb: &mut BasicBlock, operand: &DataProc3Src, ty: IrType) {
+    todo!()
+}
+
+fn compile_div(bb: &mut BasicBlock, operand: &DataProc2Src, ty: IrType) {
+    todo!()
+}
+
+fn compile_ubfm(bb: &mut BasicBlock, operand: &Bitfield, ty: IrType) {
+    todo!()
+}
+
+fn compile_sbfm(bb: &mut BasicBlock, operand: &Bitfield, ty: IrType) {
+    todo!()
+}
+
+fn compile_and_imm(bb: &mut BasicBlock, operand: &LogicalImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_ands_imm(bb: &mut BasicBlock, operand: &LogicalImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_ands_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_and_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_orr_imm(bb: &mut BasicBlock, operand: &LogicalImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_orr_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_orn_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_lslv(bb: &mut BasicBlock, operand: &DataProc2Src, ty: IrType) {
+    todo!()
+}
+
+fn compile_bl_imm(bb: &mut BasicBlock, operand: &Imm26) {
+    todo!()
+}
+
+fn compile_b_imm(bb: &mut BasicBlock, operand: &Imm26) {
+    todo!()
+}
+
+fn compile_br(bb: &mut BasicBlock, operand: &UncondBranchReg) {
+    todo!()
+}
+
+fn compile_blr(bb: &mut BasicBlock, operand: &UncondBranchReg) {
+    todo!()
+}
+
+fn compile_b_cond(bb: &mut BasicBlock, operand: &Imm19Cond) {
+    todo!()
+}
+
+fn compile_cbz(bb: &mut BasicBlock, operand: &Imm19Rt, ty: IrType) {
+    todo!()
+}
+
+fn compile_cbnz(bb: &mut BasicBlock, operand: &Imm19Rt, ty: IrType) {
+    todo!()
+}
+
+fn compile_ret(bb: &mut BasicBlock, operand: &UncondBranchReg) {
+    todo!()
+}
+
+fn compile_tbz(bb: &mut BasicBlock, operand: &B5B40Imm14Rt) {
+    todo!()
+}
+
+fn compile_tbnz(bb: &mut BasicBlock, operand: &B5B40Imm14Rt) {
+    todo!()
+}
+
+fn compile_ccmp_imm(bb: &mut BasicBlock, operand: &CondCmpImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_ccmp_reg(bb: &mut BasicBlock, operand: &CondCmpReg, ty: IrType) {
+    todo!()
+}
+
+fn compile_ccmn_imm(bb: &mut BasicBlock, operand: &CondCmpImm, ty: IrType) {
+    todo!()
+}
+
+fn compile_csel(bb: &mut BasicBlock, operand: &RmCondRnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_csinv(bb: &mut BasicBlock, operand: &RmCondRnRd, ty: IrType) {
+    todo!()
+}
+
+fn compile_svc(bb: &mut BasicBlock, operand: &ExceptionGen) {
+    todo!()
+}
+
+fn compile_brk(bb: &mut BasicBlock, operand: &ExceptionGen) {
+    todo!()
+}
+
+fn compile_mrs(bb: &mut BasicBlock, operand: &SysRegMov) {
+    todo!()
+}
+
+fn compile_msr_reg(bb: &mut BasicBlock, operand: &SysRegMov) {
+    todo!()
+}
+
+fn compile_msr_imm(bb: &mut BasicBlock, operand: &PstateOp) {
+    todo!()
+}

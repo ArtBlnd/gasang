@@ -1,7 +1,7 @@
 use core::Interrupt;
 use std::ops::Generator;
 
-use device::devices::SoftMmu;
+use crate::SoftMmu;
 
 /// An executable object that can be executed on a context.
 pub trait Executable {
@@ -13,6 +13,6 @@ pub trait Executable {
     unsafe fn execute<'a>(
         &'a self,
         context: &'a mut Self::Context,
-        io_device: &'a SoftMmu,
+        mmu: &'a SoftMmu,
     ) -> Self::Generator<'a>;
 }

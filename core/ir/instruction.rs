@@ -1,3 +1,5 @@
+use crate::Interrupt;
+
 use super::{IrType, IrValue, TypeOf};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -80,6 +82,7 @@ pub enum IrInst {
         dst: IrValue,
         src: IrValue,
     },
+    Interrupt(Interrupt),
     Intrinsic(IrIntrinsic),
 }
 
@@ -103,16 +106,11 @@ impl TypeOf for IrInst {
             Self::Store { dst, .. } => dst.ty(),
             Self::ZextCast { dst, .. } => dst.ty(),
             Self::SextCast { dst, .. } => dst.ty(),
-            Self::Intrinsic(intrinsic) => intrinsic.ty(),
+            Self::Interrupt(_) => IrType::Void,
+            Self::Intrinsic(_) => IrType::Void,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IrIntrinsic {}
-
-impl TypeOf for IrIntrinsic {
-    fn ty(&self) -> IrType {
-        todo!()
-    }
-}

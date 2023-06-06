@@ -77,6 +77,7 @@ impl Analysis for VariableLivenessAnalysis<'_> {
                     try_mark_as_dead(idx, dst);
                     try_mark_as_dead(idx, src);
                 }
+                IrInst::Interrupt(_) => {}
                 IrInst::Intrinsic(_) => todo!(),
             }
         }
@@ -132,6 +133,7 @@ impl Analysis for VariableLivenessAnalysis<'_> {
 
                     maximum_variable_live = maximum_variable_live.max(variable_live.len());
                 }
+                IrInst::Interrupt(_) => {}
                 IrInst::Intrinsic(_) => todo!(),
             }
         }

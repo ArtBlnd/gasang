@@ -7,4 +7,5 @@ edition = "2021"
 path = "lib.rs"
 
 [dependencies]
+crossbeam-queue = "0.3.8"
 num-traits = "0.2.15"
