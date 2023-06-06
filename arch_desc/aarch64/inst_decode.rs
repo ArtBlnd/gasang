@@ -9,9 +9,9 @@ use utility::BitPatternMatcher;
 use once_cell::sync::Lazy;
 use utility::Extract;
 
-pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> AArch64Inst {
+pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> Option<AArch64Inst> {
     // AArch64 instruction has fixed length of 32 bits
-    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
+    pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -21,7 +21,7 @@ pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> AArch64Inst {
              Extract(imm16): Extract<u16, 0, 16>| {
                 let imm16 = Imm16 { imm16 };
                 match (op0, op1) {
-                    (0b00, 0b000000000) => AArch64Inst::Udf(imm16),
+                    (0b00, 0b000000000) => Some(AArch64Inst::Udf(imm16)),
                     _ => todo!("Unknown reserved instruction {:?}", raw_instr),
                 }
             },
@@ -52,12 +52,12 @@ pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> AArch64Inst {
         m
     });
 
-    MATCHER.try_match(raw).unwrap()
+    MATCHER.try_match(raw).flatten()
 }
 
 // parse DPI(Data Processing Immediate) instructions in AArch64
-fn parse_aarch64_d_p_i(raw_instr: &[u8]) -> AArch64Inst {
-    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
+fn parse_aarch64_d_p_i(raw_instr: &[u8]) -> Option<AArch64Inst> {
+    pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "xxx_100_00x_xxxxxxxxxxxxxxxxxxxxxxx",
@@ -79,16 +79,12 @@ fn parse_aarch64_d_p_i(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr).flatten()
 }
 
 // parse DPI(Data Processing Register) instructions in AArch64
-fn parse_aarch64_d_p_r(raw_instr: &[u8]) -> AArch64Inst {
-    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
+fn parse_aarch64_d_p_r(raw_instr: &[u8]) -> Option<AArch64Inst> {
+    pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "x_0_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx",
@@ -139,15 +135,11 @@ fn parse_aarch64_d_p_r(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr).flatten()
 }
 
-fn parse_aarch64_dp_sfp_adv_simd(raw_instr: &[u8]) -> AArch64Inst {
-    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
+fn parse_aarch64_dp_sfp_adv_simd(raw_instr: &[u8]) -> Option<AArch64Inst> {
+    pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
             &format!(
@@ -439,16 +431,12 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr).flatten()
 }
 
 // parse Load and stores instructions i pairn AArch64
-fn parse_aarch64_load_and_stores(raw_instr: &[u8]) -> AArch64Inst {
-    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
+fn parse_aarch64_load_and_stores(raw_instr: &[u8]) -> Option<AArch64Inst> {
+    pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
             "0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
@@ -560,15 +548,11 @@ fn parse_aarch64_load_and_stores(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr).flatten()
 }
 
-fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: &[u8]) -> AArch64Inst {
-    pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
+fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: &[u8]) -> Option<AArch64Inst> {
+    pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         //--------------------------------------------
         //      |op1|101|      op2     |       | op3 |
@@ -610,14 +594,10 @@ fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: &[u8]) -> AArch
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr).flatten()
 }
 
-fn parse_add_sub_shifted_reg(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_add_sub_shifted_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -655,14 +635,10 @@ fn parse_add_sub_shifted_reg(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_add_sub_immediate(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_add_sub_immediate(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -700,14 +676,10 @@ fn parse_add_sub_immediate(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_fp_data_processing_3src(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_fp_data_processing_3src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -750,14 +722,10 @@ fn parse_fp_data_processing_3src(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_unsigned_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_unsigned_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -818,14 +786,10 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_move_wide_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_move_wide_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -856,14 +820,10 @@ fn parse_move_wide_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_uncond_branch_reg(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_uncond_branch_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -942,14 +902,10 @@ fn parse_uncond_branch_reg(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_uncond_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_uncond_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -970,14 +926,10 @@ fn parse_uncond_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_cond_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_cond_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1000,14 +952,10 @@ fn parse_cond_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_cond_sel(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_cond_sel(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1043,14 +991,10 @@ fn parse_cond_sel(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_test_and_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_test_and_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1079,14 +1023,10 @@ fn parse_test_and_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_logical_shifted_register(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_logical_shifted_register(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1134,14 +1074,10 @@ fn parse_logical_shifted_register(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_hints(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_hints(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1177,14 +1113,10 @@ fn parse_hints(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_pc_rel_addressing(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_pc_rel_addressing(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1211,14 +1143,10 @@ fn parse_pc_rel_addressing(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_exception_gen(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_exception_gen(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1253,14 +1181,10 @@ fn parse_exception_gen(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_reg_offset(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_reg_offset(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1317,14 +1241,10 @@ fn parse_load_store_reg_reg_offset(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_add_sub_ext_reg(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_add_sub_ext_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1368,14 +1288,10 @@ fn parse_add_sub_ext_reg(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_bitfield(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_bitfield(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1412,14 +1328,10 @@ fn parse_bitfield(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_logical_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_logical_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1461,14 +1373,10 @@ fn parse_logical_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_pair_offset(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_pair_offset(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1514,14 +1422,10 @@ fn parse_load_store_reg_pair_offset(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_add_sub_imm_with_tags(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_add_sub_imm_with_tags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1560,14 +1464,10 @@ fn parse_add_sub_imm_with_tags(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_extract(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_extract(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1600,14 +1500,10 @@ fn parse_extract(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_data_proc_1src(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_data_proc_1src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1644,14 +1540,10 @@ fn parse_data_proc_1src(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_cmp_and_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_cmp_and_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1679,14 +1571,10 @@ fn parse_cmp_and_branch_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_data_proccessing_3src(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_data_proccessing_3src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1726,14 +1614,10 @@ fn parse_data_proccessing_3src(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_unscaled_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_unscaled_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1788,14 +1672,10 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_sys_reg_mov(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_sys_reg_mov(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1828,14 +1708,10 @@ fn parse_sys_reg_mov(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_pair_pre_indexed(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_pair_pre_indexed(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1881,14 +1757,10 @@ fn parse_load_store_reg_pair_pre_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_pair_post_indexed(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_pair_post_indexed(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1934,14 +1806,10 @@ fn parse_load_store_reg_pair_post_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_data_proc_2src(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_data_proc_2src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -1982,14 +1850,10 @@ fn parse_data_proc_2src(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_imm_pre_indexed(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_imm_pre_indexed(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2048,14 +1912,10 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_imm_post_indexed(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_imm_post_indexed(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2114,14 +1974,10 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_barriers(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_barriers(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2146,14 +2002,10 @@ fn parse_barriers(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_advanced_simd_copy(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_advanced_simd_copy(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2190,14 +2042,10 @@ fn parse_advanced_simd_copy(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_cond_cmp_reg(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_cond_cmp_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2231,14 +2079,10 @@ fn parse_cond_cmp_reg(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_ld_st_multi_structures(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_ld_st_multi_structures(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2285,14 +2129,10 @@ fn parse_adv_simd_ld_st_multi_structures(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_advanced_simd_extract(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_advanced_simd_extract(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2322,14 +2162,10 @@ fn parse_advanced_simd_extract(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2421,14 +2257,10 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: &[u8]) -> AArch
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_conv_between_float_and_int(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_conv_between_float_and_int(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2621,14 +2453,10 @@ fn parse_conv_between_float_and_int(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_modified_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_modified_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2694,14 +2522,10 @@ fn parse_adv_simd_modified_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_cond_cmp_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_cond_cmp_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2735,14 +2559,10 @@ fn parse_cond_cmp_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_exclusive_register(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_exclusive_register(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2792,14 +2612,10 @@ fn parse_load_store_exclusive_register(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_ordered(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_ordered(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2840,14 +2656,10 @@ fn parse_load_store_ordered(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_advanced_simd_three_same(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_advanced_simd_three_same(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -2965,14 +2777,10 @@ fn parse_advanced_simd_three_same(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_shift_by_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_shift_by_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3033,14 +2841,10 @@ fn parse_adv_simd_shift_by_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_float_data_proc_1src(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_float_data_proc_1src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3098,14 +2902,10 @@ fn parse_float_data_proc_1src(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_scalar_pairwise(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_scalar_pairwise(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3138,14 +2938,10 @@ fn parse_adv_simd_scalar_pairwise(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_ld_st_single_structure(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_ld_st_single_structure(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3228,14 +3024,10 @@ fn parse_adv_simd_ld_st_single_structure(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_2reg_miscellaneous(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_2reg_miscellaneous(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3332,14 +3124,10 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_across_lanes(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_across_lanes(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3382,14 +3170,10 @@ fn parse_adv_simd_across_lanes(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_compare_and_swap(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_compare_and_swap(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3440,14 +3224,10 @@ fn parse_compare_and_swap(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_atomic_memory_operations(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_atomic_memory_operations(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3651,14 +3431,10 @@ fn parse_atomic_memory_operations(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_add_sub_with_carry(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_add_sub_with_carry(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3693,14 +3469,10 @@ fn parse_add_sub_with_carry(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_floating_point_compare(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_floating_point_compare(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3737,14 +3509,10 @@ fn parse_floating_point_compare(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_advanced_simd_permute(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_advanced_simd_permute(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3781,14 +3549,10 @@ fn parse_advanced_simd_permute(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_float_data_proc_2src(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_float_data_proc_2src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3836,14 +3600,10 @@ fn parse_float_data_proc_2src(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_floating_point_immediate(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_floating_point_immediate(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3872,14 +3632,10 @@ fn parse_floating_point_immediate(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_conv_between_float_and_fixed_point(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_conv_between_float_and_fixed_point(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3960,14 +3716,10 @@ fn parse_conv_between_float_and_fixed_point(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_floating_point_conditional_select(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_floating_point_conditional_select(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -3999,14 +3751,10 @@ fn parse_floating_point_conditional_select(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_vec_x_indexed_elem(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_vec_x_indexed_elem(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4064,14 +3812,10 @@ fn parse_adv_simd_vec_x_indexed_elem(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4118,14 +3862,10 @@ fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_sys_instr_with_reg_arg(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_sys_instr_with_reg_arg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4150,14 +3890,10 @@ fn parse_sys_instr_with_reg_arg(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_pstate(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_pstate(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4183,14 +3919,10 @@ fn parse_pstate(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_sys_with_result(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_sys_with_result(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4217,14 +3949,10 @@ fn parse_sys_with_result(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_sys_instr(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_sys_instr(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4256,14 +3984,10 @@ fn parse_sys_instr(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_rot_right_into_flags(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_rot_right_into_flags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4291,14 +4015,10 @@ fn parse_rot_right_into_flags(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_eval_into_flags(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_eval_into_flags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4326,14 +4046,10 @@ fn parse_eval_into_flags(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_register_literal(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_register_literal(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4365,14 +4081,10 @@ fn parse_load_register_literal(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_compare_and_swap_pair(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_compare_and_swap_pair(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4410,14 +4122,10 @@ fn parse_compare_and_swap_pair(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_memory_tags(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_memory_tags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4459,14 +4167,10 @@ fn parse_load_store_memory_tags(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_exclusive_pair(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_exclusive_pair(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4508,14 +4212,10 @@ fn parse_load_store_exclusive_pair(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_ldapr_stlr_unscaled_imm(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_ldapr_stlr_unscaled_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4561,14 +4261,10 @@ fn parse_ldapr_stlr_unscaled_imm(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_ld_st_no_alloc_pair_offset(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_ld_st_no_alloc_pair_offset(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4612,14 +4308,10 @@ fn parse_ld_st_no_alloc_pair_offset(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }
 
-fn parse_load_store_reg_unprivileged(raw_instr: &[u8]) -> AArch64Inst {
+fn parse_load_store_reg_unprivileged(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
@@ -4666,9 +4358,5 @@ fn parse_load_store_reg_unprivileged(raw_instr: &[u8]) -> AArch64Inst {
         m
     });
 
-    if let Some(instr) = MATCHER.try_match(raw_instr) {
-        instr
-    } else {
-        todo!("Unknown instruction {:?}", raw_instr);
-    }
+    MATCHER.try_match(raw_instr)
 }

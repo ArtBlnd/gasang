@@ -12,5 +12,5 @@ pub trait Codegen {
     type Executable: Executable<Context = Self::Context>;
 
     fn new_context<A: Architecture>() -> Self::Context;
-    fn compile(&self, bb: BasicBlock) -> Self::Executable;
+    fn compile(&self, bb: &BasicBlock) -> Self::Executable;
 }

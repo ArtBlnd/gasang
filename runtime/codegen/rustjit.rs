@@ -70,13 +70,13 @@ impl Codegen for RustjitCodegen {
         }
     }
 
-    fn compile(&self, bb: BasicBlock) -> Self::Executable {
+    fn compile(&self, bb: &BasicBlock) -> Self::Executable {
         let mut executable = RustjitExectuable { inst: Vec::new() };
 
         for inst in bb.inst() {
             let inst = match inst {
                 &IrInst::Add { dst, lhs, rhs } => {
-                    Box::new(move |ctx: &mut RustjitContext, mmu: &SoftMmu| {
+                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
                         let lhs = ctx.get(lhs);
                         let rhs = ctx.get(rhs);
                         ctx.set(dst, lhs + rhs);
@@ -85,7 +85,7 @@ impl Codegen for RustjitCodegen {
                     }) as Box<_>
                 }
                 &IrInst::Sub { dst, lhs, rhs } => {
-                    Box::new(move |ctx: &mut RustjitContext, mmu: &SoftMmu| {
+                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
                         let lhs = ctx.get(lhs);
                         let rhs = ctx.get(rhs);
                         ctx.set(dst, lhs - rhs);

@@ -1084,7 +1084,7 @@ impl Instruction for AArch64Inst {
     }
 
     /// decode the instruction from raw bytes
-    fn decode(raw_inst: &[u8]) -> Self {
+    fn decode(raw_inst: &[u8]) -> Option<Self> {
         decode_aarch64_inst(raw_inst)
     }
 

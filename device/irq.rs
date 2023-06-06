@@ -29,6 +29,10 @@ impl IrqQueue {
 
         irq
     }
+
+    pub fn recv(&self) -> Option<usize> {
+        self.queue.pop()
+    }
 }
 
 pub struct DeviceIrqQueue {
