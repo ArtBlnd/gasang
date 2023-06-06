@@ -1,4 +1,6 @@
 mod register_file;
+mod value;
+
 use core::{
     ir::{BasicBlock, IrInst, IrValue},
     Architecture, Interrupt,
@@ -7,26 +9,32 @@ use std::{collections::HashMap, ops::Generator};
 
 use device::devices::SoftMmu;
 pub use register_file::*;
+use value::RustjitValue;
 
 use super::{Codegen, Executable};
 pub struct RustjitContext {
     registers: RegisterFile,
-    variables: HashMap<usize, u64>,
+    variables: HashMap<usize, RustjitValue>,
 }
 
 impl RustjitContext {
-    pub fn get(&self, value: IrValue) -> u64 {
+    fn get(&self, value: IrValue) -> RustjitValue {
         match value {
-            IrValue::Variable(_ty, _id) => todo!(),
-            IrValue::Register(_ty, _id) => todo!(),
-            IrValue::Constant(_constant) => todo!(),
+            IrValue::Variable(_ty, id) => *self.variables.get(&id).unwrap(),
+            IrValue::Register(ty, id) => self.registers.get_value(id, ty),
+            IrValue::Constant(constant) => constant.into(),
         }
     }
-    pub fn set(&mut self, value: IrValue, _data: u64) {
+
+    fn set(&mut self, value: IrValue, data: RustjitValue) {
         match value {
-            IrValue::Variable(_ty, _id) => todo!(),
-            IrValue::Register(_ty, _id) => todo!(),
-            IrValue::Constant(_constant) => todo!(),
+            IrValue::Variable(_, id) => {
+                self.variables.insert(id, data);
+            }
+            IrValue::Register(_, id) => {
+                self.registers.set_value(id, &data);
+            }
+            IrValue::Constant(_) => panic!("Constant cannot be set"),
         }
     }
 }

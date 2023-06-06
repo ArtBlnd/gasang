@@ -1,4 +1,5 @@
-use core::{RawRegisterId, RegisterFileDesc};
+use super::value::RustjitValue;
+use core::{ir::IrType, RawRegisterId, RegisterFileDesc};
 
 /// Represents a cpu register file.
 pub struct RegisterFile {
@@ -73,6 +74,39 @@ impl RegisterFile {
             assert!(reg.offset + std::mem::size_of::<T>() <= self.file.len());
             assert!(std::mem::size_of::<T>() == reg.size);
             &mut *(ptr as *mut T)
+        }
+    }
+
+    /// Get register value as RustjitValue
+    ///
+    /// This function will panic if the size of `ty` and the register size does not match.
+    pub fn get_value(&self, reg: RawRegisterId, ty: IrType) -> RustjitValue {
+        unsafe {
+            let reg = self.desc.register(reg);
+            let ptr = self.file.as_ptr().add(reg.offset);
+
+            assert!(reg.offset + reg.size <= self.file.len());
+            assert_eq!(reg.size, ty.size_in_bytes());
+
+            RustjitValue::from_bytes(std::slice::from_raw_parts(ptr, reg.size), ty)
+        }
+    }
+
+    /// Set register value to RustjitValue
+    ///
+    /// This function will panic if the size of `ty` and the register size does not match.
+    pub fn set_value(&mut self, reg: RawRegisterId, value: &RustjitValue) {
+        unsafe {
+            let reg = self.desc.register(reg);
+            assert!(reg.is_read_only == false);
+            let ptr = self.file.as_mut_ptr().add(reg.offset);
+
+            let src = value.as_bytes();
+
+            assert!(reg.offset + reg.size <= self.file.len());
+            assert_eq!(reg.size, src.len());
+
+            std::ptr::copy_nonoverlapping(src.as_ptr(), ptr, reg.size);
         }
     }
 }
