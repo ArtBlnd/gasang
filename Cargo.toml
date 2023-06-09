@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "abi",
     "arch_desc",
     "core",
     "runtime",

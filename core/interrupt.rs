@@ -2,8 +2,8 @@
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Interrupt {
     SystemCall(u64),
-    Aborts(u64),
-    Reset(u64),
+    Aborts(i32),
+    Reset,
     Exception(u64),
     Interrupt(u64),
     Yield,

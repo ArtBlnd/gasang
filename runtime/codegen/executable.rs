@@ -14,7 +14,7 @@ pub trait Executable {
 
     unsafe fn execute<'a>(
         &'a self,
-        context: &'a mut Self::Context,
+        context: &'a Self::Context,
         mmu: &'a SoftMmu,
     ) -> Self::Generator<'a>;
 }

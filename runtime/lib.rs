@@ -1,48 +1,66 @@
 #![feature(generators, generator_trait)]
 #![feature(impl_trait_in_assoc_type)]
-#![allow(unreachable_code)]
+pub mod abi;
 pub mod codegen;
 mod soft_mmu;
 use core::{
-    ir::{BasicBlock, BasicBlockTerminator, IrConstant},
-    Architecture, Instruction, Interrupt,
+    ir::{BasicBlock, BasicBlockTerminator, IrConstant, IrValue, IrType},
+    Architecture, Instruction, Interrupt, ArchitectureCompat, Register,
 };
 use std::{
+    collections::BinaryHeap,
     convert::Infallible,
     ops::{Generator, GeneratorState},
     pin::pin,
 };
 
-use codegen::{rustjit::RustjitCodegen, Codegen, Executable};
+use abi::Abi;
+use codegen::{Codegen, Executable};
 use device::{IoDevice, IrqQueue};
 pub use soft_mmu::*;
 
 use crate::codegen::Context;
 
-pub struct Runtime {
-    mmu: SoftMmu,
-    irq_queue: IrqQueue,
-}
-
+pub struct Runtime;
 impl Runtime {
-    pub unsafe fn run<A, F>(&mut self, prepare: F) -> Infallible
+    pub unsafe fn run<A, C, I, F>(binary: &[u8], prepare: F) -> Infallible
     where
         A: Architecture,
+        C: ArchitectureCompat<A> + Codegen,
+        I: ArchitectureCompat<A> + Abi,
         F: FnOnce(&mut SoftMmu, &mut IrqQueue),
     {
-        // prepare the runtime
-        prepare(&mut self.mmu, &mut self.irq_queue);
-        let compiler = RustjitCodegen;
-        let mut ctx = RustjitCodegen::new_context::<A>();
+        let mut mmu = SoftMmu::new();
+        let mut irq = IrqQueue::new();
+        prepare(&mut mmu, &mut irq);
+
+        let mut abi = I::new();
+        let cgn = C::new();
+        let ctx = C::allocate_execution_context::<A>();
+
+        // Initializes the ABI, execution context, and mmu with given binary
+        abi.on_initialize(binary, &ctx, &mmu);
 
         let mut curr_mem = [0u8; 4096];
-        let mut next_off = 0;
+        let mut next_off = {
+            let IrConstant::U64(offs) = ctx.evaluate(IrValue::Register(IrType::U64, A::get_pc_register().raw())) 
+            else {
+                unreachable!("Failed to get the initial PC value");
+            };
 
-        self.mmu.read_all_at(next_off, &mut curr_mem);
+            offs
+        };
+
+        mmu.read_all_at(next_off, &mut curr_mem);
         loop {
             // Process device IRQs
-            if let Some(irq) = self.irq_queue.recv() {
-                todo!()
+            let mut irq_queue = BinaryHeap::new();
+            while let Some(irq) = irq.recv() {
+                irq_queue.push(irq);
+            }
+
+            for irq in irq_queue {
+                abi.on_irq(irq.id, irq.level, &ctx, &mmu);
             }
 
             // Try to decode and compile instructions into BasicBlock
@@ -55,7 +73,7 @@ impl Runtime {
                     next_off += total_inst_size;
                     total_inst_size = 0;
 
-                    self.mmu.read_all_at(next_off, &mut curr_mem);
+                    mmu.read_all_at(next_off, &mut curr_mem);
                     continue;
                 };
 
@@ -67,16 +85,29 @@ impl Runtime {
                 }
             }
 
-            {
-                let compiled_bb = compiler.compile(&bb);
-                let gen = compiled_bb.execute(&mut ctx, &self.mmu);
-                let mut gen = pin!(gen);
+            let compiled_bb = cgn.compile(&bb);
+            let gen = compiled_bb.execute(&ctx, &mmu);
+            let mut gen = pin!(gen);
 
-                while let GeneratorState::Yielded(interrupt) = gen.as_mut().resume(()) {
-                    match interrupt {
-                        Interrupt::SystemCall(id) => (),
-                        Interrupt::Yield => std::thread::yield_now(),
-                        _ => (),
+            while let GeneratorState::Yielded(interrupt) = gen.as_mut().resume(()) {
+                match interrupt {
+                    Interrupt::Exception(id) => abi.on_exception(id, &ctx, &mmu),
+                    Interrupt::Interrupt(id) => abi.on_interrupt(id, &ctx, &mmu),
+                    Interrupt::SystemCall(id) => abi.on_system_call(id, &ctx, &mmu),
+                    Interrupt::Aborts(value) => std::process::exit(value),
+                    Interrupt::Reset => std::process::exit(0),
+                    Interrupt::Yield => std::thread::yield_now(),
+                    Interrupt::WaitForInterrupt => {
+                        // TODO: wait for a interrupt using Parking
+                        loop {
+                            let Some(irq) = irq.recv() 
+                            else {
+                                std::thread::yield_now();
+                                continue;
+                            };
+                            
+                            abi.on_irq(irq.id, irq.level, &ctx, &mmu);
+                        }
                     }
                 }
             }
@@ -111,7 +142,5 @@ impl Runtime {
                 }
             };
         }
-
-        unreachable!()
     }
 }

@@ -3,15 +3,6 @@
 version = 3
 
 [[package]]
-name = "abi"
-version = "0.1.0"
-dependencies = [
- "core",
- "once_cell",
- "utility",
-]
-
-[[package]]
 name = "ahash"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -237,6 +228,7 @@ dependencies = [
 name = "execution"
 version = "0.1.0"
 dependencies = [
+ "arch_desc",
  "core",
  "cranelift",
  "cranelift-jit",

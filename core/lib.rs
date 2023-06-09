@@ -10,4 +10,6 @@ mod register_file;
 pub use register_file::*;
 mod interrupt;
 pub use interrupt::*;
+mod compat;
+pub use compat::*;
 pub mod ir;

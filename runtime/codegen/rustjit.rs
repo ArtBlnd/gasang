@@ -1,9 +1,11 @@
 mod register_file;
+use arch_desc::aarch64::AArch64Architecture;
+use device::IoDevice;
 pub use register_file::*;
 
 use core::{
     ir::{BasicBlock, IrConstant, IrInst, IrValue},
-    Architecture, Interrupt,
+    Architecture, ArchitectureCompat, Interrupt,
 };
 use std::{collections::HashMap, ops::Generator};
 
@@ -23,7 +25,7 @@ impl RustjitContext {
             IrValue::Constant(_constant) => todo!(),
         }
     }
-    pub fn set(&mut self, value: IrValue, _data: u64) {
+    pub fn set(&self, value: IrValue, _data: u64) {
         match value {
             IrValue::Variable(_ty, _id) => todo!(),
             IrValue::Register(_ty, _id) => todo!(),
@@ -43,7 +45,7 @@ impl Context for RustjitContext {
 }
 
 pub struct RustjitExectuable {
-    inst: Vec<Box<dyn Fn(&mut RustjitContext, &SoftMmu) -> Option<Interrupt>>>,
+    inst: Vec<Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>>>,
 }
 
 impl Executable for RustjitExectuable {
@@ -52,7 +54,7 @@ impl Executable for RustjitExectuable {
 
     unsafe fn execute<'a>(
         &'a self,
-        context: &'a mut Self::Context,
+        context: &'a Self::Context,
         mmu: &'a SoftMmu,
     ) -> Self::Generator<'a> {
         || {
@@ -68,12 +70,17 @@ impl Executable for RustjitExectuable {
 }
 
 pub struct RustjitCodegen;
+impl ArchitectureCompat<AArch64Architecture> for RustjitCodegen {}
 
 impl Codegen for RustjitCodegen {
     type Context = RustjitContext;
     type Executable = RustjitExectuable;
 
-    fn new_context<A: Architecture>() -> Self::Context {
+    fn new() -> Self {
+        Self
+    }
+
+    fn allocate_execution_context<A: Architecture>() -> Self::Context {
         RustjitContext {
             registers: RegisterFile::new(&A::get_register_file_desc()),
             variables: HashMap::new(),
@@ -86,7 +93,7 @@ impl Codegen for RustjitCodegen {
         for inst in bb.inst() {
             let inst = match inst {
                 &IrInst::Add { dst, lhs, rhs } => {
-                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
+                    Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
                         let lhs = ctx.get(lhs);
                         let rhs = ctx.get(rhs);
                         ctx.set(dst, lhs + rhs);
@@ -95,7 +102,7 @@ impl Codegen for RustjitCodegen {
                     }) as Box<_>
                 }
                 &IrInst::Sub { dst, lhs, rhs } => {
-                    Box::new(move |ctx: &mut RustjitContext, _: &SoftMmu| {
+                    Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
                         let lhs = ctx.get(lhs);
                         let rhs = ctx.get(rhs);
                         ctx.set(dst, lhs - rhs);

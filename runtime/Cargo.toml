@@ -6,8 +6,13 @@ edition = "2021"
 [lib]
 path = "lib.rs"
 
+[[bin]]
+name = "execution"
+path = "driver/aarch64_unknown_linux.rs"
+
 [dependencies]
 core = { path = "../core/" }
+arch_desc = { path = "../arch_desc/" }
 device = { path = "../device/" }
 cranelift = "0.96.3"
 cranelift-jit = "0.96.3"
