@@ -1,6 +1,6 @@
 use crate::Interrupt;
 
-use super::{IrType, IrValue, TypeOf};
+use super::{Flag, IrType, IrValue, TypeOf};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IrInst {
@@ -82,6 +82,11 @@ pub enum IrInst {
         dst: IrValue,
         src: IrValue,
     },
+    MoveFlag {
+        dst: IrValue,
+        dst_pos: usize,
+        flag: Flag,
+    },
     Interrupt(Interrupt),
     Intrinsic(IrIntrinsic),
 }
@@ -106,6 +111,7 @@ impl TypeOf for IrInst {
             Self::Store { dst, .. } => dst.ty(),
             Self::ZextCast { dst, .. } => dst.ty(),
             Self::SextCast { dst, .. } => dst.ty(),
+            Self::MoveFlag { dst, dst_pos, flag } => dst.ty(),
             Self::Interrupt(_) => IrType::Void,
             Self::Intrinsic(_) => IrType::Void,
         }

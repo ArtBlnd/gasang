@@ -4,7 +4,7 @@ pub mod abi;
 pub mod codegen;
 mod soft_mmu;
 use core::{
-    ir::{BasicBlock, BasicBlockTerminator, IrConstant, IrValue, IrType},
+    ir::{BasicBlock, BasicBlockTerminator, IrValue, IrType},
     Architecture, Instruction, Interrupt, ArchitectureCompat, Register,
 };
 use std::{
@@ -42,14 +42,7 @@ impl Runtime {
         abi.on_initialize(binary, &ctx, &mmu);
 
         let mut curr_mem = [0u8; 4096];
-        let mut next_off = {
-            let IrConstant::U64(offs) = ctx.evaluate(IrValue::Register(IrType::U64, A::get_pc_register().raw())) 
-            else {
-                unreachable!("Failed to get the initial PC value");
-            };
-
-            offs
-        };
+        let mut next_off = ctx.get(IrValue::Register(IrType::U64, A::get_pc_register().raw()));
 
         mmu.read_all_at(next_off, &mut curr_mem);
         loop {
@@ -108,6 +101,9 @@ impl Runtime {
                             
                             abi.on_irq(irq.id, irq.level, &ctx, &mmu);
                         }
+                    },
+                    Interrupt::DivideByZero => {
+                        panic!("divide by zero");
                     }
                 }
             }
@@ -117,28 +113,17 @@ impl Runtime {
                 BasicBlockTerminator::None => unreachable!("BasicBlock should have a terminator"),
                 BasicBlockTerminator::Next => next_off += total_inst_size,
                 BasicBlockTerminator::BranchCond { cond, target } => {
-                    let IrConstant::U64(cond) = ctx.evaluate(cond)
-                    else {
-                        unreachable!("Condition should be a u64");
-                    };
-                    let IrConstant::U64(jump_to) = ctx.evaluate(target)
-                    else {
-                        unreachable!("Jump target should be a u64");
-                    };
+                    let cond: u64 = ctx.get(cond);
+                    let dest: u64 = ctx.get(target);
 
                     if cond != 0 {
-                        next_off = jump_to;
+                        next_off = dest;
                     } else {
                         next_off += total_inst_size;
                     }
                 }
                 BasicBlockTerminator::Branch(target) => {
-                    let IrConstant::U64(jump_to) = ctx.evaluate(target)
-                    else {
-                        unreachable!("Jump target should be a u64");
-                    };
-
-                    next_off = jump_to;
+                    next_off = ctx.get(target);
                 }
             };
         }

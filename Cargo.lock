@@ -233,6 +233,7 @@ dependencies = [
  "cranelift",
  "cranelift-jit",
  "device",
+ "num-traits",
  "thread_local",
 ]
 

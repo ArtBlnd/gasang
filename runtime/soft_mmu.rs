@@ -1,6 +1,5 @@
-use core::{Architecture, ArchitectureCompat};
 use device::IoDevice;
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 use thread_local::ThreadLocal;
 
