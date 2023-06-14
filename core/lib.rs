@@ -1,13 +1,15 @@
-pub mod board;
-pub mod codegen;
-pub mod compiler;
-pub mod cpu;
-pub mod debug;
-pub mod error;
-pub mod image;
+mod architecture;
+pub use architecture::*;
+mod register;
+pub use register::*;
+mod instruction;
+pub use instruction::*;
+mod primitives;
+pub use primitives::*;
+mod register_file;
+pub use register_file::*;
+mod interrupt;
+pub use interrupt::*;
+mod compat;
+pub use compat::*;
 pub mod ir;
-pub mod register;
-pub mod softmmu;
-pub mod value;
-
-pub use cpu::Cpu;

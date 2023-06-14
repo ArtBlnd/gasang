@@ -7,3 +7,4 @@ edition = "2021"
 path = "lib.rs"
 
 [dependencies]
+num-traits = "0.2.15"

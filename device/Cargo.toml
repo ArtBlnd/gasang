@@ -1,5 +1,5 @@
 [package]
-name = "core"
+name = "device"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,5 +7,6 @@ edition = "2021"
 path = "lib.rs"
 
 [dependencies]
+core = { path = "../core" }
 crossbeam-queue = "0.3.8"
-num-traits = "0.2.15"
+thread_local = "1.1.7"

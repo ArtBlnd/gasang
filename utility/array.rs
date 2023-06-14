@@ -1,10 +1,13 @@
-use std::mem::MaybeUninit;
+pub trait FixedBytesArray: Sized {
+    const SIZE: usize;
 
-pub fn make_array<T, const N: usize>(f: impl Fn(usize) -> T) -> [T; N] {
-    let mut array: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-    for (i, v) in array.iter_mut().enumerate() {
-        *v = MaybeUninit::new(f(i));
+    fn from_bytes(from: &[u8]) -> Self;
+}
+
+impl<const LEN: usize> FixedBytesArray for [u8; LEN] {
+    const SIZE: usize = LEN;
+
+    fn from_bytes(from: &[u8]) -> Self {
+        from[..LEN].try_into().unwrap()
     }
-
-    unsafe { std::mem::transmute_copy(&array) }
 }
