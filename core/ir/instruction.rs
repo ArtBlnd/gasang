@@ -1,6 +1,6 @@
 use crate::Interrupt;
 
-use super::{Flag, IrType, IrValue, TypeOf};
+use super::{Flag, IrType, IrValue, Reordering, TypeOf};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IrInst {
@@ -29,10 +29,6 @@ pub enum IrInst {
         lhs: IrValue,
         rhs: IrValue,
     },
-    Neg {
-        dst: IrValue,
-        src: IrValue,
-    },
     BitAnd {
         dst: IrValue,
         lhs: IrValue,
@@ -52,12 +48,38 @@ pub enum IrInst {
         dst: IrValue,
         src: IrValue,
     },
+    LogicalAnd {
+        dst: IrValue,
+        lhs: IrValue,
+        rhs: IrValue,
+    },
+    LogicalOr {
+        dst: IrValue,
+        lhs: IrValue,
+        rhs: IrValue,
+    },
+    LogicalXor {
+        dst: IrValue,
+        lhs: IrValue,
+        rhs: IrValue,
+    },
+    LogicalNot {
+        dst: IrValue,
+        src: IrValue,
+    },
     Shl {
         dst: IrValue,
         lhs: IrValue,
         rhs: IrValue,
     },
-    Shr {
+    /// Logical shift right
+    Lshr {
+        dst: IrValue,
+        lhs: IrValue,
+        rhs: IrValue,
+    },
+    /// Arithmetic shift right
+    Ashr {
         dst: IrValue,
         lhs: IrValue,
         rhs: IrValue,
@@ -74,6 +96,7 @@ pub enum IrInst {
         dst: IrValue,
         src: IrValue,
     },
+
     ZextCast {
         dst: IrValue,
         src: IrValue,
@@ -87,6 +110,10 @@ pub enum IrInst {
         dst_pos: usize,
         flag: Flag,
     },
+    /// A memory fence
+    Fence {
+        ordering: Reordering,
+    },
     Interrupt(Interrupt),
     Intrinsic(IrIntrinsic),
 }
@@ -99,19 +126,24 @@ impl TypeOf for IrInst {
             Self::Mul { dst, .. } => dst.ty(),
             Self::Div { dst, .. } => dst.ty(),
             Self::Rem { dst, .. } => dst.ty(),
-            Self::Neg { dst, .. } => dst.ty(),
             Self::BitAnd { dst, .. } => dst.ty(),
             Self::BitOr { dst, .. } => dst.ty(),
             Self::BitXor { dst, .. } => dst.ty(),
             Self::BitNot { dst, .. } => dst.ty(),
+            Self::LogicalAnd { dst, .. } => dst.ty(),
+            Self::LogicalOr { dst, .. } => dst.ty(),
+            Self::LogicalXor { dst, .. } => dst.ty(),
+            Self::LogicalNot { dst, .. } => dst.ty(),
             Self::Shl { dst, .. } => dst.ty(),
-            Self::Shr { dst, .. } => dst.ty(),
+            Self::Lshr { dst, .. } => dst.ty(),
+            Self::Ashr { dst, .. } => dst.ty(),
             Self::Assign { dst, .. } => dst.ty(),
             Self::Load { dst, .. } => dst.ty(),
             Self::Store { dst, .. } => dst.ty(),
             Self::ZextCast { dst, .. } => dst.ty(),
             Self::SextCast { dst, .. } => dst.ty(),
-            Self::MoveFlag { dst, dst_pos, flag } => dst.ty(),
+            Self::MoveFlag { dst, .. } => dst.ty(),
+            Self::Fence { .. } => IrType::Void,
             Self::Interrupt(_) => IrType::Void,
             Self::Intrinsic(_) => IrType::Void,
         }

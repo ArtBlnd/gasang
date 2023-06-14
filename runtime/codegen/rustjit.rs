@@ -78,7 +78,7 @@ impl Codegen for RustjitCodegen {
         let mut var_allocation_map = HashMap::new();
         let mut var_allocation_ids: VecDeque<_> = (0usize..max_variables).collect();
 
-        let mut allocate_variable = |value: IrValue, idx: usize| -> IrValue {
+        let mut map_variable = |value: IrValue, idx: usize| -> IrValue {
             let IrValue::Variable(ty, id) = value
             else {
                 return value;
@@ -107,35 +107,90 @@ impl Codegen for RustjitCodegen {
         for (idx, inst) in bb.inst().iter().enumerate() {
             let inst = match inst {
                 &IrInst::Add { dst, lhs, rhs } => {
-                    let dst = allocate_variable(dst, idx);
-                    let lhs = allocate_variable(lhs, idx);
-                    let rhs = allocate_variable(rhs, idx);
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
 
                     gen_add(dst, lhs, rhs)
                 }
                 &IrInst::Sub { dst, lhs, rhs } => {
-                    let dst = allocate_variable(dst, idx);
-                    let lhs = allocate_variable(lhs, idx);
-                    let rhs = allocate_variable(rhs, idx);
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
 
                     gen_sub(dst, lhs, rhs)
                 }
                 &IrInst::Mul { dst, lhs, rhs } => {
-                    let dst = allocate_variable(dst, idx);
-                    let lhs = allocate_variable(lhs, idx);
-                    let rhs = allocate_variable(rhs, idx);
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
 
                     gen_mul(dst, lhs, rhs)
                 }
                 &IrInst::Div { dst, lhs, rhs } => {
-                    let dst = allocate_variable(dst, idx);
-                    let lhs = allocate_variable(lhs, idx);
-                    let rhs = allocate_variable(rhs, idx);
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
 
                     gen_div(dst, lhs, rhs)
                 }
+                &IrInst::Rem { dst, lhs, rhs } => {
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+
+                    gen_rem(dst, lhs, rhs)
+                }
+                &IrInst::BitAnd { dst, lhs, rhs } => {
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+
+                    gen_bit_and(dst, lhs, rhs)
+                }
+                &IrInst::BitOr { dst, lhs, rhs } => {
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+
+                    gen_bit_or(dst, lhs, rhs)
+                }
+                &IrInst::BitXor { dst, lhs, rhs } => {
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+
+                    gen_bit_xor(dst, lhs, rhs)
+                }
+                &IrInst::BitNot { dst, src } => {
+                    let dst = map_variable(dst, idx);
+                    let src = map_variable(src, idx);
+
+                    gen_bit_not(dst, src)
+                }
+                &IrInst::LogicalAnd { dst, lhs, rhs } => {
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+
+                    gen_logical_and(dst, lhs, rhs)
+                }
+                &IrInst::LogicalOr { dst, lhs, rhs } => {
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+
+                    gen_logical_or(dst, lhs, rhs)
+                }
+                &IrInst::LogicalXor { dst, lhs, rhs } => {
+                    let dst = map_variable(dst, idx);
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+
+                    gen_logical_xor(dst, lhs, rhs)
+                }
                 &IrInst::MoveFlag { dst, dst_pos, flag } => {
-                    let dst = allocate_variable(dst, idx);
+                    let dst = map_variable(dst, idx);
 
                     gen_move_flag(dst, dst_pos, flag)
                 }
@@ -337,6 +392,445 @@ fn gen_div(
         IrType::I32 => gen_div_impl!(i32),
         IrType::I64 => gen_div_impl!(i64),
         IrType::I128 => gen_div_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_rem(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_rem_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                if rhs == 0 {
+                    return Some(Interrupt::DivideByZero);
+                }
+
+                let v = lhs.wrapping_rem(rhs);
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_rem_impl!(u8),
+        IrType::U16 => gen_rem_impl!(u16),
+        IrType::U32 => gen_rem_impl!(u32),
+        IrType::U64 => gen_rem_impl!(u64),
+        IrType::U128 => gen_rem_impl!(u128),
+        IrType::I8 => gen_rem_impl!(i8),
+        IrType::I16 => gen_rem_impl!(i16),
+        IrType::I32 => gen_rem_impl!(i32),
+        IrType::I64 => gen_rem_impl!(i64),
+        IrType::I128 => gen_rem_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_bit_and(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_bit_and_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = lhs & rhs;
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_bit_and_impl!(u8),
+        IrType::U16 => gen_bit_and_impl!(u16),
+        IrType::U32 => gen_bit_and_impl!(u32),
+        IrType::U64 => gen_bit_and_impl!(u64),
+        IrType::U128 => gen_bit_and_impl!(u128),
+        IrType::I8 => gen_bit_and_impl!(i8),
+        IrType::I16 => gen_bit_and_impl!(i16),
+        IrType::I32 => gen_bit_and_impl!(i32),
+        IrType::I64 => gen_bit_and_impl!(i64),
+        IrType::I128 => gen_bit_and_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_bit_or(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_bit_or_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = lhs | rhs;
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_bit_or_impl!(u8),
+        IrType::U16 => gen_bit_or_impl!(u16),
+        IrType::U32 => gen_bit_or_impl!(u32),
+        IrType::U64 => gen_bit_or_impl!(u64),
+        IrType::U128 => gen_bit_or_impl!(u128),
+        IrType::I8 => gen_bit_or_impl!(i8),
+        IrType::I16 => gen_bit_or_impl!(i16),
+        IrType::I32 => gen_bit_or_impl!(i32),
+        IrType::I64 => gen_bit_or_impl!(i64),
+        IrType::I128 => gen_bit_or_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_bit_xor(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_bit_xor_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = lhs ^ rhs;
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_bit_xor_impl!(u8),
+        IrType::U16 => gen_bit_xor_impl!(u16),
+        IrType::U32 => gen_bit_xor_impl!(u32),
+        IrType::U64 => gen_bit_xor_impl!(u64),
+        IrType::U128 => gen_bit_xor_impl!(u128),
+        IrType::I8 => gen_bit_xor_impl!(i8),
+        IrType::I16 => gen_bit_xor_impl!(i16),
+        IrType::I32 => gen_bit_xor_impl!(i32),
+        IrType::I64 => gen_bit_xor_impl!(i64),
+        IrType::I128 => gen_bit_xor_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_bit_not(
+    dst: IrValue,
+    src: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == src.ty());
+    macro_rules! gen_bit_not_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let src: $ty = ctx.get(src);
+
+                let v = !src;
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_bit_not_impl!(u8),
+        IrType::U16 => gen_bit_not_impl!(u16),
+        IrType::U32 => gen_bit_not_impl!(u32),
+        IrType::U64 => gen_bit_not_impl!(u64),
+        IrType::U128 => gen_bit_not_impl!(u128),
+        IrType::I8 => gen_bit_not_impl!(i8),
+        IrType::I16 => gen_bit_not_impl!(i16),
+        IrType::I32 => gen_bit_not_impl!(i32),
+        IrType::I64 => gen_bit_not_impl!(i64),
+        IrType::I128 => gen_bit_not_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_logical_and(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_logical_and_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = (lhs != 0 && rhs != 0).into();
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_logical_and_impl!(u8),
+        IrType::U16 => gen_logical_and_impl!(u16),
+        IrType::U32 => gen_logical_and_impl!(u32),
+        IrType::U64 => gen_logical_and_impl!(u64),
+        IrType::U128 => gen_logical_and_impl!(u128),
+        IrType::I8 => gen_logical_and_impl!(i8),
+        IrType::I16 => gen_logical_and_impl!(i16),
+        IrType::I32 => gen_logical_and_impl!(i32),
+        IrType::I64 => gen_logical_and_impl!(i64),
+        IrType::I128 => gen_logical_and_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_logical_or(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_logical_or_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = (lhs != 0 || rhs != 0).into();
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_logical_or_impl!(u8),
+        IrType::U16 => gen_logical_or_impl!(u16),
+        IrType::U32 => gen_logical_or_impl!(u32),
+        IrType::U64 => gen_logical_or_impl!(u64),
+        IrType::U128 => gen_logical_or_impl!(u128),
+        IrType::I8 => gen_logical_or_impl!(i8),
+        IrType::I16 => gen_logical_or_impl!(i16),
+        IrType::I32 => gen_logical_or_impl!(i32),
+        IrType::I64 => gen_logical_or_impl!(i64),
+        IrType::I128 => gen_logical_or_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_logical_xor(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_logical_xor_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = ((lhs != 0) ^ (rhs != 0)).into();
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_logical_xor_impl!(u8),
+        IrType::U16 => gen_logical_xor_impl!(u16),
+        IrType::U32 => gen_logical_xor_impl!(u32),
+        IrType::U64 => gen_logical_xor_impl!(u64),
+        IrType::U128 => gen_logical_xor_impl!(u128),
+        IrType::I8 => gen_logical_xor_impl!(i8),
+        IrType::I16 => gen_logical_xor_impl!(i16),
+        IrType::I32 => gen_logical_xor_impl!(i32),
+        IrType::I64 => gen_logical_xor_impl!(i64),
+        IrType::I128 => gen_logical_xor_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_logical_not(
+    dst: IrValue,
+    src: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == src.ty());
+    macro_rules! gen_logical_not_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let src: $ty = ctx.get(src);
+
+                let v = (src == 0).into();
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_logical_not_impl!(u8),
+        IrType::U16 => gen_logical_not_impl!(u16),
+        IrType::U32 => gen_logical_not_impl!(u32),
+        IrType::U64 => gen_logical_not_impl!(u64),
+        IrType::U128 => gen_logical_not_impl!(u128),
+        IrType::I8 => gen_logical_not_impl!(i8),
+        IrType::I16 => gen_logical_not_impl!(i16),
+        IrType::I32 => gen_logical_not_impl!(i32),
+        IrType::I64 => gen_logical_not_impl!(i64),
+        IrType::I128 => gen_logical_not_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_shl(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_shl_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = lhs << rhs;
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_shl_impl!(u8),
+        IrType::U16 => gen_shl_impl!(u16),
+        IrType::U32 => gen_shl_impl!(u32),
+        IrType::U64 => gen_shl_impl!(u64),
+        IrType::U128 => gen_shl_impl!(u128),
+        IrType::I8 => gen_shl_impl!(i8),
+        IrType::I16 => gen_shl_impl!(i16),
+        IrType::I32 => gen_shl_impl!(i32),
+        IrType::I64 => gen_shl_impl!(i64),
+        IrType::I128 => gen_shl_impl!(i128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_lshr(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_lshr_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = lhs >> rhs;
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 | IrType::I8 => gen_lshr_impl!(u8),
+        IrType::U16 | IrType::I16 => gen_lshr_impl!(u16),
+        IrType::U32 | IrType::I32 => gen_lshr_impl!(u32),
+        IrType::U64 | IrType::I64 => gen_lshr_impl!(u64),
+        IrType::U128 | IrType::I128 => gen_lshr_impl!(u128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_ashr(
+    dst: IrValue,
+    lhs: IrValue,
+    rhs: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    macro_rules! gen_ashr_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let lhs: $ty = ctx.get(lhs);
+                let rhs: $ty = ctx.get(rhs);
+
+                let v = lhs >> rhs;
+                ctx.set::<$ty>(dst, v);
+                ctx.set_flag(Flag::ZF, v == 0);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::U8 => gen_ashr_impl!(u8),
+        IrType::U16 => gen_ashr_impl!(u16),
+        IrType::U32 => gen_ashr_impl!(u32),
+        IrType::U64 => gen_ashr_impl!(u64),
+        IrType::U128 => gen_ashr_impl!(u128),
+        IrType::I8 => gen_ashr_impl!(i8),
+        IrType::I16 => gen_ashr_impl!(i16),
+        IrType::I32 => gen_ashr_impl!(i32),
+        IrType::I64 => gen_ashr_impl!(i64),
+        IrType::I128 => gen_ashr_impl!(i128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }

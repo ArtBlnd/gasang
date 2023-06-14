@@ -61,23 +61,27 @@ impl Analysis for VariableLivenessAnalysis<'_> {
                 | &IrInst::BitAnd { dst, lhs, rhs }
                 | &IrInst::BitOr { dst, lhs, rhs }
                 | &IrInst::BitXor { dst, lhs, rhs }
+                | &IrInst::LogicalAnd { dst, lhs, rhs }
+                | &IrInst::LogicalXor { dst, lhs, rhs }
+                | &IrInst::LogicalOr { dst, lhs, rhs }
                 | &IrInst::Shl { dst, lhs, rhs }
-                | &IrInst::Shr { dst, lhs, rhs } => {
+                | &IrInst::Lshr { dst, lhs, rhs }
+                | &IrInst::Ashr { dst, lhs, rhs } => {
                     try_mark_as_dead(idx, dst);
                     try_mark_as_dead(idx, lhs);
                     try_mark_as_dead(idx, rhs);
                 }
-                &IrInst::Neg { dst, src }
+                &IrInst::LogicalNot { dst, src }
                 | &IrInst::BitNot { dst, src }
                 | &IrInst::Assign { dst, src }
-                | &IrInst::Load { dst, src }
-                | &IrInst::Store { dst, src }
+                | &IrInst::Load { dst, src, .. }
+                | &IrInst::Store { dst, src, .. }
                 | &IrInst::ZextCast { dst, src }
                 | &IrInst::SextCast { dst, src } => {
                     try_mark_as_dead(idx, dst);
                     try_mark_as_dead(idx, src);
                 }
-                IrInst::MoveFlag { .. } | IrInst::Interrupt(_) => {}
+                IrInst::Fence { .. } | IrInst::MoveFlag { .. } | IrInst::Interrupt(_) => {}
                 IrInst::Intrinsic(_) => todo!(),
             }
         }
@@ -103,8 +107,12 @@ impl Analysis for VariableLivenessAnalysis<'_> {
                 | &IrInst::BitAnd { dst, lhs, rhs }
                 | &IrInst::BitOr { dst, lhs, rhs }
                 | &IrInst::BitXor { dst, lhs, rhs }
+                | &IrInst::LogicalAnd { dst, lhs, rhs }
+                | &IrInst::LogicalXor { dst, lhs, rhs }
+                | &IrInst::LogicalOr { dst, lhs, rhs }
                 | &IrInst::Shl { dst, lhs, rhs }
-                | &IrInst::Shr { dst, lhs, rhs } => {
+                | &IrInst::Lshr { dst, lhs, rhs }
+                | &IrInst::Ashr { dst, lhs, rhs } => {
                     try_mark_as_live(dst, &mut variable_live);
                     try_mark_as_live(lhs, &mut variable_live);
                     try_mark_as_live(rhs, &mut variable_live);
@@ -116,11 +124,11 @@ impl Analysis for VariableLivenessAnalysis<'_> {
 
                     maximum_variable_live = maximum_variable_live.max(variable_live.len());
                 }
-                &IrInst::Neg { dst, src }
+                &IrInst::LogicalNot { dst, src }
                 | &IrInst::BitNot { dst, src }
                 | &IrInst::Assign { dst, src }
-                | &IrInst::Load { dst, src }
-                | &IrInst::Store { dst, src }
+                | &IrInst::Load { dst, src, .. }
+                | &IrInst::Store { dst, src, .. }
                 | &IrInst::ZextCast { dst, src }
                 | &IrInst::SextCast { dst, src } => {
                     try_mark_as_live(dst, &mut variable_live);
@@ -133,7 +141,7 @@ impl Analysis for VariableLivenessAnalysis<'_> {
 
                     maximum_variable_live = maximum_variable_live.max(variable_live.len());
                 }
-                IrInst::MoveFlag { .. } | IrInst::Interrupt(_) => {}
+                IrInst::Fence { .. } | IrInst::MoveFlag { .. } | IrInst::Interrupt(_) => {}
                 IrInst::Intrinsic(_) => todo!(),
             }
         }
