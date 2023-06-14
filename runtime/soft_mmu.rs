@@ -41,7 +41,9 @@ impl SoftMmu {
             size,
             link_state: Arc::new(LinkState::new()),
             device: Arc::new(device),
-        })
+        });
+
+        self.map.sort_by(|a, b| a.base.cmp(&b.base));
     }
 
     fn get_device_block(&self, offset: u64) -> DeviceBlock {

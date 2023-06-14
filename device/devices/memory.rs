@@ -1,7 +1,5 @@
 use std::cell::UnsafeCell;
-use std::collections::VecDeque;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use crate::IoDevice;
 
