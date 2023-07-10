@@ -8,7 +8,6 @@ pub enum Interrupt {
     Interrupt(u64),
     Yield,
     WaitForInterrupt,
-    DivideByZero,
 }
 
 pub struct InterruptQueue {

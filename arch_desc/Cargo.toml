@@ -10,3 +10,4 @@ path = "lib.rs"
 core = { path = "../core" }
 utility = { path = "../utility" }
 once_cell = "1.17.1"
+num-traits = "0.2.15"

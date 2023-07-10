@@ -19,10 +19,6 @@ pub trait Architecture: Default + Clone + Copy + PartialEq + Eq {
     /// This panics if the arch does not have a pc register.
     fn get_pc_register() -> Self::Register;
 
-    /// Get flag register id.
-    /// This panics if the arch does not have a flag register.
-    fn get_flag_register() -> Self::Register;
-
     /// Get register file description.
     fn get_register_file_desc() -> RegisterFileDesc;
 }

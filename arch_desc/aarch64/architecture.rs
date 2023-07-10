@@ -1,4 +1,5 @@
-use core::{Architecture, Primitive, RegisterFileDesc};
+use core::{Architecture, Primitive, Register, RegisterDesc, RegisterFileDesc};
+use std::collections::HashMap;
 
 use super::{AArch64Inst, AArch64MnemonicHint, AArch64Register};
 
@@ -63,11 +64,55 @@ impl Architecture for AArch64Architecture {
         AArch64Register::Pc
     }
 
-    fn get_flag_register() -> Self::Register {
-        AArch64Register::Pstate
-    }
-
     fn get_register_file_desc() -> RegisterFileDesc {
-        todo!()
+        let mut register = HashMap::new();
+        register.insert(
+            Self::get_pc_register().raw(),
+            RegisterDesc {
+                is_read_only: false,
+                size: 8,
+                offset: 0,
+            },
+        );
+
+        for i in 0..32 {
+            register.insert(
+                AArch64Register::X(i as u8).raw(),
+                RegisterDesc {
+                    is_read_only: false,
+                    size: 8,
+                    offset: 8 * (i + 1),
+                },
+            );
+            register.insert(
+                AArch64Register::W(i as u8).raw(),
+                RegisterDesc {
+                    is_read_only: false,
+                    size: 4,
+                    offset: 8 * (i + 1),
+                },
+            );
+        }
+
+        let current_offset = 8 * 33;
+        register.insert(
+            AArch64Register::Xzr.raw(),
+            RegisterDesc {
+                is_read_only: true,
+                size: 8,
+                offset: current_offset,
+            },
+        );
+
+        register.insert(
+            AArch64Register::Sp.raw(),
+            RegisterDesc {
+                is_read_only: false,
+                size: 8,
+                offset: current_offset + 8,
+            },
+        );
+
+        RegisterFileDesc { register }
     }
 }

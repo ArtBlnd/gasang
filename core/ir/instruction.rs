@@ -29,41 +29,22 @@ pub enum IrInst {
         lhs: IrValue,
         rhs: IrValue,
     },
-    BitAnd {
+    And {
         dst: IrValue,
         lhs: IrValue,
         rhs: IrValue,
     },
-    BitOr {
+    Or {
         dst: IrValue,
         lhs: IrValue,
         rhs: IrValue,
     },
-    BitXor {
+    Xor {
         dst: IrValue,
         lhs: IrValue,
         rhs: IrValue,
     },
-    BitNot {
-        dst: IrValue,
-        src: IrValue,
-    },
-    LogicalAnd {
-        dst: IrValue,
-        lhs: IrValue,
-        rhs: IrValue,
-    },
-    LogicalOr {
-        dst: IrValue,
-        lhs: IrValue,
-        rhs: IrValue,
-    },
-    LogicalXor {
-        dst: IrValue,
-        lhs: IrValue,
-        rhs: IrValue,
-    },
-    LogicalNot {
+    Not {
         dst: IrValue,
         src: IrValue,
     },
@@ -80,6 +61,11 @@ pub enum IrInst {
     },
     /// Arithmetic shift right
     Ashr {
+        dst: IrValue,
+        lhs: IrValue,
+        rhs: IrValue,
+    },
+    Rotr {
         dst: IrValue,
         lhs: IrValue,
         rhs: IrValue,
@@ -111,9 +97,7 @@ pub enum IrInst {
         flag: Flag,
     },
     /// A memory fence
-    Fence {
-        ordering: Reordering,
-    },
+    Fence(Reordering),
     Interrupt(Interrupt),
     Intrinsic(IrIntrinsic),
 }
@@ -126,17 +110,14 @@ impl TypeOf for IrInst {
             Self::Mul { dst, .. } => dst.ty(),
             Self::Div { dst, .. } => dst.ty(),
             Self::Rem { dst, .. } => dst.ty(),
-            Self::BitAnd { dst, .. } => dst.ty(),
-            Self::BitOr { dst, .. } => dst.ty(),
-            Self::BitXor { dst, .. } => dst.ty(),
-            Self::BitNot { dst, .. } => dst.ty(),
-            Self::LogicalAnd { dst, .. } => dst.ty(),
-            Self::LogicalOr { dst, .. } => dst.ty(),
-            Self::LogicalXor { dst, .. } => dst.ty(),
-            Self::LogicalNot { dst, .. } => dst.ty(),
+            Self::And { dst, .. } => dst.ty(),
+            Self::Or { dst, .. } => dst.ty(),
+            Self::Xor { dst, .. } => dst.ty(),
+            Self::Not { dst, .. } => dst.ty(),
             Self::Shl { dst, .. } => dst.ty(),
             Self::Lshr { dst, .. } => dst.ty(),
             Self::Ashr { dst, .. } => dst.ty(),
+            Self::Rotr { dst, .. } => dst.ty(),
             Self::Assign { dst, .. } => dst.ty(),
             Self::Load { dst, .. } => dst.ty(),
             Self::Store { dst, .. } => dst.ty(),

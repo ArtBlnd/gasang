@@ -4,7 +4,7 @@ use crate::RawRegisterId;
 
 #[derive(Clone)]
 pub struct RegisterFileDesc {
-    register: HashMap<RawRegisterId, RegisterDesc>,
+    pub register: HashMap<RawRegisterId, RegisterDesc>,
 }
 
 impl RegisterFileDesc {

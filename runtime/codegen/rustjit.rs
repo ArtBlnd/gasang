@@ -3,17 +3,20 @@ mod register_file;
 use arch_desc::aarch64::AArch64Architecture;
 use num_traits::{PrimInt, WrappingAdd, WrappingMul, WrappingSub};
 pub use register_file::*;
+use smallvec::SmallVec;
 
 use core::{
-    ir::{BasicBlock, Flag, IrInst, IrType, IrValue, TypeOf},
-    Architecture, ArchitectureCompat, Interrupt,
+    ir::{BasicBlock, BasicBlockTerminator, Flag, IrInst, IrType, IrValue, TypeOf},
+    Architecture, ArchitectureCompat, Interrupt, Register,
 };
 use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, VecDeque},
+    mem,
     ops::Generator,
 };
 
+use crate::IoDevice;
 use crate::SoftMmu;
 
 use self::context::RustjitContext;
@@ -24,6 +27,7 @@ use super::{
 
 pub struct RustjitExectuable {
     exec: Vec<Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>>>,
+    terminator: Box<dyn Fn(&RustjitContext, &SoftMmu)>,
 }
 
 impl Executable for RustjitExectuable {
@@ -43,6 +47,8 @@ impl Executable for RustjitExectuable {
 
                 yield interrput;
             }
+
+            (self.terminator)(context, mmu);
         }
     }
 }
@@ -69,7 +75,7 @@ impl Codegen for RustjitCodegen {
         }
     }
 
-    fn compile(&self, bb: &BasicBlock) -> Self::Executable {
+    fn compile<A: Architecture>(&self, bb: &BasicBlock) -> Self::Executable {
         let mut exec: Vec<Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>>> = Vec::new();
 
         let variable_liveness = VariableLivenessAnalysis::new(bb).analyze();
@@ -86,7 +92,7 @@ impl Codegen for RustjitCodegen {
 
             let allocated_id = var_allocation_map
                 .entry(id)
-                .or_insert(var_allocation_ids.pop_front().unwrap())
+                .or_insert_with(|| var_allocation_ids.pop_front().unwrap())
                 .clone();
 
             if variable_liveness.is_dead_after(idx, &value) {
@@ -141,72 +147,99 @@ impl Codegen for RustjitCodegen {
 
                     gen_rem(dst, lhs, rhs)
                 }
-                &IrInst::BitAnd { dst, lhs, rhs } => {
+                &IrInst::And { dst, lhs, rhs } => {
                     let dst = map_variable(dst, idx);
                     let lhs = map_variable(lhs, idx);
                     let rhs = map_variable(rhs, idx);
 
                     gen_bit_and(dst, lhs, rhs)
                 }
-                &IrInst::BitOr { dst, lhs, rhs } => {
+                &IrInst::Or { dst, lhs, rhs } => {
                     let dst = map_variable(dst, idx);
                     let lhs = map_variable(lhs, idx);
                     let rhs = map_variable(rhs, idx);
 
                     gen_bit_or(dst, lhs, rhs)
                 }
-                &IrInst::BitXor { dst, lhs, rhs } => {
+                &IrInst::Xor { dst, lhs, rhs } => {
                     let dst = map_variable(dst, idx);
                     let lhs = map_variable(lhs, idx);
                     let rhs = map_variable(rhs, idx);
 
                     gen_bit_xor(dst, lhs, rhs)
                 }
-                &IrInst::BitNot { dst, src } => {
+                &IrInst::Not { dst, src } => {
                     let dst = map_variable(dst, idx);
                     let src = map_variable(src, idx);
 
                     gen_bit_not(dst, src)
-                }
-                &IrInst::LogicalAnd { dst, lhs, rhs } => {
-                    let dst = map_variable(dst, idx);
-                    let lhs = map_variable(lhs, idx);
-                    let rhs = map_variable(rhs, idx);
-
-                    gen_logical_and(dst, lhs, rhs)
-                }
-                &IrInst::LogicalOr { dst, lhs, rhs } => {
-                    let dst = map_variable(dst, idx);
-                    let lhs = map_variable(lhs, idx);
-                    let rhs = map_variable(rhs, idx);
-
-                    gen_logical_or(dst, lhs, rhs)
-                }
-                &IrInst::LogicalXor { dst, lhs, rhs } => {
-                    let dst = map_variable(dst, idx);
-                    let lhs = map_variable(lhs, idx);
-                    let rhs = map_variable(rhs, idx);
-
-                    gen_logical_xor(dst, lhs, rhs)
                 }
                 &IrInst::MoveFlag { dst, dst_pos, flag } => {
                     let dst = map_variable(dst, idx);
 
                     gen_move_flag(dst, dst_pos, flag)
                 }
-                _ => todo!(),
+                &IrInst::Assign { dst, src } => {
+                    let src = map_variable(src, idx);
+                    let dst = map_variable(dst, idx);
+
+                    gen_assign(dst, src)
+                }
+                &IrInst::Shl { dst, lhs, rhs } => {
+                    let lhs = map_variable(lhs, idx);
+                    let rhs = map_variable(rhs, idx);
+                    let dst = map_variable(dst, idx);
+
+                    gen_shl(dst, lhs, rhs)
+                }
+                &IrInst::Load { dst, src } => {
+                    let src = map_variable(src, idx);
+                    let dst = map_variable(dst, idx);
+
+                    gen_load(dst, src)
+                }
+                &IrInst::ZextCast { dst, src } => {
+                    let src = map_variable(src, idx);
+                    let dst = map_variable(dst, idx);
+
+                    gen_zext_cast(dst, src)
+                }
+                x => todo!("todo {:?}", x),
             };
 
             exec.push(inst);
         }
 
-        // free variable space
-        exec.push(Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
-            *ctx.variables.borrow_mut() = None;
-            None
-        }) as Box<_>);
+        let terminator = match bb.terminator() {
+            BasicBlockTerminator::None => unreachable!("unreachable basic block"),
+            BasicBlockTerminator::Next => Box::new(|_: &RustjitContext, _: &SoftMmu| {}) as Box<_>,
+            BasicBlockTerminator::BranchCond {
+                cond,
+                target_true,
+                target_false,
+            } => {
+                let cond = map_variable(cond, bb.inst().len());
+                Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                    let cond = ctx.get::<u64>(cond);
 
-        RustjitExectuable { exec }
+                    let pc = IrValue::Register(IrType::B64, A::get_pc_register().raw());
+                    if cond != 0 {
+                        ctx.set(pc, ctx.get::<u64>(target_true));
+                    } else {
+                        ctx.set(pc, ctx.get::<u64>(target_false));
+                    }
+                }) as Box<_>
+            }
+            BasicBlockTerminator::Branch(target) => {
+                let target = map_variable(target, bb.inst().len());
+                Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                    let pc = IrValue::Register(IrType::B64, A::get_pc_register().raw());
+                    ctx.set(pc, ctx.get::<u64>(target));
+                }) as Box<_>
+            }
+        };
+
+        RustjitExectuable { exec, terminator }
     }
 }
 
@@ -215,6 +248,7 @@ fn gen_add(
     lhs: IrValue,
     rhs: IrValue,
 ) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
     #[inline(always)]
     fn carrying_add<T: WrappingAdd + PrimInt>(a: T, b: T, carry_in: bool) -> (T, bool, bool, bool) {
         let carry = if carry_in { T::one() } else { T::zero() };
@@ -243,16 +277,11 @@ fn gen_add(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_add_impl!(u8),
-        IrType::U16 => gen_add_impl!(u16),
-        IrType::U32 => gen_add_impl!(u32),
-        IrType::U64 => gen_add_impl!(u64),
-        IrType::U128 => gen_add_impl!(u128),
-        IrType::I8 => gen_add_impl!(i8),
-        IrType::I16 => gen_add_impl!(i16),
-        IrType::I32 => gen_add_impl!(i32),
-        IrType::I64 => gen_add_impl!(i64),
-        IrType::I128 => gen_add_impl!(i128),
+        IrType::B8 => gen_add_impl!(u8),
+        IrType::B16 => gen_add_impl!(u16),
+        IrType::B32 => gen_add_impl!(u32),
+        IrType::B64 => gen_add_impl!(u64),
+        IrType::B128 => gen_add_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -292,16 +321,11 @@ fn gen_sub(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_sub_impl!(u8),
-        IrType::U16 => gen_sub_impl!(u16),
-        IrType::U32 => gen_sub_impl!(u32),
-        IrType::U64 => gen_sub_impl!(u64),
-        IrType::U128 => gen_sub_impl!(u128),
-        IrType::I8 => gen_sub_impl!(i8),
-        IrType::I16 => gen_sub_impl!(i16),
-        IrType::I32 => gen_sub_impl!(i32),
-        IrType::I64 => gen_sub_impl!(i64),
-        IrType::I128 => gen_sub_impl!(i128),
+        IrType::B8 => gen_sub_impl!(u8),
+        IrType::B16 => gen_sub_impl!(u16),
+        IrType::B32 => gen_sub_impl!(u32),
+        IrType::B64 => gen_sub_impl!(u64),
+        IrType::B128 => gen_sub_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -341,16 +365,11 @@ fn gen_mul(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_mul_impl!(u8),
-        IrType::U16 => gen_mul_impl!(u16),
-        IrType::U32 => gen_mul_impl!(u32),
-        IrType::U64 => gen_mul_impl!(u64),
-        IrType::U128 => gen_mul_impl!(u128),
-        IrType::I8 => gen_mul_impl!(i8),
-        IrType::I16 => gen_mul_impl!(i16),
-        IrType::I32 => gen_mul_impl!(i32),
-        IrType::I64 => gen_mul_impl!(i64),
-        IrType::I128 => gen_mul_impl!(i128),
+        IrType::B8 => gen_mul_impl!(u8),
+        IrType::B16 => gen_mul_impl!(u16),
+        IrType::B32 => gen_mul_impl!(u32),
+        IrType::B64 => gen_mul_impl!(u64),
+        IrType::B128 => gen_mul_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -369,7 +388,7 @@ fn gen_div(
                 let rhs: $ty = ctx.get(rhs);
 
                 if rhs == 0 {
-                    return Some(Interrupt::DivideByZero);
+                    return Some(Interrupt::Exception(0));
                 }
 
                 let v = lhs.wrapping_div(rhs);
@@ -382,16 +401,11 @@ fn gen_div(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_div_impl!(u8),
-        IrType::U16 => gen_div_impl!(u16),
-        IrType::U32 => gen_div_impl!(u32),
-        IrType::U64 => gen_div_impl!(u64),
-        IrType::U128 => gen_div_impl!(u128),
-        IrType::I8 => gen_div_impl!(i8),
-        IrType::I16 => gen_div_impl!(i16),
-        IrType::I32 => gen_div_impl!(i32),
-        IrType::I64 => gen_div_impl!(i64),
-        IrType::I128 => gen_div_impl!(i128),
+        IrType::B8 => gen_div_impl!(u8),
+        IrType::B16 => gen_div_impl!(u16),
+        IrType::B32 => gen_div_impl!(u32),
+        IrType::B64 => gen_div_impl!(u64),
+        IrType::B128 => gen_div_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -410,7 +424,7 @@ fn gen_rem(
                 let rhs: $ty = ctx.get(rhs);
 
                 if rhs == 0 {
-                    return Some(Interrupt::DivideByZero);
+                    return Some(Interrupt::Exception(0));
                 }
 
                 let v = lhs.wrapping_rem(rhs);
@@ -423,16 +437,11 @@ fn gen_rem(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_rem_impl!(u8),
-        IrType::U16 => gen_rem_impl!(u16),
-        IrType::U32 => gen_rem_impl!(u32),
-        IrType::U64 => gen_rem_impl!(u64),
-        IrType::U128 => gen_rem_impl!(u128),
-        IrType::I8 => gen_rem_impl!(i8),
-        IrType::I16 => gen_rem_impl!(i16),
-        IrType::I32 => gen_rem_impl!(i32),
-        IrType::I64 => gen_rem_impl!(i64),
-        IrType::I128 => gen_rem_impl!(i128),
+        IrType::B8 => gen_rem_impl!(u8),
+        IrType::B16 => gen_rem_impl!(u16),
+        IrType::B32 => gen_rem_impl!(u32),
+        IrType::B64 => gen_rem_impl!(u64),
+        IrType::B128 => gen_rem_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -460,16 +469,11 @@ fn gen_bit_and(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_bit_and_impl!(u8),
-        IrType::U16 => gen_bit_and_impl!(u16),
-        IrType::U32 => gen_bit_and_impl!(u32),
-        IrType::U64 => gen_bit_and_impl!(u64),
-        IrType::U128 => gen_bit_and_impl!(u128),
-        IrType::I8 => gen_bit_and_impl!(i8),
-        IrType::I16 => gen_bit_and_impl!(i16),
-        IrType::I32 => gen_bit_and_impl!(i32),
-        IrType::I64 => gen_bit_and_impl!(i64),
-        IrType::I128 => gen_bit_and_impl!(i128),
+        IrType::B8 => gen_bit_and_impl!(u8),
+        IrType::B16 => gen_bit_and_impl!(u16),
+        IrType::B32 => gen_bit_and_impl!(u32),
+        IrType::B64 => gen_bit_and_impl!(u64),
+        IrType::B128 => gen_bit_and_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -497,16 +501,11 @@ fn gen_bit_or(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_bit_or_impl!(u8),
-        IrType::U16 => gen_bit_or_impl!(u16),
-        IrType::U32 => gen_bit_or_impl!(u32),
-        IrType::U64 => gen_bit_or_impl!(u64),
-        IrType::U128 => gen_bit_or_impl!(u128),
-        IrType::I8 => gen_bit_or_impl!(i8),
-        IrType::I16 => gen_bit_or_impl!(i16),
-        IrType::I32 => gen_bit_or_impl!(i32),
-        IrType::I64 => gen_bit_or_impl!(i64),
-        IrType::I128 => gen_bit_or_impl!(i128),
+        IrType::B8 => gen_bit_or_impl!(u8),
+        IrType::B16 => gen_bit_or_impl!(u16),
+        IrType::B32 => gen_bit_or_impl!(u32),
+        IrType::B64 => gen_bit_or_impl!(u64),
+        IrType::B128 => gen_bit_or_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -534,16 +533,11 @@ fn gen_bit_xor(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_bit_xor_impl!(u8),
-        IrType::U16 => gen_bit_xor_impl!(u16),
-        IrType::U32 => gen_bit_xor_impl!(u32),
-        IrType::U64 => gen_bit_xor_impl!(u64),
-        IrType::U128 => gen_bit_xor_impl!(u128),
-        IrType::I8 => gen_bit_xor_impl!(i8),
-        IrType::I16 => gen_bit_xor_impl!(i16),
-        IrType::I32 => gen_bit_xor_impl!(i32),
-        IrType::I64 => gen_bit_xor_impl!(i64),
-        IrType::I128 => gen_bit_xor_impl!(i128),
+        IrType::B8 => gen_bit_xor_impl!(u8),
+        IrType::B16 => gen_bit_xor_impl!(u16),
+        IrType::B32 => gen_bit_xor_impl!(u32),
+        IrType::B64 => gen_bit_xor_impl!(u64),
+        IrType::B128 => gen_bit_xor_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -569,162 +563,11 @@ fn gen_bit_not(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_bit_not_impl!(u8),
-        IrType::U16 => gen_bit_not_impl!(u16),
-        IrType::U32 => gen_bit_not_impl!(u32),
-        IrType::U64 => gen_bit_not_impl!(u64),
-        IrType::U128 => gen_bit_not_impl!(u128),
-        IrType::I8 => gen_bit_not_impl!(i8),
-        IrType::I16 => gen_bit_not_impl!(i16),
-        IrType::I32 => gen_bit_not_impl!(i32),
-        IrType::I64 => gen_bit_not_impl!(i64),
-        IrType::I128 => gen_bit_not_impl!(i128),
-
-        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
-    }
-}
-
-fn gen_logical_and(
-    dst: IrValue,
-    lhs: IrValue,
-    rhs: IrValue,
-) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
-    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
-    macro_rules! gen_logical_and_impl {
-        ($ty:ty) => {
-            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
-                let lhs: $ty = ctx.get(lhs);
-                let rhs: $ty = ctx.get(rhs);
-
-                let v = (lhs != 0 && rhs != 0).into();
-                ctx.set::<$ty>(dst, v);
-                ctx.set_flag(Flag::ZF, v == 0);
-
-                None
-            }) as Box<_>
-        };
-    }
-
-    match dst.ty() {
-        IrType::U8 => gen_logical_and_impl!(u8),
-        IrType::U16 => gen_logical_and_impl!(u16),
-        IrType::U32 => gen_logical_and_impl!(u32),
-        IrType::U64 => gen_logical_and_impl!(u64),
-        IrType::U128 => gen_logical_and_impl!(u128),
-        IrType::I8 => gen_logical_and_impl!(i8),
-        IrType::I16 => gen_logical_and_impl!(i16),
-        IrType::I32 => gen_logical_and_impl!(i32),
-        IrType::I64 => gen_logical_and_impl!(i64),
-        IrType::I128 => gen_logical_and_impl!(i128),
-
-        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
-    }
-}
-
-fn gen_logical_or(
-    dst: IrValue,
-    lhs: IrValue,
-    rhs: IrValue,
-) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
-    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
-    macro_rules! gen_logical_or_impl {
-        ($ty:ty) => {
-            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
-                let lhs: $ty = ctx.get(lhs);
-                let rhs: $ty = ctx.get(rhs);
-
-                let v = (lhs != 0 || rhs != 0).into();
-                ctx.set::<$ty>(dst, v);
-                ctx.set_flag(Flag::ZF, v == 0);
-
-                None
-            }) as Box<_>
-        };
-    }
-
-    match dst.ty() {
-        IrType::U8 => gen_logical_or_impl!(u8),
-        IrType::U16 => gen_logical_or_impl!(u16),
-        IrType::U32 => gen_logical_or_impl!(u32),
-        IrType::U64 => gen_logical_or_impl!(u64),
-        IrType::U128 => gen_logical_or_impl!(u128),
-        IrType::I8 => gen_logical_or_impl!(i8),
-        IrType::I16 => gen_logical_or_impl!(i16),
-        IrType::I32 => gen_logical_or_impl!(i32),
-        IrType::I64 => gen_logical_or_impl!(i64),
-        IrType::I128 => gen_logical_or_impl!(i128),
-
-        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
-    }
-}
-
-fn gen_logical_xor(
-    dst: IrValue,
-    lhs: IrValue,
-    rhs: IrValue,
-) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
-    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
-    macro_rules! gen_logical_xor_impl {
-        ($ty:ty) => {
-            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
-                let lhs: $ty = ctx.get(lhs);
-                let rhs: $ty = ctx.get(rhs);
-
-                let v = ((lhs != 0) ^ (rhs != 0)).into();
-                ctx.set::<$ty>(dst, v);
-                ctx.set_flag(Flag::ZF, v == 0);
-
-                None
-            }) as Box<_>
-        };
-    }
-
-    match dst.ty() {
-        IrType::U8 => gen_logical_xor_impl!(u8),
-        IrType::U16 => gen_logical_xor_impl!(u16),
-        IrType::U32 => gen_logical_xor_impl!(u32),
-        IrType::U64 => gen_logical_xor_impl!(u64),
-        IrType::U128 => gen_logical_xor_impl!(u128),
-        IrType::I8 => gen_logical_xor_impl!(i8),
-        IrType::I16 => gen_logical_xor_impl!(i16),
-        IrType::I32 => gen_logical_xor_impl!(i32),
-        IrType::I64 => gen_logical_xor_impl!(i64),
-        IrType::I128 => gen_logical_xor_impl!(i128),
-
-        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
-    }
-}
-
-fn gen_logical_not(
-    dst: IrValue,
-    src: IrValue,
-) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
-    assert!(dst.ty() == src.ty());
-    macro_rules! gen_logical_not_impl {
-        ($ty:ty) => {
-            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
-                let src: $ty = ctx.get(src);
-
-                let v = (src == 0).into();
-                ctx.set::<$ty>(dst, v);
-                ctx.set_flag(Flag::ZF, v == 0);
-
-                None
-            }) as Box<_>
-        };
-    }
-
-    match dst.ty() {
-        IrType::U8 => gen_logical_not_impl!(u8),
-        IrType::U16 => gen_logical_not_impl!(u16),
-        IrType::U32 => gen_logical_not_impl!(u32),
-        IrType::U64 => gen_logical_not_impl!(u64),
-        IrType::U128 => gen_logical_not_impl!(u128),
-        IrType::I8 => gen_logical_not_impl!(i8),
-        IrType::I16 => gen_logical_not_impl!(i16),
-        IrType::I32 => gen_logical_not_impl!(i32),
-        IrType::I64 => gen_logical_not_impl!(i64),
-        IrType::I128 => gen_logical_not_impl!(i128),
+        IrType::B8 => gen_bit_not_impl!(u8),
+        IrType::B16 => gen_bit_not_impl!(u16),
+        IrType::B32 => gen_bit_not_impl!(u32),
+        IrType::B64 => gen_bit_not_impl!(u64),
+        IrType::B128 => gen_bit_not_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -735,15 +578,15 @@ fn gen_shl(
     lhs: IrValue,
     rhs: IrValue,
 ) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
-    assert!(dst.ty() == lhs.ty() && lhs.ty() == rhs.ty());
+    assert!(dst.ty() == lhs.ty());
     macro_rules! gen_shl_impl {
-        ($ty:ty) => {
+        ($lhs_ty:ty, $rhs_ty:ty) => {
             Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
-                let lhs: $ty = ctx.get(lhs);
-                let rhs: $ty = ctx.get(rhs);
+                let lhs: $lhs_ty = ctx.get(lhs);
+                let rhs: $rhs_ty = ctx.get(rhs);
 
                 let v = lhs << rhs;
-                ctx.set::<$ty>(dst, v);
+                ctx.set::<$lhs_ty>(dst, v);
                 ctx.set_flag(Flag::ZF, v == 0);
 
                 None
@@ -751,19 +594,14 @@ fn gen_shl(
         };
     }
 
-    match dst.ty() {
-        IrType::U8 => gen_shl_impl!(u8),
-        IrType::U16 => gen_shl_impl!(u16),
-        IrType::U32 => gen_shl_impl!(u32),
-        IrType::U64 => gen_shl_impl!(u64),
-        IrType::U128 => gen_shl_impl!(u128),
-        IrType::I8 => gen_shl_impl!(i8),
-        IrType::I16 => gen_shl_impl!(i16),
-        IrType::I32 => gen_shl_impl!(i32),
-        IrType::I64 => gen_shl_impl!(i64),
-        IrType::I128 => gen_shl_impl!(i128),
+    match (lhs.ty(), rhs.ty()) {
+        (IrType::B8, IrType::B8) => gen_shl_impl!(u8, u8),
+        (IrType::B16, IrType::B8) => gen_shl_impl!(u16, u8),
+        (IrType::B32, IrType::B8) => gen_shl_impl!(u32, u8),
+        (IrType::B64, IrType::B8) => gen_shl_impl!(u64, u8),
+        (IrType::B128, IrType::B8) => gen_shl_impl!(u128, u8),
 
-        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+        _ => unimplemented!("Unsupported type: {:?} << {:?}", lhs.ty(), rhs.ty()),
     }
 }
 
@@ -789,11 +627,11 @@ fn gen_lshr(
     }
 
     match dst.ty() {
-        IrType::U8 | IrType::I8 => gen_lshr_impl!(u8),
-        IrType::U16 | IrType::I16 => gen_lshr_impl!(u16),
-        IrType::U32 | IrType::I32 => gen_lshr_impl!(u32),
-        IrType::U64 | IrType::I64 => gen_lshr_impl!(u64),
-        IrType::U128 | IrType::I128 => gen_lshr_impl!(u128),
+        IrType::B8 => gen_lshr_impl!(u8),
+        IrType::B16 => gen_lshr_impl!(u16),
+        IrType::B32 => gen_lshr_impl!(u32),
+        IrType::B64 => gen_lshr_impl!(u64),
+        IrType::B128 => gen_lshr_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -821,16 +659,11 @@ fn gen_ashr(
     }
 
     match dst.ty() {
-        IrType::U8 => gen_ashr_impl!(u8),
-        IrType::U16 => gen_ashr_impl!(u16),
-        IrType::U32 => gen_ashr_impl!(u32),
-        IrType::U64 => gen_ashr_impl!(u64),
-        IrType::U128 => gen_ashr_impl!(u128),
-        IrType::I8 => gen_ashr_impl!(i8),
-        IrType::I16 => gen_ashr_impl!(i16),
-        IrType::I32 => gen_ashr_impl!(i32),
-        IrType::I64 => gen_ashr_impl!(i64),
-        IrType::I128 => gen_ashr_impl!(i128),
+        IrType::B8 => gen_ashr_impl!(u8),
+        IrType::B16 => gen_ashr_impl!(u16),
+        IrType::B32 => gen_ashr_impl!(u32),
+        IrType::B64 => gen_ashr_impl!(u64),
+        IrType::B128 => gen_ashr_impl!(u128),
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
@@ -846,4 +679,100 @@ fn gen_move_flag(
         ctx.set::<u64>(dst, v << dst_pos as u64);
         None
     })
+}
+
+fn gen_assign(
+    dst: IrValue,
+    src: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty() == src.ty());
+    macro_rules! gen_assign_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let src: $ty = ctx.get(src);
+
+                ctx.set::<$ty>(dst, src);
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::B8 => gen_assign_impl!(u8),
+        IrType::B16 => gen_assign_impl!(u16),
+        IrType::B32 => gen_assign_impl!(u32),
+        IrType::B64 => gen_assign_impl!(u64),
+        IrType::B128 => gen_assign_impl!(u128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_load(
+    dst: IrValue,
+    src: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    // TODO: check that size of src is same as pointer size
+    macro_rules! gen_load_impl {
+        ($src_ty:ty, $dst_ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, mmu: &SoftMmu| unsafe {
+                let src: $src_ty = ctx.get(src);
+                let src = src as u64;
+
+                let mut buf = SmallVec::<[u8; 32]>::new();
+                buf.resize(mem::size_of::<$dst_ty>(), 0);
+                mmu.read_at(src, &mut buf);
+                ctx.set::<$dst_ty>(
+                    dst,
+                    <$dst_ty>::from_ne_bytes(buf[..mem::size_of::<$dst_ty>()].try_into().unwrap()),
+                );
+                None
+            }) as Box<_>
+        };
+    }
+
+    match (src.ty(), dst.ty()) {
+        (IrType::B64, IrType::B8) => gen_load_impl!(u64, u8),
+        (IrType::B64, IrType::B16) => gen_load_impl!(u64, u16),
+        (IrType::B64, IrType::B32) => gen_load_impl!(u64, u32),
+        (IrType::B64, IrType::B64) => gen_load_impl!(u64, u64),
+        (IrType::B64, IrType::B128) => gen_load_impl!(u64, u128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
+fn gen_zext_cast(
+    dst: IrValue,
+    src: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    assert!(dst.ty().size_of() >= src.ty().size_of());
+    macro_rules! gen_zext_cast_impl {
+        ($ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, _: &SoftMmu| {
+                let src_ext = match src.ty() {
+                    IrType::B8 => ctx.get::<u8>(src) as $ty,
+                    IrType::B16 => ctx.get::<u16>(src) as $ty,
+                    IrType::B32 => ctx.get::<u32>(src) as $ty,
+                    IrType::B64 => ctx.get::<u64>(src) as $ty,
+                    IrType::B128 => ctx.get::<u128>(src) as $ty,
+
+                    _ => unimplemented!("Unsupported type: {:?}", src.ty()),
+                };
+
+                ctx.set::<$ty>(dst, src_ext);
+                None
+            }) as Box<_>
+        };
+    }
+
+    match dst.ty() {
+        IrType::B8 => gen_zext_cast_impl!(u8),
+        IrType::B16 => gen_zext_cast_impl!(u16),
+        IrType::B32 => gen_zext_cast_impl!(u32),
+        IrType::B64 => gen_zext_cast_impl!(u64),
+        IrType::B128 => gen_zext_cast_impl!(u128),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
 }

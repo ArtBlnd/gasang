@@ -9,6 +9,9 @@ pub struct Memory {
     mem: Arc<UnsafeCell<Box<[u8]>>>,
 }
 
+unsafe impl Send for Memory {}
+unsafe impl Sync for Memory {}
+
 impl Memory {
     pub fn allocate(size: usize) -> Self {
         Self {

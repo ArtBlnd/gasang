@@ -17,5 +17,5 @@ pub trait Codegen {
 
     /// Allocate a new context for the given architecture.
     fn allocate_execution_context<A: Architecture>() -> Self::Context;
-    fn compile(&self, bb: &BasicBlock) -> Self::Executable;
+    fn compile<A: Architecture>(&self, bb: &BasicBlock) -> Self::Executable;
 }

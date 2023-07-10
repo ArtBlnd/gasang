@@ -19,5 +19,7 @@ cranelift-jit = "0.96.3"
 thread_local = "1.1.7"
 num-traits = "0.2.15"
 parking_lot = "0.12.1"
+elf = "0.7.2"
+smallvec = "1.10.0"
 
 

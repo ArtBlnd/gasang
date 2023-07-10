@@ -58,21 +58,18 @@ impl Analysis for VariableLivenessAnalysis<'_> {
                 | &IrInst::Mul { dst, lhs, rhs }
                 | &IrInst::Div { dst, lhs, rhs }
                 | &IrInst::Rem { dst, lhs, rhs }
-                | &IrInst::BitAnd { dst, lhs, rhs }
-                | &IrInst::BitOr { dst, lhs, rhs }
-                | &IrInst::BitXor { dst, lhs, rhs }
-                | &IrInst::LogicalAnd { dst, lhs, rhs }
-                | &IrInst::LogicalXor { dst, lhs, rhs }
-                | &IrInst::LogicalOr { dst, lhs, rhs }
+                | &IrInst::And { dst, lhs, rhs }
+                | &IrInst::Or { dst, lhs, rhs }
+                | &IrInst::Xor { dst, lhs, rhs }
                 | &IrInst::Shl { dst, lhs, rhs }
                 | &IrInst::Lshr { dst, lhs, rhs }
-                | &IrInst::Ashr { dst, lhs, rhs } => {
+                | &IrInst::Ashr { dst, lhs, rhs }
+                | &IrInst::Rotr { dst, lhs, rhs } => {
                     try_mark_as_dead(idx, dst);
                     try_mark_as_dead(idx, lhs);
                     try_mark_as_dead(idx, rhs);
                 }
-                &IrInst::LogicalNot { dst, src }
-                | &IrInst::BitNot { dst, src }
+                &IrInst::Not { dst, src }
                 | &IrInst::Assign { dst, src }
                 | &IrInst::Load { dst, src, .. }
                 | &IrInst::Store { dst, src, .. }
@@ -104,15 +101,13 @@ impl Analysis for VariableLivenessAnalysis<'_> {
                 | &IrInst::Mul { dst, lhs, rhs }
                 | &IrInst::Div { dst, lhs, rhs }
                 | &IrInst::Rem { dst, lhs, rhs }
-                | &IrInst::BitAnd { dst, lhs, rhs }
-                | &IrInst::BitOr { dst, lhs, rhs }
-                | &IrInst::BitXor { dst, lhs, rhs }
-                | &IrInst::LogicalAnd { dst, lhs, rhs }
-                | &IrInst::LogicalXor { dst, lhs, rhs }
-                | &IrInst::LogicalOr { dst, lhs, rhs }
+                | &IrInst::And { dst, lhs, rhs }
+                | &IrInst::Or { dst, lhs, rhs }
+                | &IrInst::Xor { dst, lhs, rhs }
                 | &IrInst::Shl { dst, lhs, rhs }
                 | &IrInst::Lshr { dst, lhs, rhs }
-                | &IrInst::Ashr { dst, lhs, rhs } => {
+                | &IrInst::Ashr { dst, lhs, rhs }
+                | &IrInst::Rotr { dst, lhs, rhs } => {
                     try_mark_as_live(dst, &mut variable_live);
                     try_mark_as_live(lhs, &mut variable_live);
                     try_mark_as_live(rhs, &mut variable_live);
@@ -124,8 +119,7 @@ impl Analysis for VariableLivenessAnalysis<'_> {
 
                     maximum_variable_live = maximum_variable_live.max(variable_live.len());
                 }
-                &IrInst::LogicalNot { dst, src }
-                | &IrInst::BitNot { dst, src }
+                &IrInst::Not { dst, src }
                 | &IrInst::Assign { dst, src }
                 | &IrInst::Load { dst, src, .. }
                 | &IrInst::Store { dst, src, .. }

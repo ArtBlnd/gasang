@@ -32,8 +32,8 @@ pub enum AArch64Register {
 impl Register for AArch64Register {
     fn raw(&self) -> RawRegisterId {
         let raw = match self {
-            &Self::W(v) => 0x00FF + v as usize,
             &Self::X(v) => v as usize,
+            &Self::W(v) => 0x00FF + v as usize,
             &Self::V(v) => 0x01FF + v as usize,
             &Self::Q(v) => 0x02FF + v as usize,
             &Self::D(v) => 0x03FF + v as usize,

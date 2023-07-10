@@ -18,14 +18,10 @@ impl Context for RustjitContext {
     #[inline(always)]
     fn get<T: ValueView>(&self, value: IrValue) -> T {
         match value {
-            IrValue::Constant(IrConstant::U8(value)) => T::from_bytes(&[value]),
-            IrValue::Constant(IrConstant::U16(value)) => T::from_bytes(&value.into_bytes()),
-            IrValue::Constant(IrConstant::U32(value)) => T::from_bytes(&value.into_bytes()),
-            IrValue::Constant(IrConstant::U64(value)) => T::from_bytes(&value.into_bytes()),
-            IrValue::Constant(IrConstant::I8(value)) => T::from_bytes(&[value as u8]),
-            IrValue::Constant(IrConstant::I16(value)) => T::from_bytes(&value.into_bytes()),
-            IrValue::Constant(IrConstant::I32(value)) => T::from_bytes(&value.into_bytes()),
-            IrValue::Constant(IrConstant::I64(value)) => T::from_bytes(&value.into_bytes()),
+            IrValue::Constant(IrConstant::B8(value)) => T::from_bytes(&[value]),
+            IrValue::Constant(IrConstant::B16(value)) => T::from_bytes(&value.into_bytes()),
+            IrValue::Constant(IrConstant::B32(value)) => T::from_bytes(&value.into_bytes()),
+            IrValue::Constant(IrConstant::B64(value)) => T::from_bytes(&value.into_bytes()),
             IrValue::Register(_, id) => self.registers.get(id),
             IrValue::Variable(_, id) => {
                 let variable = self.variables.borrow().as_ref().unwrap()[id].get();

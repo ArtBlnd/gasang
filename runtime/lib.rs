@@ -23,29 +23,30 @@ use crate::codegen::Context;
 
 pub struct Runtime;
 impl Runtime {
-    pub unsafe fn run<A, C, I, F>(binary: &[u8], prepare: F) -> Infallible
+    pub unsafe fn run<A, C, I>(binary: &[u8], prepare: impl FnOnce(&mut SoftMmu, &mut IrqQueue)) -> Infallible
     where
         A: Architecture,
         C: ArchitectureCompat<A> + Codegen,
         I: ArchitectureCompat<A> + Abi,
-        F: FnOnce(&mut SoftMmu, &mut IrqQueue),
     {
+        let pc_reg = IrValue::Register(IrType::B64, A::get_pc_register().raw());
+
         let mut mmu = SoftMmu::new();
         let mut irq = IrqQueue::new();
         prepare(&mut mmu, &mut irq);
 
         let mut abi = I::new();
+        let mut ctx = C::allocate_execution_context::<A>();
         let cgn = C::new();
-        let ctx = C::allocate_execution_context::<A>();
 
         // Initializes the ABI, execution context, and mmu with given binary
-        abi.on_initialize(binary, &ctx, &mmu);
+        abi.on_initialize(binary, &mut ctx, &mut mmu);
 
-        let mut curr_mem = [0u8; 4096];
-        let mut next_off = ctx.get(IrValue::Register(IrType::U64, A::get_pc_register().raw()));
-
-        mmu.read_all_at(next_off, &mut curr_mem);
+        let mut buffer = [0u8; 4096];
         loop {
+            let mut pc = ctx.get(pc_reg);
+            mmu.read_all_at(pc, &mut buffer);
+
             // Process device IRQs
             let mut irq_queue = BinaryHeap::new();
             while let Some(irq) = irq.recv() {
@@ -57,17 +58,20 @@ impl Runtime {
             }
 
             // Try to decode and compile instructions into BasicBlock
-            let mut bb = BasicBlock::new(next_off);
+            let mut bb = BasicBlock::new(pc);
             let mut total_inst_size = 0u64;
             loop {
-                let Some(raw_inst) = A::Inst::decode(&curr_mem[total_inst_size as usize..])
+                let Some(raw_inst) = A::Inst::decode(&buffer[total_inst_size as usize..])
                 else {
                     // If failed to parse an instruction, we need to read a new memory
-                    next_off += total_inst_size;
+                    pc += total_inst_size;
                     total_inst_size = 0;
 
-                    mmu.read_all_at(next_off, &mut curr_mem);
-                    continue;
+                    mmu.read_all_at(pc, &mut buffer);
+                    if total_inst_size == 0 {
+                        panic!("Failed to decode instruction at 0x{:x}", pc);
+                    }
+                    break;
                 };
 
                 raw_inst.compile_to_ir(&mut bb);
@@ -78,7 +82,7 @@ impl Runtime {
                 }
             }
 
-            let compiled_bb = cgn.compile(&bb);
+            let compiled_bb = cgn.compile::<A>(&bb);
             let gen = compiled_bb.execute(&ctx, &mmu);
             let mut gen = pin!(gen);
 
@@ -102,30 +106,8 @@ impl Runtime {
                             abi.on_irq(irq.id, irq.level, &ctx, &mmu);
                         }
                     },
-                    Interrupt::DivideByZero => {
-                        panic!("divide by zero");
-                    }
                 }
             }
-
-            // prepare next address
-            match bb.terminator() {
-                BasicBlockTerminator::None => unreachable!("BasicBlock should have a terminator"),
-                BasicBlockTerminator::Next => next_off += total_inst_size,
-                BasicBlockTerminator::BranchCond { cond, target } => {
-                    let cond: u64 = ctx.get(cond);
-                    let dest: u64 = ctx.get(target);
-
-                    if cond != 0 {
-                        next_off = dest;
-                    } else {
-                        next_off += total_inst_size;
-                    }
-                }
-                BasicBlockTerminator::Branch(target) => {
-                    next_off = ctx.get(target);
-                }
-            };
         }
     }
 }

@@ -1,4 +1,5 @@
 use core::Architecture;
+use std::str::Chars;
 
 use crate::aarch64::inst::AArch64Inst;
 use crate::aarch64::inst_operand::*;
@@ -9,12 +10,21 @@ use utility::BitPatternMatcher;
 use once_cell::sync::Lazy;
 use utility::Extract;
 
+fn to_le(pat: impl AsRef<str>) -> String {
+    let pat: Vec<char> = pat
+        .as_ref()
+        .chars()
+        .filter(|&c| c != ' ' && c != '_')
+        .collect();
+
+    pat.chunks(8).rev().flatten().collect()
+}
+
 pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> Option<AArch64Inst> {
-    // AArch64 instruction has fixed length of 32 bits
     pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("0_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx"),
             |raw_instr: &[u8],
              Extract(op0): Extract<u8, 29, 31>,
              Extract(op1): Extract<u8, 16, 25>,
@@ -27,25 +37,31 @@ pub(crate) fn decode_aarch64_inst(raw: &[u8]) -> Option<AArch64Inst> {
             },
         )
         .bind(
-            "1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("1_xx_0000_xxxxxxxxxxxxxxxxxxxxxxxxx"),
             |_raw_instr: &[u8]| todo!("SME encodings"),
         )
         .bind(
-            "x_xx_0010_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("x_xx_0010_xxxxxxxxxxxxxxxxxxxxxxxxx"),
             |_raw_instr: &[u8]| todo!("SVE encodings"),
         )
-        .bind("x_xx_100x_xxxxxxxxxxxxxxxxxxxxxxxxx", parse_aarch64_d_p_i)
         .bind(
-            "x_xx_101x_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("x_xx_100x_xxxxxxxxxxxxxxxxxxxxxxxxx"),
+            parse_aarch64_d_p_i,
+        )
+        .bind(
+            to_le("x_xx_101x_xxxxxxxxxxxxxxxxxxxxxxxxx"),
             parse_aarch64_branches_exception_gen_and_sys_instr,
         )
         .bind(
-            "x_xx_x1x0_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("x_xx_x1x0_xxxxxxxxxxxxxxxxxxxxxxxxx"),
             parse_aarch64_load_and_stores,
         )
-        .bind("x_xx_x101_xxxxxxxxxxxxxxxxxxxxxxxxx", parse_aarch64_d_p_r)
         .bind(
-            "x_xx_x111_xxxxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("x_xx_x101_xxxxxxxxxxxxxxxxxxxxxxxxx"),
+            parse_aarch64_d_p_r,
+        )
+        .bind(
+            to_le("x_xx_x111_xxxxxxxxxxxxxxxxxxxxxxxxx"),
             parse_aarch64_dp_sfp_adv_simd,
         );
 
@@ -60,21 +76,27 @@ fn parse_aarch64_d_p_i(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xxx_100_00x_xxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("xxx_100_00x_xxxxxxxxxxxxxxxxxxxxxxx"),
             parse_pc_rel_addressing,
         )
         .bind(
-            "xxx_100_010_xxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("xxx_100_010_xxxxxxxxxxxxxxxxxxxxxxx"),
             parse_add_sub_immediate,
         )
         .bind(
-            "xxx_100_011_xxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("xxx_100_011_xxxxxxxxxxxxxxxxxxxxxxx"),
             parse_add_sub_imm_with_tags,
         )
-        .bind("xxx_100_100_xxxxxxxxxxxxxxxxxxxxxxx", parse_logical_imm)
-        .bind("xxx_100_101_xxxxxxxxxxxxxxxxxxxxxxx", parse_move_wide_imm)
-        .bind("xxx_100_110_xxxxxxxxxxxxxxxxxxxxxxx", parse_bitfield)
-        .bind("xxx_100_111_xxxxxxxxxxxxxxxxxxxxxxx", parse_extract);
+        .bind(
+            to_le("xxx_100_100_xxxxxxxxxxxxxxxxxxxxxxx"),
+            parse_logical_imm,
+        )
+        .bind(
+            to_le("xxx_100_101_xxxxxxxxxxxxxxxxxxxxxxx"),
+            parse_move_wide_imm,
+        )
+        .bind(to_le("xxx_100_110_xxxxxxxxxxxxxxxxxxxxxxx"), parse_bitfield)
+        .bind(to_le("xxx_100_111_xxxxxxxxxxxxxxxxxxxxxxx"), parse_extract);
 
         m
     });
@@ -87,48 +109,51 @@ fn parse_aarch64_d_p_r(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx",
+            to_le("x_0_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx"),
             parse_data_proc_2src,
         )
         .bind(
-            "x_1_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx",
+            to_le("x_1_x_1_101_0110_xxxxx_xxxxxx_xxxxxxxxxx"),
             parse_data_proc_1src,
         )
         .bind(
-            "x_x_x_0_101_0xxx_xxxxx_xxxxxx_xxxxxxxxxx",
+            to_le("x_x_x_0_101_0xxx_xxxxx_xxxxxx_xxxxxxxxxx"),
             parse_logical_shifted_register,
         )
         .bind(
-            "x_x_x_0_101_1xx0_xxxxx_xxxxxx_xxxxxxxxxx",
+            to_le("x_x_x_0_101_1xx0_xxxxx_xxxxxx_xxxxxxxxxx"),
             parse_add_sub_shifted_reg,
         )
         .bind(
-            "x_x_x_0_101_1xx1_xxxxx_xxxxxx_xxxxxxxxxx",
+            to_le("x_x_x_0_101_1xx1_xxxxx_xxxxxx_xxxxxxxxxx"),
             parse_add_sub_ext_reg,
         )
         .bind(
-            "x_x_x_1_101_0000_xxxxx_000000_xxxxxxxxxx",
+            to_le("x_x_x_1_101_0000_xxxxx_000000_xxxxxxxxxx"),
             parse_add_sub_with_carry,
         )
         .bind(
-            "x_x_x_1_101_0000_xxxxx_x00001_xxxxxxxxxx",
+            to_le("x_x_x_1_101_0000_xxxxx_x00001_xxxxxxxxxx"),
             parse_rot_right_into_flags,
         )
         .bind(
-            "x_x_x_1_101_0000_xxxxx_xx0010_xxxxxxxxxx",
+            to_le("x_x_x_1_101_0000_xxxxx_xx0010_xxxxxxxxxx"),
             parse_eval_into_flags,
         )
         .bind(
-            "x_x_x_1_101_0010_xxxxx_xxxx0x_xxxxxxxxxx",
+            to_le("x_x_x_1_101_0010_xxxxx_xxxx0x_xxxxxxxxxx"),
             parse_cond_cmp_reg,
         )
         .bind(
-            "x_x_x_1_101_0010_xxxxx_xxxx1x_xxxxxxxxxx",
+            to_le("x_x_x_1_101_0010_xxxxx_xxxx1x_xxxxxxxxxx"),
             parse_cond_cmp_imm,
         )
-        .bind("x_x_x_1_101_0100_xxxxx_xxxxxx_xxxxxxxxxx", parse_cond_sel)
         .bind(
-            "x_x_x_1_101_1xxx_xxxxx_xxxxxx_xxxxxxxxxx",
+            to_le("x_x_x_1_101_0100_xxxxx_xxxxxx_xxxxxxxxxx"),
+            parse_cond_sel,
+        )
+        .bind(
+            to_le("x_x_x_1_101_1xxx_xxxxx_xxxxxx_xxxxxxxxxx"),
             parse_data_proccessing_3src,
         );
 
@@ -144,175 +169,250 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: &[u8]) -> Option<AArch64Inst> {
         m.bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0100", "0x", "x101", "00xxxxx10"
+                to_le("0100"),
+                to_le("0x"),
+                to_le("x101"),
+                "00xxxxx10"
             ),
             |_raw_instr: &[u8]| todo!("Cryptographic AES"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0101", "0x", "x0xx", "xxx0xxx00"
+                to_le("0101"),
+                to_le("0x"),
+                to_le("x0xx"),
+                "xxx0xxx00"
             ),
             |_raw_instr: &[u8]| todo!("Cryptographic three-register SHA"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0101", "0x", "x101", "00xxxxx10"
+                to_le("0101"),
+                to_le("0x"),
+                to_le("x101"),
+                "00xxxxx10"
             ),
             |_raw_instr: &[u8]| todo!("Cryptographic two-register SHA"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "00", "00xx", "xxx0xxxx1"
+                to_le("01x1"),
+                to_le("00"),
+                to_le("00xx"),
+                "xxx0xxxx1"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar copy"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "0x", "10xx", "xxx00xxx1"
+                to_le("01x1"),
+                to_le("0x"),
+                to_le("10xx"),
+                "xxx00xxx1"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar three same FP16"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "0x", "1111", "00xxxxx10"
+                to_le("01x1"),
+                to_le("0x"),
+                to_le("1111"),
+                "00xxxxx10"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar two-register miscellaneous FP16"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "0x", "x0xx", "xxx1xxxx1"
+                to_le("01x1"),
+                to_le("0x"),
+                to_le("x0xx"),
+                "xxx1xxxx1"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar three same extra"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "0x", "x100", "00xxxxx10"
+                to_le("01x1"),
+                to_le("0x"),
+                to_le("x100"),
+                "00xxxxx10"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar two-register miscellaneous"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "0x", "x110", "00xxxxx10"
+                to_le("01x1"),
+                to_le("0x"),
+                to_le("x110"),
+                "00xxxxx10"
             ),
             parse_adv_simd_scalar_pairwise,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "0x", "x1xx", "xxxxxxx00"
+                to_le("01x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxxx00"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar three different"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "0x", "x1xx", "xxxxxxxx1"
+                to_le("01x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxxxx1"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar three same"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "10", "xxxx", "xxxxxxxx1"
+                to_le("01x1"),
+                to_le("10"),
+                to_le("xxxx"),
+                "xxxxxxxx1"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD scalar shifted by immediate"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "01x1", "1x", "xxxx", "xxxxxxxx0"
+                to_le("01x1"),
+                to_le("1x"),
+                to_le("xxxx"),
+                "xxxxxxxx0"
             ),
             parse_adv_simd_scalar_x_indexed_elem,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0x00", "0x", "x0xx", "xxx0xxx00"
+                to_le("0x00"),
+                to_le("0x"),
+                to_le("x0xx"),
+                "xxx0xxx00"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD table lookup"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0x00", "0x", "x0xx", "xxx0xxx10"
+                to_le("0x00"),
+                to_le("0x"),
+                to_le("x0xx"),
+                "xxx0xxx10"
             ),
             parse_advanced_simd_permute,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0x10", "0x", "x0xx", "xxx0xxxx0"
+                to_le("0x10"),
+                to_le("0x"),
+                to_le("x0xx"),
+                "xxx0xxxx0"
             ),
             parse_advanced_simd_extract,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "00", "00xx", "xxx0xxxx1"
+                to_le("0xx0"),
+                to_le("00"),
+                to_le("00xx"),
+                "xxx0xxxx1"
             ),
             parse_advanced_simd_copy,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "0x", "10xx", "xxx00xxx1"
+                to_le("0xx0"),
+                to_le("0x"),
+                to_le("10xx"),
+                "xxx00xxx1"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD three same (FP16)"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "0x", "1111", "00xxxxx10"
+                to_le("0xx0"),
+                to_le("0x"),
+                to_le("1111"),
+                "00xxxxx10"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD two-register miscellaneous (FP16)"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "0x", "x0xx", "xxx1xxxx1"
+                to_le("0xx0"),
+                to_le("0x"),
+                to_le("x0xx"),
+                "xxx1xxxx1"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD three-register extension"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "0x", "x100", "00xxxxx10"
+                to_le("0xx0"),
+                to_le("0x"),
+                to_le("x100"),
+                "00xxxxx10"
             ),
             parse_adv_simd_2reg_miscellaneous,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "0x", "x110", "00xxxxx10"
+                to_le("0xx0"),
+                to_le("0x"),
+                to_le("x110"),
+                "00xxxxx10"
             ),
             parse_adv_simd_across_lanes,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "0x", "x1xx", "xxxxxxx00"
+                to_le("0xx0"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxxx00"
             ),
             |_raw_instr: &[u8]| todo!("Advanced SIMD three different"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "0x", "x1xx", "xxxxxxxx1"
+                to_le("0xx0"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxxxx1"
             ),
             parse_advanced_simd_three_same,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "10", "xxxx", "xxxxxxxx1"
+                to_le("0xx0"),
+                to_le("10"),
+                to_le("xxxx"),
+                "xxxxxxxx1"
             ),
             |raw_instr: &[u8], Extract(op2): Extract<u8, 19, 23>| {
                 if op2 == 0b0000 {
@@ -325,105 +425,150 @@ fn parse_aarch64_dp_sfp_adv_simd(raw_instr: &[u8]) -> Option<AArch64Inst> {
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "0xx0", "1x", "xxxx", "xxxxxxxx0"
+                to_le("0xx0"),
+                to_le("1x"),
+                to_le("xxxx"),
+                "xxxxxxxx0"
             ),
             parse_adv_simd_vec_x_indexed_elem,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "1100", "00", "10xx", "xxx10xxxx"
+                to_le("1100"),
+                to_le("00"),
+                to_le("10xx"),
+                "xxx10xxxx"
             ),
             |_raw_instr: &[u8]| todo!("Cryptographic three-register, imm2"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "1100", "00", "11xx", "xxx1x00xx"
+                to_le("1100"),
+                to_le("00"),
+                to_le("11xx"),
+                "xxx1x00xx"
             ),
             |_raw_instr: &[u8]| todo!("Cryptographic three-reigster SHA 512"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "1100", "00", "xxxx", "xxx0xxxxx"
+                to_le("1100"),
+                to_le("00"),
+                to_le("xxxx"),
+                "xxx0xxxxx"
             ),
             |_raw_instr: &[u8]| todo!("Cryptographic four-register"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "1100", "01", "00xx", "xxxxxxxxx"
+                to_le("1100"),
+                to_le("01"),
+                to_le("00xx"),
+                "xxxxxxxxx"
             ),
             |_raw_instr: &[u8]| todo!("XAR"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "1100", "01", "1000", "0001000xx"
+                to_le("1100"),
+                to_le("01"),
+                to_le("1000"),
+                "0001000xx"
             ),
             |_raw_instr: &[u8]| todo!("Cryptographic two-register SHA 512"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x0xx", "xxxxxxxxx"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x0xx"),
+                "xxxxxxxxx"
             ),
             parse_conv_between_float_and_fixed_point,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x1xx", "xxx000000"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxx000000"
             ),
             parse_conv_between_float_and_int,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x1xx", "xxxx10000"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxx10000"
             ),
             parse_float_data_proc_1src,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x1xx", "xxxxx1000"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxx1000"
             ),
             parse_floating_point_compare,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x1xx", "xxxxxx100"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxx100"
             ),
             parse_floating_point_immediate,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x1xx", "xxxxxxx01"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxxx01"
             ),
             |_raw_instr: &[u8]| todo!("Floating-point conditional compare"),
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x1xx", "xxxxxxx10"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxxx10"
             ),
             parse_float_data_proc_2src,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "0x", "x1xx", "xxxxxxx11"
+                to_le("x0x1"),
+                to_le("0x"),
+                to_le("x1xx"),
+                "xxxxxxx11"
             ),
             parse_floating_point_conditional_select,
         )
         .bind(
             &format!(
                 "{}_xxx_{}_{}_{}_xxxxxxxxxx",
-                "x0x1", "1x", "xxxx", "xxxxxxxxx"
+                to_le("x0x1"),
+                to_le("1x"),
+                to_le("xxxx"),
+                "xxxxxxxxx"
             ),
             parse_fp_data_processing_3src,
         );
@@ -439,109 +584,109 @@ fn parse_aarch64_load_and_stores(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<Option<AArch64Inst>>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("0x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_compare_and_swap_pair,
         )
         .bind(
-            "0x00_1_1_0_00_x_000000_xxxx_xx_xxxxxxxxxx",
+            to_le("0x00_1_1_0_00_x_000000_xxxx_xx_xxxxxxxxxx"),
             parse_adv_simd_ld_st_multi_structures,
         )
         .bind(
-            "0x00_1_1_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("0x00_1_1_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_adv_simd_ld_st_multi_structures_post_indexed,
         )
         .bind(
-            "0x00_1_1_0_10_x_x00000_xxxx_xx_xxxxxxxxxx",
+            to_le("0x00_1_1_0_10_x_x00000_xxxx_xx_xxxxxxxxxx"),
             parse_adv_simd_ld_st_single_structure,
         )
         .bind(
-            "0x00_1_1_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("0x00_1_1_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx"),
             |_raw_instr: &[u8]| {
                 todo!("Advanced SIMD Load/Store single structure(post-indexed)");
             },
         )
         .bind(
-            "1101_1_0_0_1x_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("1101_1_0_0_1x_x_1xxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_memory_tags,
         )
         .bind(
-            "1x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("1x00_1_0_0_00_x_1xxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_exclusive_pair,
         )
         .bind(
-            "xx00_1_0_0_00_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx00_1_0_0_00_x_0xxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_exclusive_register,
         )
         .bind(
-            "xx00_1_0_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx00_1_0_0_01_x_0xxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_ordered,
         )
         .bind(
-            "xx00_1_0_0_01_x_1xxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx00_1_0_0_01_x_1xxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_compare_and_swap,
         )
         .bind(
-            "xx01_1_0_0_1x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
+            to_le("xx01_1_0_0_1x_x_0xxxxx_xxxx_00_xxxxxxxxxx"),
             parse_ldapr_stlr_unscaled_imm,
         )
         .bind(
-            "xx01_1_x_0_0x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx01_1_x_0_0x_x_xxxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_register_literal,
         )
         .bind(
-            "xx01_1_x_0_1x_x_0xxxxx_xxxx_01_xxxxxxxxxx",
+            to_le("xx01_1_x_0_1x_x_0xxxxx_xxxx_01_xxxxxxxxxx"),
             |_raw_instr: &[u8]| {
                 todo!("Memory Copy and Memory Set");
             },
         )
         .bind(
-            "xx10_1_x_0_00_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx10_1_x_0_00_x_xxxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_ld_st_no_alloc_pair_offset,
         )
         .bind(
-            "xx10_1_x_0_01_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx10_1_x_0_01_x_xxxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_reg_pair_post_indexed,
         )
         .bind(
-            "xx10_1_x_0_10_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx10_1_x_0_10_x_xxxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_reg_pair_offset,
         )
         .bind(
-            "xx10_1_x_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx10_1_x_0_11_x_xxxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_reg_pair_pre_indexed,
         )
         .bind(
-            "xx11_1_x_0_0x_x_0xxxxx_xxxx_00_xxxxxxxxxx",
+            to_le("xx11_1_x_0_0x_x_0xxxxx_xxxx_00_xxxxxxxxxx"),
             parse_load_store_reg_unscaled_imm,
         )
         .bind(
-            "xx11_1_x_0_0x_x_0xxxxx_xxxx_01_xxxxxxxxxx",
+            to_le("xx11_1_x_0_0x_x_0xxxxx_xxxx_01_xxxxxxxxxx"),
             parse_load_store_reg_imm_post_indexed,
         )
         .bind(
-            "xx11_1_x_0_0x_x_0xxxxx_xxxx_10_xxxxxxxxxx",
+            to_le("xx11_1_x_0_0x_x_0xxxxx_xxxx_10_xxxxxxxxxx"),
             parse_load_store_reg_unprivileged,
         )
         .bind(
-            "xx11_1_x_0_0x_x_0xxxxx_xxxx_11_xxxxxxxxxx",
+            to_le("xx11_1_x_0_0x_x_0xxxxx_xxxx_11_xxxxxxxxxx"),
             parse_load_store_reg_imm_pre_indexed,
         )
         .bind(
-            "xx11_1_x_0_0x_x_1xxxxx_xxxx_00_xxxxxxxxxx",
+            to_le("xx11_1_x_0_0x_x_1xxxxx_xxxx_00_xxxxxxxxxx"),
             parse_atomic_memory_operations,
         )
         .bind(
-            "xx11_1_x_0_0x_x_1xxxxx_xxxx_10_xxxxxxxxxx",
+            to_le("xx11_1_x_0_0x_x_1xxxxx_xxxx_10_xxxxxxxxxx"),
             parse_load_store_reg_reg_offset,
         )
         .bind(
-            "xx11_1_x_0_0x_x_1xxxxx_xxxx_x1_xxxxxxxxxx",
+            to_le("xx11_1_x_0_0x_x_1xxxxx_xxxx_x1_xxxxxxxxxx"),
             |_raw_instr: &[u8]| {
                 todo!("Load/Store register (pac)"); // Need to do FEAT_PAuth feature instructions
             },
         )
         .bind(
-            "xx11_1_x_0_1x_x_xxxxxx_xxxx_xx_xxxxxxxxxx",
+            to_le("xx11_1_x_0_1x_x_xxxxxx_xxxx_xx_xxxxxxxxxx"),
             parse_load_store_reg_unsigned_imm,
         );
 
@@ -557,37 +702,49 @@ fn parse_aarch64_branches_exception_gen_and_sys_instr(raw_instr: &[u8]) -> Optio
         //--------------------------------------------
         //      |op1|101|      op2     |       | op3 |
         m.bind(
-            "010_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            to_le("010_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx"),
             parse_cond_branch_imm,
         )
-        .bind("110_101_00xxxxxxxxxxxx_xxxxxxx_xxxxx", parse_exception_gen)
         .bind(
-            "110_101_01000000110001_xxxxxxx_xxxxx",
+            to_le("110_101_00xxxxxxxxxxxx_xxxxxxx_xxxxx"),
+            parse_exception_gen,
+        )
+        .bind(
+            to_le("110_101_01000000110001_xxxxxxx_xxxxx"),
             parse_sys_instr_with_reg_arg,
         )
-        .bind("110_101_01000000110010_xxxxxxx_11111", parse_hints)
-        .bind("110_101_01000000110011_xxxxxxx_xxxxx", parse_barriers)
-        .bind("110_101_0100000xxx0100_xxxxxxx_xxxxx", parse_pstate)
+        .bind(to_le("110_101_01000000110010_xxxxxxx_11111"), parse_hints)
         .bind(
-            "110_101_0100100xxxxxxx_xxxxxxx_xxxxx",
+            to_le("110_101_01000000110011_xxxxxxx_xxxxx"),
+            parse_barriers,
+        )
+        .bind(to_le("110_101_0100000xxx0100_xxxxxxx_xxxxx"), parse_pstate)
+        .bind(
+            to_le("110_101_0100100xxxxxxx_xxxxxxx_xxxxx"),
             parse_sys_with_result,
         )
-        .bind("110_101_0100x01xxxxxxx_xxxxxxx_xxxxx", parse_sys_instr)
-        .bind("110_101_0100x1xxxxxxxx_xxxxxxx_xxxxx", parse_sys_reg_mov)
         .bind(
-            "110_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            to_le("110_101_0100x01xxxxxxx_xxxxxxx_xxxxx"),
+            parse_sys_instr,
+        )
+        .bind(
+            to_le("110_101_0100x1xxxxxxxx_xxxxxxx_xxxxx"),
+            parse_sys_reg_mov,
+        )
+        .bind(
+            to_le("110_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx"),
             parse_uncond_branch_reg,
         )
         .bind(
-            "x00_101_xxxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            to_le("x00_101_xxxxxxxxxxxxxx_xxxxxxx_xxxxx"),
             parse_uncond_branch_imm,
         )
         .bind(
-            "x01_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            to_le("x01_101_0xxxxxxxxxxxxx_xxxxxxx_xxxxx"),
             parse_cmp_and_branch_imm,
         )
         .bind(
-            "x01_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx",
+            to_le("x01_101_1xxxxxxxxxxxxx_xxxxxxx_xxxxx"),
             parse_test_and_branch_imm,
         );
 
@@ -601,7 +758,7 @@ fn parse_add_sub_shifted_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xxx_01011_xx_0_xxxxxxxxxxxxxxxxxxxxx",
+            to_le("xxx_01011_xx_0_xxxxxxxxxxxxxxxxxxxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(shift): Extract<u8, 22, 24>,
@@ -642,7 +799,7 @@ fn parse_add_sub_immediate(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_100010_x_xxxxxxxxxxxx_xxxxx_xxxxx",
+            to_le("x_x_x_100010_x_xxxxxxxxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(sh): Extract<u8, 22, 23>,
@@ -683,7 +840,7 @@ fn parse_fp_data_processing_3src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11111_xx_x_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            to_le("x_0_x_11111_xx_x_xxxxx_x_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(m): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -729,7 +886,7 @@ fn parse_load_store_reg_unsigned_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_111_x_01_xx_xxxxxxxxxxxx_xxxxx_xxxxx",
+            to_le("xx_111_x_01_xx_xxxxxxxxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -793,7 +950,7 @@ fn parse_move_wide_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_xx_100101_xx_xxxxxxxxxxxxxxxx_xxxxx",
+            to_le("x_xx_100101_xx_xxxxxxxxxxxxxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf_opc): Extract<u8, 29, 32>,
              Extract(hw): Extract<u8, 21, 23>,
@@ -827,7 +984,7 @@ fn parse_uncond_branch_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "1101011_xxxx_xxxxx_xxxxxx_xxxxx_xxxxx",
+            to_le("1101011_xxxx_xxxxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 21, 25>,
              Extract(op2): Extract<u8, 16, 21>,
@@ -909,7 +1066,7 @@ fn parse_uncond_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_00101_xxxxxxxxxxxxxxxxxxxxxxxxxx",
+            to_le("x_00101_xxxxxxxxxxxxxxxxxxxxxxxxxx"),
             |raw_instr: &[u8],
              Extract(op): Extract<u8, 31, 32>,
              Extract(imm26): Extract<u32, 0, 26>| {
@@ -933,7 +1090,7 @@ fn parse_cond_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0101010_x_xxxxxxxxxxxxxxxxxxx_x_xxxx",
+            to_le("0101010_x_xxxxxxxxxxxxxxxxxxx_x_xxxx"),
             |raw_instr: &[u8],
              Extract(o1): Extract<u8, 24, 25>,
              Extract(imm19): Extract<u32, 5, 24>,
@@ -959,7 +1116,7 @@ fn parse_cond_sel(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_11010100_xxxxx_xxxx_xx_xxxxx_xxxxx",
+            to_le("x_x_x_11010100_xxxxx_xxxx_xx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(rm): Extract<u8, 16, 21>,
@@ -998,7 +1155,7 @@ fn parse_test_and_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_011011_x_xxxxx_xxxxxxxxxxxxxx_xxxxx",
+            to_le("x_011011_x_xxxxx_xxxxxxxxxxxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(b5): Extract<u8, 31, 32>,
              Extract(op): Extract<u8, 24, 25>,
@@ -1030,7 +1187,7 @@ fn parse_logical_shifted_register(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_xx_01010_xx_x_xxxxx_xxxxxx_xxxxx_xxxxx",
+            to_le("x_xx_01010_xx_x_xxxxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(opc): Extract<u8, 29, 31>,
@@ -1081,7 +1238,7 @@ fn parse_hints(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "11010101000000110010_xxxx_xxx_11111",
+            to_le("11010101000000110010_xxxx_xxx_11111"),
             |raw_instr: &[u8],
              Extract(crm): Extract<u8, 8, 12>,
              Extract(op2): Extract<u8, 5, 8>| match (crm, op2) {
@@ -1120,7 +1277,7 @@ fn parse_pc_rel_addressing(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_xx_10000_xxxxxxxxxxxxxxxxxxx_xxxxx",
+            to_le("x_xx_10000_xxxxxxxxxxxxxxxxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(op): Extract<u8, 31, 32>,
              Extract(immlo): Extract<u8, 29, 31>,
@@ -1150,7 +1307,7 @@ fn parse_exception_gen(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "11010100_xxx_xxxxxxxxxxxxxxxx_xxx_xx",
+            to_le("11010100_xxx_xxxxxxxxxxxxxxxx_xxx_xx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 21, 24>,
              Extract(imm16): Extract<u16, 5, 21>,
@@ -1188,7 +1345,7 @@ fn parse_load_store_reg_reg_offset(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_111_x_00_xx_1_xxxxx_xxx_x_10_xxxxx_xxxxx",
+            to_le("xx_111_x_00_xx_1_xxxxx_xxx_x_10_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -1248,7 +1405,7 @@ fn parse_add_sub_ext_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_01011_xx_1_xxxxx_xxx_xxx_xxxxx_xxxxx",
+            to_le("x_x_x_01011_xx_1_xxxxx_xxx_xxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(opt): Extract<u8, 22, 24>,
@@ -1295,7 +1452,7 @@ fn parse_bitfield(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_xx_100110_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
+            to_le("x_xx_100110_x_xxxxxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(opc): Extract<u8, 29, 31>,
@@ -1335,7 +1492,7 @@ fn parse_logical_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_xx_100100_x_xxxxxx_xxxxxx_xxxxx_xxxxx",
+            to_le("x_xx_100100_x_xxxxxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(opc): Extract<u8, 29, 31>,
@@ -1380,7 +1537,7 @@ fn parse_load_store_reg_pair_offset(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_101_x_010_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+            to_le("xx_101_x_010_x_xxxxxxx_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -1429,7 +1586,7 @@ fn parse_add_sub_imm_with_tags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_100011_x_xxxxxx_xx_xxxx_xxxxx_xxxxx",
+            to_le("x_x_x_100011_x_xxxxxx_xx_xxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(o2): Extract<u8, 22, 23>,
@@ -1471,7 +1628,7 @@ fn parse_extract(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_xx_100111_x_x_xxxxx_xxxxxx_xxxxx_xxxxx",
+            to_le("x_xx_100111_x_x_xxxxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf_op21): Extract<u8, 29, 32>,
              Extract(n): Extract<u8, 22, 23>,
@@ -1507,7 +1664,7 @@ fn parse_data_proc_1src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_1_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
+            to_le("x_1_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -1547,7 +1704,7 @@ fn parse_cmp_and_branch_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_011010_x_xxxxxxxxxxxxxxxxxxx_xxxxx",
+            to_le("x_011010_x_xxxxxxxxxxxxxxxxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(op): Extract<u8, 24, 25>,
@@ -1578,7 +1735,7 @@ fn parse_data_proccessing_3src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_xx_11011_xxx_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            to_le("x_xx_11011_xxx_xxxxx_x_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(op54): Extract<u8, 29, 31>,
@@ -1621,7 +1778,7 @@ fn parse_load_store_reg_unscaled_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_111_x_00_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
+            to_le("xx_111_x_00_xx_0_xxxxxxxxx_00_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -1679,7 +1836,7 @@ fn parse_sys_reg_mov(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "1101010100_x_1_x_xxx_xxxx_xxxx_xxx_xxxxx",
+            to_le("1101010100_x_1_x_xxx_xxxx_xxxx_xxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(l): Extract<u8, 21, 22>,
              Extract(o0): Extract<u8, 19, 20>,
@@ -1715,7 +1872,7 @@ fn parse_load_store_reg_pair_pre_indexed(raw_instr: &[u8]) -> Option<AArch64Inst
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_101_x_011_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+            to_le("xx_101_x_011_x_xxxxxxx_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -1764,7 +1921,7 @@ fn parse_load_store_reg_pair_post_indexed(raw_instr: &[u8]) -> Option<AArch64Ins
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_101_x_001_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+            to_le("xx_101_x_001_x_xxxxxxx_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -1813,7 +1970,7 @@ fn parse_data_proc_2src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx",
+            to_le("x_0_x_11010110_xxxxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -1857,7 +2014,7 @@ fn parse_load_store_reg_imm_pre_indexed(raw_instr: &[u8]) -> Option<AArch64Inst>
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_111_x_00_xx_0_xxxxxxxxx_11_xxxxx_xxxxx",
+            to_le("xx_111_x_00_xx_0_xxxxxxxxx_11_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -1919,7 +2076,7 @@ fn parse_load_store_reg_imm_post_indexed(raw_instr: &[u8]) -> Option<AArch64Inst
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_111_x_00_xx_0_xxxxxxxxx_01_xxxxx_xxxxx",
+            to_le("xx_111_x_00_xx_0_xxxxxxxxx_01_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -1981,7 +2138,7 @@ fn parse_barriers(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "11010101000000110011_xxxx_xxx_xxxxx",
+            to_le("11010101000000110011_xxxx_xxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(crm): Extract<u8, 8, 12>,
              Extract(op2): Extract<u8, 5, 8>,
@@ -2009,7 +2166,7 @@ fn parse_advanced_simd_copy(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_x_01110000_xxxxx_0_xxxx_1_xxxxx_xxxxx",
+            to_le("0_x_x_01110000_xxxxx_0_xxxx_1_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(op): Extract<u8, 29, 30>,
@@ -2049,7 +2206,7 @@ fn parse_cond_cmp_reg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_11010010_xxxxx_xxxx_0_x_xxxxx_x_xxxx",
+            to_le("x_x_x_11010010_xxxxx_xxxx_0_x_xxxxx_x_xxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(rm): Extract<u8, 16, 21>,
@@ -2086,7 +2243,7 @@ fn parse_adv_simd_ld_st_multi_structures(raw_instr: &[u8]) -> Option<AArch64Inst
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_0011000_x_000000_xxxx_xx_xxxxx_xxxxx",
+            to_le("0_x_0011000_x_000000_xxxx_xx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(l): Extract<u8, 22, 23>,
@@ -2136,7 +2293,7 @@ fn parse_advanced_simd_extract(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_101110_xx_0_xxxxx_0_xxxx_0_xxxxx_xxxxx",
+            to_le("0_x_101110_xx_0_xxxxx_0_xxxx_0_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(op2): Extract<u8, 22, 24>,
@@ -2169,7 +2326,7 @@ fn parse_adv_simd_ld_st_multi_structures_post_indexed(raw_instr: &[u8]) -> Optio
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_0011001_x_0_xxxxx_xxxx_xx_xxxxx_xxxxx",
+            to_le("0_x_0011001_x_0_xxxxx_xxxx_xx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(l): Extract<u8, 22, 23>,
@@ -2264,7 +2421,7 @@ fn parse_conv_between_float_and_int(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11110_xx_1_xx_xxx_000000_xxxxx_xxxxx",
+            to_le("x_0_x_11110_xx_1_xx_xxx_000000_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -2460,7 +2617,7 @@ fn parse_adv_simd_modified_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_x_01111_00000_x_x_x_xxxx_x_1_x_x_x_x_x_xxxxx",
+            to_le("0_x_x_01111_00000_x_x_x_xxxx_x_1_x_x_x_x_x_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(op): Extract<u8, 29, 30>,
@@ -2529,7 +2686,7 @@ fn parse_cond_cmp_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_11010010_xxxxx_xxxx_1_x_xxxxx_x_xxxx",
+            to_le("x_x_x_11010010_xxxxx_xxxx_1_x_xxxxx_x_xxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(imm5): Extract<u8, 16, 21>,
@@ -2566,7 +2723,7 @@ fn parse_load_store_exclusive_register(raw_instr: &[u8]) -> Option<AArch64Inst> 
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_0010000_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            to_le("xx_0010000_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(l): Extract<u8, 22, 23>,
@@ -2619,7 +2776,7 @@ fn parse_load_store_ordered(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_0010001_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            to_le("xx_0010001_x_0_xxxxx_x_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(l): Extract<u8, 22, 23>,
@@ -2663,7 +2820,7 @@ fn parse_advanced_simd_three_same(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_x_01110_xx_1_xxxxx_xxxxx_1_xxxxx_xxxxx",
+            to_le("0_x_x_01110_xx_1_xxxxx_xxxxx_1_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(u): Extract<u8, 29, 30>,
@@ -2784,7 +2941,7 @@ fn parse_adv_simd_shift_by_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_x_011110_xxxx_xxx_xxxxx_1_xxxxx_xxxxx",
+            to_le("0_x_x_011110_xxxx_xxx_xxxxx_1_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(u): Extract<u8, 29, 30>,
@@ -2848,7 +3005,7 @@ fn parse_float_data_proc_1src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11110_xx_1_xxxxxx_10000_xxxxx_xxxxx",
+            to_le("x_0_x_11110_xx_1_xxxxxx_10000_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(m): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -2909,7 +3066,7 @@ fn parse_adv_simd_scalar_pairwise(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "01_x_11110_xx_11000_xxxxx_10_xxxxx_xxxxx",
+            to_le("01_x_11110_xx_11000_xxxxx_10_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(u): Extract<u8, 29, 30>,
              Extract(size): Extract<u8, 22, 24>,
@@ -2945,7 +3102,7 @@ fn parse_adv_simd_ld_st_single_structure(raw_instr: &[u8]) -> Option<AArch64Inst
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_0011010_x_x_00000_xxx_x_xx_xxxxx_xxxxx",
+            to_le("0_x_0011010_x_x_00000_xxx_x_xx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(l): Extract<u8, 22, 23>,
@@ -3031,7 +3188,7 @@ fn parse_adv_simd_2reg_miscellaneous(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_x_01110_xx_10000_xxxxx_10_xxxxx_xxxxx",
+            to_le("0_x_x_01110_xx_10000_xxxxx_10_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(u): Extract<u8, 29, 30>,
@@ -3131,7 +3288,7 @@ fn parse_adv_simd_across_lanes(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_x_01110_xx_11000_xxxxx_10_xxxxx_xxxxx",
+            to_le("0_x_x_01110_xx_11000_xxxxx_10_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(u): Extract<u8, 29, 30>,
@@ -3177,7 +3334,7 @@ fn parse_compare_and_swap(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_0010001_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            to_le("xx_0010001_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(l): Extract<u8, 22, 23>,
@@ -3231,7 +3388,7 @@ fn parse_atomic_memory_operations(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_111_x_00_x_x_1_xxxxx_x_xxx_00_xxxxx_xxxxx",
+            to_le("xx_111_x_00_x_x_1_xxxxx_x_xxx_00_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -3438,7 +3595,7 @@ fn parse_add_sub_with_carry(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_11010000_xxxxx_000000_xxxxx_xxxxx",
+            to_le("x_x_x_11010000_xxxxx_000000_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(rm): Extract<u8, 16, 21>,
@@ -3476,7 +3633,7 @@ fn parse_floating_point_compare(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11110_xx_1_xxxxx_xx_1000_xxxxx_xxxxx",
+            to_le("x_0_x_11110_xx_1_xxxxx_xx_1000_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(m): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -3516,7 +3673,7 @@ fn parse_advanced_simd_permute(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_001110_xx_0_xxxxx_0_xxx_10_xxxxx_xxxxx",
+            to_le("0_x_001110_xx_0_xxxxx_0_xxx_10_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 30, 31>,
              Extract(size): Extract<u8, 22, 24>,
@@ -3556,7 +3713,7 @@ fn parse_float_data_proc_2src(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11110_xx_1_xxxxx_xxxx_10_xxxxx_xxxxx",
+            to_le("x_0_x_11110_xx_1_xxxxx_xxxx_10_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(m): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -3607,7 +3764,7 @@ fn parse_floating_point_immediate(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11110_xx_1_xxxxxxxx_100_xxxxx_xxxxx",
+            to_le("x_0_x_11110_xx_1_xxxxxxxx_100_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(m): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -3639,7 +3796,7 @@ fn parse_conv_between_float_and_fixed_point(raw_instr: &[u8]) -> Option<AArch64I
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11110_xx_0_xx_xxx_xxxxxx_xxxxx_xxxxx",
+            to_le("x_0_x_11110_xx_0_xx_xxx_xxxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sf): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -3723,7 +3880,7 @@ fn parse_floating_point_conditional_select(raw_instr: &[u8]) -> Option<AArch64In
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_0_x_11110_xx_1_xxxxx_xxxx_11_xxxxx_xxxxx",
+            to_le("x_0_x_11110_xx_1_xxxxx_xxxx_11_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(m): Extract<u8, 31, 32>,
              Extract(s): Extract<u8, 29, 30>,
@@ -3758,7 +3915,7 @@ fn parse_adv_simd_vec_x_indexed_elem(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_x_01111_xx_x_x_xxxx_xxxx_x_0_xxxxx_xxxxx",
+            to_le("0_x_x_01111_xx_x_x_xxxx_xxxx_x_0_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(q): Extract<u8, 31, 32>,
              Extract(u): Extract<u8, 29, 30>,
@@ -3819,7 +3976,7 @@ fn parse_adv_simd_scalar_x_indexed_elem(raw_instr: &[u8]) -> Option<AArch64Inst>
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "01_x_11111_xx_x_x_xxxx_xxxx_x_0_xxxxx_xxxxx",
+            to_le("01_x_11111_xx_x_x_xxxx_xxxx_x_0_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(u): Extract<u8, 29, 30>,
              Extract(size): Extract<u8, 22, 24>,
@@ -3869,7 +4026,7 @@ fn parse_sys_instr_with_reg_arg(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "11010101000000110001_xxxx_xxx_xxxxx",
+            to_le("11010101000000110001_xxxx_xxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(crm): Extract<u8, 8, 12>,
              Extract(op2): Extract<u8, 5, 8>,
@@ -3897,7 +4054,7 @@ fn parse_pstate(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "1101010100000_xxx_0100_xxxx_xxx_xxxxx",
+            to_le("1101010100000_xxx_0100_xxxx_xxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(op1): Extract<u8, 16, 19>,
              Extract(crm): Extract<u8, 8, 12>,
@@ -3926,7 +4083,7 @@ fn parse_sys_with_result(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "1101010100000_xxx_0100_xxxx_xxx_xxxxx",
+            to_le("1101010100000_xxx_0100_xxxx_xxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(op1): Extract<u8, 16, 19>,
              Extract(crn): Extract<u8, 12, 16>,
@@ -3956,7 +4113,7 @@ fn parse_sys_instr(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "1101010100000_xxx_0100_xxxx_xxx_xxxxx",
+            to_le("1101010100000_xxx_0100_xxxx_xxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(l): Extract<u8, 21, 22>,
              Extract(op1): Extract<u8, 16, 19>,
@@ -3991,7 +4148,7 @@ fn parse_rot_right_into_flags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_11010000_xxxxxx_00001_xxxxx_x_xxxx",
+            to_le("x_x_x_11010000_xxxxxx_00001_xxxxx_x_xxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(imm6): Extract<u8, 15, 21>,
@@ -4022,7 +4179,7 @@ fn parse_eval_into_flags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "x_x_x_11010000_xxxxxx_x_0010_xxxxx_x_xxxx",
+            to_le("x_x_x_11010000_xxxxxx_x_0010_xxxxx_x_xxxx"),
             |raw_instr: &[u8],
              Extract(sf_op_s): Extract<u8, 29, 32>,
              Extract(opcode2): Extract<u8, 15, 21>,
@@ -4053,7 +4210,7 @@ fn parse_load_register_literal(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_011_x_00_xxxxxxxxxxxxxxxxxxx_xxxxx",
+            to_le("xx_011_x_00_xxxxxxxxxxxxxxxxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -4088,7 +4245,7 @@ fn parse_compare_and_swap_pair(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "0_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            to_le("0_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sz): Extract<u8, 30, 31>,
              Extract(l): Extract<u8, 22, 23>,
@@ -4129,7 +4286,7 @@ fn parse_load_store_memory_tags(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "11011001_xx_1_xxxxxxxxx_xx_xxxxx_xxxxx",
+            to_le("11011001_xx_1_xxxxxxxxx_xx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 22, 24>,
              Extract(imm9): Extract<u16, 12, 221>,
@@ -4174,7 +4331,7 @@ fn parse_load_store_exclusive_pair(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "1_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx",
+            to_le("1_x_0010000_x_1_xxxxx_x_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(sz): Extract<u8, 30, 31>,
              Extract(l): Extract<u8, 22, 23>,
@@ -4219,7 +4376,7 @@ fn parse_ldapr_stlr_unscaled_imm(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_011001_xx_0_xxxxxxxxx_00_xxxxx_xxxxx",
+            to_le("xx_011001_xx_0_xxxxxxxxx_00_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(opc): Extract<u8, 22, 24>,
@@ -4268,7 +4425,7 @@ fn parse_ld_st_no_alloc_pair_offset(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_101_x_000_x_xxxxxxx_xxxxx_xxxxx_xxxxx",
+            to_le("xx_101_x_000_x_xxxxxxx_xxxxx_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(opc): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,
@@ -4315,7 +4472,7 @@ fn parse_load_store_reg_unprivileged(raw_instr: &[u8]) -> Option<AArch64Inst> {
     pub static MATCHER: Lazy<BitPatternMatcher<AArch64Inst>> = Lazy::new(|| {
         let mut m = BitPatternMatcher::new();
         m.bind(
-            "xx_111_x_00_xx_0_xxxxxxxxx_10_xxxxx_xxxxx",
+            to_le("xx_111_x_00_xx_0_xxxxxxxxx_10_xxxxx_xxxxx"),
             |raw_instr: &[u8],
              Extract(size): Extract<u8, 30, 32>,
              Extract(v): Extract<u8, 26, 27>,

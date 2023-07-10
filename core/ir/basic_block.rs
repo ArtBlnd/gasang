@@ -48,10 +48,11 @@ impl BasicBlock {
 pub enum BasicBlockTerminator {
     #[default]
     None,
-    /// Branch to the next basic block
     Next,
-    /// Branch to the basic block if the condition is true
-    BranchCond { cond: IrValue, target: IrValue },
-    /// Branch to another basic block if the condition is true
+    BranchCond {
+        cond: IrValue,
+        target_true: IrValue,
+        target_false: IrValue,
+    },
     Branch(IrValue),
 }

@@ -74,13 +74,14 @@ impl<O> BitPatternMatcher<O> {
         }
     }
 
-    pub fn bind<H, A>(&mut self, pattern: &str, handler: H) -> &mut Self
+    pub fn bind<H, A>(&mut self, pattern: impl AsRef<str>, handler: H) -> &mut Self
     where
         H: Send + Sync + 'static,
         A: Send + Sync + 'static,
         H: Handler<A, Output = O>,
     {
-        self.matches.push(Box::new(Match::new(pattern, handler)));
+        self.matches
+            .push(Box::new(Match::new(pattern.as_ref(), handler)));
         self
     }
 
@@ -195,7 +196,7 @@ where
 {
     fn extract(from: &[u8]) -> Self {
         let mut result = T::default();
-        for (i, v) in (L..=R).enumerate() {
+        for (i, v) in (L..R).enumerate() {
             result.set_bit(i, from[v / 8] & (1 << (v % 8)) != 0);
         }
 
