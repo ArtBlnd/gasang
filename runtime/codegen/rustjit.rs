@@ -198,12 +198,19 @@ impl Codegen for RustjitCodegen {
 
                     gen_load(dst, src)
                 }
+                &IrInst::Store { dst, src } => {
+                    let src = map_variable(src, idx);
+                    let dst = map_variable(dst, idx);
+
+                    gen_store(dst, src)
+                }
                 &IrInst::ZextCast { dst, src } => {
                     let src = map_variable(src, idx);
                     let dst = map_variable(dst, idx);
 
                     gen_zext_cast(dst, src)
                 }
+                &IrInst::Fence(_) => gen_fence(),
                 x => todo!("todo {:?}", x),
             };
 
@@ -742,6 +749,36 @@ fn gen_load(
     }
 }
 
+fn gen_store(
+    dst: IrValue,
+    src: IrValue,
+) -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    macro_rules! gen_store_impl {
+        ($src_ty:ty, $dst_ty:ty) => {
+            Box::new(move |ctx: &RustjitContext, mmu: &SoftMmu| unsafe {
+                let src: $src_ty = ctx.get(src);
+                let dst: $dst_ty = ctx.get(dst);
+                let dst = dst as u64;
+
+                let mut buf = src.to_ne_bytes();
+                mmu.write_at(dst, &mut buf);
+
+                None
+            }) as Box<_>
+        };
+    }
+
+    match (src.ty(), dst.ty()) {
+        (IrType::B8, IrType::B64) => gen_store_impl!(u8, u64),
+        (IrType::B16, IrType::B64) => gen_store_impl!(u16, u64),
+        (IrType::B32, IrType::B64) => gen_store_impl!(u32, u64),
+        (IrType::B64, IrType::B64) => gen_store_impl!(u64, u64),
+        (IrType::B128, IrType::B64) => gen_store_impl!(u128, u64),
+
+        _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
+    }
+}
+
 fn gen_zext_cast(
     dst: IrValue,
     src: IrValue,
@@ -775,4 +812,8 @@ fn gen_zext_cast(
 
         _ => unimplemented!("Unsupported type: {:?}", dst.ty()),
     }
+}
+
+fn gen_fence() -> Box<dyn Fn(&RustjitContext, &SoftMmu) -> Option<Interrupt>> {
+    Box::new(move |_: &RustjitContext, _: &SoftMmu| None)
 }

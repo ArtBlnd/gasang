@@ -516,8 +516,32 @@ fn compile_add_ext_reg(bb: &mut BasicBlock, operand: &AddSubtractExtReg, ty: IrT
 }
 
 fn compile_sub_imm(bb: &mut BasicBlock, operand: &ShImm12RnRd, ty: IrType) {
-    if operand.sh == 0b0 {}
-    todo!()
+    let imm = if operand.sh == 0b0 {
+        operand.imm12 as u32
+    } else {
+        (operand.imm12 as u32) << 12
+    };
+
+    let rn = IrValue::Register(ty, operand.rn.raw());
+
+    let result = bb.new_variable(ty);
+    bb.push_inst(IrInst::Sub {
+        dst: result,
+        lhs: rn,
+        rhs: IrValue::Constant(IrConstant::new(ty, imm)),
+    });
+
+    if operand.rd == AArch64Register::Sp {
+        bb.push_inst(IrInst::ZextCast {
+            dst: rn,
+            src: result,
+        })
+    } else {
+        bb.push_inst(IrInst::Assign {
+            dst: rn,
+            src: result,
+        })
+    }
 }
 
 fn compile_sub_shifted_reg(bb: &mut BasicBlock, operand: &ShiftRmImm6RnRd, ty: IrType) {
